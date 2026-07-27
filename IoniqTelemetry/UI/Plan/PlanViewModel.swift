@@ -65,6 +65,21 @@ final class PlanViewModel {
     private(set) var errorMessage: String?
     private(set) var routingNotice: String?
 
+    // MARK: - Natural-language planning
+
+    var aiInput = ""
+    private(set) var aiBusy = false
+    /// What the assistant understood, echoed back so the driver can see whether it
+    /// got the trip right before trusting the plan.
+    private(set) var aiInterpretation: String?
+    private(set) var aiError: String?
+    private(set) var isPro = false
+
+    /// The card only appears behind the same gate as the rest of the AI features.
+    var canUseAi: Bool {
+        isPro && !(preferences.geminiApiKey ?? "").isEmpty && preferences.aiCoachingEnabled
+    }
+
     private let services: AppServices
     private let solver = TripSolver()
     private let locationProvider = LocationProvider()
@@ -98,7 +113,13 @@ final class PlanViewModel {
             .sink { [weak self] in self?.preferences = $0 }
             .store(in: &cancellables)
 
+        services.entitlement.isPro
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.isPro = $0 }
+            .store(in: &cancellables)
+
         preferences = services.userPreferences
+        isPro = services.isPro
         arrivalReserve = preferences.targetArrivalSocPercent
         reloadSaved()
     }
@@ -386,6 +407,154 @@ final class PlanViewModel {
         }
     }
 
+    // MARK: - Natural-language planning
+
+    /// Parses a free-form trip description, fills the route builder from it, and
+    /// plans. Ported from Android `planFromNaturalLanguage`.
+    func planFromNaturalLanguage() async {
+        let text = aiInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !aiBusy else { return }
+
+        guard let apiKey = preferences.geminiApiKey, !apiKey.isEmpty else {
+            aiError = "Add your API key in Settings to plan by conversation."
+            return
+        }
+
+        aiBusy = true
+        aiInterpretation = nil
+        aiError = nil
+        defer { aiBusy = false }
+
+        let parsed: ParsedTripRequest
+        switch await services.gemini.parseTripRequest(request: text, apiKey: apiKey) {
+        case .success(let result):
+            parsed = result
+        case .failure:
+            aiError = "Couldn't understand that trip — try rephrasing."
+            return
+        }
+
+        // "Where can I charge near me" is a different question from "plan a trip",
+        // and answering it with a route to nowhere would be useless.
+        if isChargerQuery(text), isVagueDestination(parsed.destination) {
+            await answerChargerQuery()
+            return
+        }
+
+        // `??` can't short-circuit an async call, so resolve it explicitly.
+        let fallback: PlaceResult?
+        if let selected = origin.selected {
+            fallback = selected
+        } else {
+            fallback = (await locationProvider.currentLocation())
+                .map { PlaceResult(name: "Current Location", location: $0) }
+        }
+
+        let originName = parsed.origin?.trimmingCharacters(in: .whitespaces)
+        let originPlace: PlaceResult?
+        if let originName, !originName.isEmpty {
+            originPlace = await geocodeFirst(originName, near: fallback?.location)
+        } else {
+            originPlace = fallback
+        }
+
+        let searchCenter = originPlace?.location ?? fallback?.location
+
+        guard let destinationName = parsed.destination?.trimmingCharacters(in: .whitespaces),
+              !destinationName.isEmpty,
+              let destinationPlace = await geocodeFirst(destinationName, near: searchCenter) else {
+            aiError = "I couldn't tell where you want to go — name a destination."
+            return
+        }
+
+        guard let originPlace else {
+            aiError = (originName?.isEmpty ?? true)
+                ? "Couldn't get your current location. Name a starting point, or enable location and try again."
+                : "Couldn't find \"\(originName ?? "")\" on the map."
+            return
+        }
+
+        // Resolve stopovers, remembering which ones failed so the driver is told
+        // rather than silently getting a shorter trip than they asked for.
+        var resolvedWaypoints: [PlaceResult] = []
+        var unresolved: [String] = []
+        for name in parsed.waypoints {
+            if let place = await geocodeFirst(name, near: searchCenter) {
+                resolvedWaypoints.append(place)
+            } else {
+                unresolved.append(name)
+            }
+        }
+
+        origin = Endpoint(query: originPlace.name, selected: originPlace)
+        destination = Endpoint(query: destinationPlace.name, selected: destinationPlace)
+        waypoints = resolvedWaypoints.map { Endpoint(query: $0.name, selected: $0) }
+        if let arrival = parsed.arrivalSocPercent { arrivalReserve = arrival }
+
+        aiInterpretation = Self.interpretation(
+            origin: originPlace,
+            destination: destinationPlace,
+            waypoints: resolvedWaypoints,
+            arrivalSoc: parsed.arrivalSocPercent,
+            unresolved: unresolved
+        )
+
+        await plan()
+    }
+
+    func dismissAiError() { aiError = nil }
+
+    private func isChargerQuery(_ text: String) -> Bool {
+        ["charger", "charging", "near me", "nearby"].contains { text.localizedCaseInsensitiveContains($0) }
+    }
+
+    private func isVagueDestination(_ destination: String?) -> Bool {
+        guard let destination, !destination.trimmingCharacters(in: .whitespaces).isEmpty else { return true }
+        return destination.localizedCaseInsensitiveContains("charger")
+            || destination.localizedCaseInsensitiveContains("near")
+    }
+
+    private func answerChargerQuery() async {
+        guard let center = await locationProvider.currentLocation() else {
+            aiError = "Location is required to find nearby chargers."
+            return
+        }
+        let found = (try? await services.chargers.chargersNear(center: center, radiusKm: 10)) ?? []
+        nearbyChargers = found
+        aiInterpretation = found.isEmpty
+            ? "No chargers found within 10 km of you."
+            : "Found \(found.count) charger\(found.count == 1 ? "" : "s") within 10 km — see Nearby Chargers below."
+    }
+
+    private func geocodeFirst(_ query: String, near: LatLon?) async -> PlaceResult? {
+        try? await services.geocoding.search(query, near: near).first
+    }
+
+    /// Echoes the parse back in one line, including anything that failed to resolve.
+    private static func interpretation(
+        origin: PlaceResult,
+        destination: PlaceResult,
+        waypoints: [PlaceResult],
+        arrivalSoc: Float?,
+        unresolved: [String]
+    ) -> String {
+        func shortName(_ place: PlaceResult) -> String {
+            place.name.split(separator: ",").first.map(String.init) ?? place.name
+        }
+
+        var line = "\(shortName(origin)) → \(shortName(destination))"
+        if !waypoints.isEmpty {
+            line += " · via " + waypoints.map(shortName).joined(separator: ", ")
+        }
+        if let arrivalSoc {
+            line += " · arrive ≥ \(Int(arrivalSoc))%"
+        }
+        if !unresolved.isEmpty {
+            line += "\nCouldn't place: " + unresolved.joined(separator: ", ")
+        }
+        return line
+    }
+
     // MARK: - Saved trips and places
 
     func reloadSaved() {
@@ -394,6 +563,13 @@ final class PlanViewModel {
     }
 
     var canSaveTrip: Bool { origin.selected != nil && destination.selected != nil }
+
+    /// Default name for a saved trip, matching Android.
+    var defaultTripName: String {
+        let originName = origin.selected?.name ?? "Origin"
+        let destinationName = destination.selected?.name ?? "Destination"
+        return "\(originName) → \(destinationName)"
+    }
 
     func saveTrip(named name: String) {
         guard let originPlace = origin.selected, let destinationPlace = destination.selected else { return }

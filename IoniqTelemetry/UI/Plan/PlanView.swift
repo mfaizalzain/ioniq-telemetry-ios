@@ -18,6 +18,9 @@ struct PlanView: View {
                             RoutingNoticeBar(message: notice, onDismiss: viewModel.dismissRoutingNotice)
                         }
 
+                        if viewModel.canUseAi {
+                            AiPlanCard(viewModel: viewModel)
+                        }
                         RouteBuilderCard(viewModel: viewModel)
                         FavoritePlaceChips(viewModel: viewModel)
                         BatteryParametersCard(viewModel: viewModel)
@@ -42,7 +45,8 @@ struct PlanView: View {
                 TextField("Name", text: $tripName)
                 Button("Cancel", role: .cancel) { tripName = "" }
                 Button("Save") {
-                    viewModel?.saveTrip(named: tripName.isEmpty ? "Trip" : tripName)
+                    let fallback = viewModel?.defaultTripName ?? "Trip"
+                    viewModel?.saveTrip(named: tripName.isEmpty ? fallback : tripName)
                     tripName = ""
                 }
             }
@@ -81,6 +85,115 @@ private struct RoutingNoticeBar: View {
         .padding(12)
         .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal)
+    }
+}
+
+// MARK: - AI planning
+
+/// Plans from a sentence: "drive from KL to Penang, stop in Ipoh, arrive with 30%".
+///
+/// The parse is echoed back before the plan appears — the driver needs to see what
+/// the assistant understood, because a misread destination produces a confident,
+/// wrong itinerary that looks exactly like a right one.
+private struct AiPlanCard: View {
+    let viewModel: PlanViewModel
+
+    private static let examples = [
+        "KL to Penang, stop in Ipoh",
+        "Drive home arriving with 30%",
+        "Chargers near me"
+    ]
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles").foregroundStyle(Color.appAccent)
+                    Text("Plan by conversation")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                }
+
+                HStack(spacing: 8) {
+                    TextField("Describe your trip…", text: Binding(
+                        get: { viewModel.aiInput },
+                        set: { viewModel.aiInput = $0 }
+                    ), axis: .vertical)
+                    .lineLimit(1...3)
+                    .textFieldStyle(.plain)
+                    .padding(10)
+                    .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
+                    .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
+
+                    Button {
+                        Task { await viewModel.planFromNaturalLanguage() }
+                    } label: {
+                        if viewModel.aiBusy {
+                            ProgressView().controlSize(.small)
+                        } else {
+                            Image(systemName: "arrow.up.circle.fill").font(.title2)
+                        }
+                    }
+                    .tint(Color.appAccent)
+                    .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .accessibilityLabel("Plan this trip")
+                }
+
+                if viewModel.aiInput.isEmpty && viewModel.aiInterpretation == nil {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(Self.examples, id: \.self) { example in
+                                Button {
+                                    viewModel.aiInput = example
+                                } label: {
+                                    Text(example)
+                                        .font(.caption)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 5)
+                                        .background(Color.appSurface, in: Capsule())
+                                }
+                                .tint(.primary)
+                            }
+                        }
+                    }
+                }
+
+                if let interpretation = viewModel.aiInterpretation {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(Color.appGreen)
+                        Text(interpretation)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+
+                if let error = viewModel.aiError {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.circle.fill")
+                            .foregroundStyle(Color.amberWarn)
+                        Text(error).font(.caption)
+                        Spacer()
+                        Button {
+                            viewModel.dismissAiError()
+                        } label: {
+                            Image(systemName: "xmark").font(.caption2)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+            }
+            .padding(14)
+        }
+        .padding(.horizontal)
+        .backgroundStyle(Color.appAccent.opacity(0.08))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.appAccent.opacity(0.3), lineWidth: 1)
+                .padding(.horizontal)
+        }
     }
 }
 

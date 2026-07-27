@@ -96,4 +96,40 @@ extension DashboardViewModel {
             ? String(format: "%.0f°F", celsius * 9 / 5 + 32)
             : String(format: "%.0f°C", celsius)
     }
+
+    // MARK: Distance & efficiency
+
+    /// km → mi when imperial; identity otherwise.
+    func distanceKm(_ km: Float?) -> String {
+        guard let km else { return "—" }
+        return unitSystem == .imperial
+            ? String(format: "%.1f mi", km * 0.621371)
+            : String(format: "%.1f km", km)
+    }
+
+    var distanceUnit: String { unitSystem == .imperial ? "mi" : "km" }
+
+    /// kWh/100km → mi/kWh when imperial.
+    func efficiency(_ kwhPer100km: Float?) -> String {
+        guard let v = kwhPer100km, v > 0 else { return "—" }
+        return unitSystem == .imperial
+            ? String(format: "%.1f mi/kWh", 62.1371 / v)
+            : String(format: "%.1f kWh/100km", v)
+    }
+
+    /// Speed in the active unit system.
+    func speed(_ kph: Float?) -> String {
+        guard let kph else { return "—" }
+        return unitSystem == .imperial
+            ? String(format: "%.0f mph", kph * 0.621371)
+            : String(format: "%.0f km/h", kph)
+    }
+
+    /// Odometer in the active unit system.
+    func odometer(_ km: Int?) -> String {
+        guard let km else { return "—" }
+        return unitSystem == .imperial
+            ? String(format: "%.0f mi", Float(km) * 0.621371)
+            : String(format: "%d km", km)
+    }
 }
