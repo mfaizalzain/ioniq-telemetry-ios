@@ -21,6 +21,17 @@ struct DashboardView: View {
                         }
                     }
                     .padding(.vertical)
+
+                    // Debug: simulate a trip without driving
+                    Button {
+                        services.connectedCar.simulateTrip()
+                    } label: {
+                        Label("Simulate 10 km drive", systemImage: "car.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .padding(.horizontal)
                 }
             }
             .background(Color.appBackground)
