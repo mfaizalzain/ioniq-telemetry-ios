@@ -139,12 +139,10 @@ simulator, in `store_assets/screenshots/`:
 > the screenshots show live SOC, a logged trip with its charts, and a solved plan with
 > charging stops.
 
-**iPad screenshots are also required**, because the target builds for iPhone *and*
-iPad (`TARGETED_DEVICE_FAMILY = "1,2"`). You need 13-inch iPad captures
-(2064 × 2752) as well. If the app has never been laid out or tested on iPad, the
-cheaper and more honest option is to set `TARGETED_DEVICE_FAMILY = "1"` and ship
-iPhone-only — an iPad build that is just a stretched iPhone layout is a common
-rejection under Review 2.4.1.
+**No iPad screenshots needed.** The app is iPhone-only:
+`TARGETED_DEVICE_FAMILY = 1` on every configuration, and the iPad orientation key
+is gone from Info.plist. App Store Connect will not ask for iPad captures, and
+there is no stretched-iPhone iPad build to fail Review 2.4.1.
 
 Not required by the store, but worth having if you promote CarPlay: a real capture
 of the CarPlay template from the simulator's External Displays → CarPlay.
@@ -185,7 +183,7 @@ device unless the user shares it.
 - [ ] `https://ioniq.faizalmzain.com/privacy` is live and reachable
 - [ ] `ioniq_telemetry_pro` created, priced, and in "Ready to Submit"
 - [ ] Screenshots recaptured with real data (see above)
-- [ ] iPad decision made: real iPad screenshots, or iPhone-only
+- [x] iPhone-only — no iPad build, no iPad screenshots
 - [ ] Review notes explain that full functionality needs an OBD-II dongle and a free
       OpenRouteService key, and give the reviewer a key to test with — otherwise the
       Plan tab looks broken and Review 2.1 rejections follow
