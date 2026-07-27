@@ -275,22 +275,12 @@ final class ConnectedCarService {
     func simulateTrip() {
         let simulator = DebugSimulator()
         Task { [weak self] in
-            var lastTelemetry = VehicleTelemetry()
             await simulator.start { [weak self] (telemetry: VehicleTelemetry, fix: Fix) in
                 guard let self else { return }
-                lastTelemetry = telemetry
                 self.location.setFix(fix)
                 self.consume(telemetry)
             }
-            // End trip directly — DriveMonitor's 90s disconnect grace is too slow.
-            guard let self else { return }
-            self.isTripActive = false
-            do {
-                try await self.services.tripLog.endTrip(telemetry: lastTelemetry)
-            } catch {
-                print("[ConnectedCar] endTrip failed: \(error.localizedDescription)")
-            }
-            self.recentTripCount += 1
+            self?.recentTripCount += 1
         }
     }
 
