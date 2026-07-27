@@ -20,6 +20,9 @@ targets:
       base:
         INFOPLIST_FILE: IoniqTelemetry/Resources/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.fmz.IoniqTelemetry
+        DEFINES_MODULE: YES
+        SWIFT_INSTALL_OBJC_HEADER: YES
+        LD_RUNPATH_SEARCH_PATHS: "@executable_path/Frameworks @loader_path/Frameworks"
     dependencies:
       - package: CoreOBD
       - package: CoreDomain
