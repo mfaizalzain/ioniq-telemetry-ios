@@ -39,7 +39,13 @@ final class PaywallViewModel {
         }
     }
 
-    deinit { Task { @MainActor in self.updateListener?.cancel() } }
+    deinit {
+        // nonisolated(unsafe) required because deinit is nonisolated even on
+        // @MainActor classes, and @Observable makes stored properties isolated.
+        // Reference type + cancel is safe across actors — no data race.
+        nonisolated(unsafe) let t = updateListener
+        t?.cancel()
+    }
 
     // MARK: - Loading
 
