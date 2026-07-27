@@ -28,21 +28,20 @@ struct DashboardView: View {
             // separate in-content header repeated both.
             .navigationTitle(viewModel?.vehicleName ?? "")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 8) {
-                        Button {
-                            services.connectedCar.simulateTrip()
-                        } label: {
-                            Image(systemName: "play.fill")
-                                .font(.caption)
-                        }
-                        .tint(Color.appAccent)
-                        .accessibilityLabel("Simulate trip")
-
-                        if let viewModel {
-                            ConnectionBadge(state: ConnectionState(viewModel.connectionState), style: .plain)
-                        }
+                if let viewModel {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ConnectionBadge(state: ConnectionState(viewModel.connectionState), style: .plain)
                     }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        services.connectedCar.simulateTrip()
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.caption)
+                    }
+                    .tint(Color.appAccent)
+                    .accessibilityLabel("Simulate trip")
                 }
                 if viewModel?.canUseCopilot == true {
                     ToolbarItem(placement: .topBarTrailing) {
