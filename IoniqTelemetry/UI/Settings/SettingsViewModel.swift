@@ -141,6 +141,16 @@ final class SettingsViewModel {
     func setReserveSoc(_ value: Float) { update { $0.reserveSocPercent = value } }
     func setTargetArrivalSoc(_ value: Float) { update { $0.targetArrivalSocPercent = value } }
 
+    /// Why charger occupancy alerts cannot run, or nil when they can. Surfaced so a
+    /// disabled toggle explains itself instead of just looking broken.
+    var occupancyBlockedReason: String? {
+        if !isPro { return "Charger occupancy alerts are part of Pro." }
+        if (preferences.googleMapsApiKey ?? "").isEmpty {
+            return "Add a Google Places API key below to check live availability."
+        }
+        return nil
+    }
+
     /// The routing key required by the selected provider, if it's still missing.
     var missingRoutingKey: String? {
         switch preferences.routingProvider {
