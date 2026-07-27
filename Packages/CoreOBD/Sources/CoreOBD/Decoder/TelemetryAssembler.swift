@@ -28,17 +28,14 @@ public final class TelemetryAssembler {
             t.moduleTempsC = [tempMin, tempMax]
         }
 
-        // Derived: power from voltage × current
         if let v = t.packVoltage, let i = t.packCurrent {
             t.powerKw = v * i / 1000.0
         }
 
-        // Derived: cell voltage delta
         if let cMax = t.cellVoltMax, let cMin = t.cellVoltMin {
             t.cellVoltDelta = cMax - cMin
         }
 
-        // Tire pressures
         if let fl = signals["tire_fl"], let fr = signals["tire_fr"],
            let rl = signals["tire_rl"], let rr = signals["tire_rr"] {
             t.tirePressuresKpa = TirePressures(
@@ -46,7 +43,6 @@ public final class TelemetryAssembler {
             )
         }
 
-        // Tire temperatures
         if let tfl = signals["tire_fl_temp"], let tfr = signals["tire_fr_temp"],
            let trl = signals["tire_rl_temp"], let trr = signals["tire_rr_temp"] {
             t.tireTempsC = TireTemperatures(
@@ -54,12 +50,11 @@ public final class TelemetryAssembler {
             )
         }
 
-        // Charging state
         if let current = t.packCurrent {
             let charging = current > 1.0
             t.isCharging = charging
             if !charging {
-                t.chargeType = .none
+                t.chargeType = ChargeType.none
             } else if current > 60.0 {
                 t.chargeType = .dc
             } else {

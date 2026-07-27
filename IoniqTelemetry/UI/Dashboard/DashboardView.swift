@@ -14,7 +14,7 @@ struct DashboardView: View {
                             .font(.headline.weight(.medium))
                             .foregroundStyle(.secondary)
                         Spacer()
-                        ConnectionBadge(state: .disconnected)
+                        ConnectionBadge(state: .offline)
                     }
                     .padding(.horizontal)
 
@@ -107,7 +107,7 @@ struct BatteryHeroCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(8)
-        .background(.quaternary)
+        .background(Color(white: 1).opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }
@@ -121,25 +121,25 @@ struct MetricTilesGrid: View {
                 icon: "bolt.fill",
                 label: "POWER",
                 value: "45 kW",
-                color: .white
+                valueColor: .white
             )
             MetricTile(
                 icon: "chart.line.uptrend.xyaxis",
                 label: "CELL Δ",
                 value: "18 mV",
-                color: Color(red: 0.40, green: 0.73, blue: 0.42)
+                valueColor: Color.greenOk
             )
             MetricTile(
                 icon: "battery.100percent.bolt",
                 label: "HV VOLTAGE",
                 value: "782 V",
-                color: Color(red: 0.09, green: 0.91, blue: 0.76)
+                valueColor: Color.electricTeal
             )
             MetricTile(
                 icon: "battery.25percent",
                 label: "AUX BATTERY",
                 value: "12.6 V",
-                color: Color(red: 0.40, green: 0.73, blue: 0.42)
+                valueColor: Color.greenOk
             )
         }
         .padding(.horizontal, 12)
@@ -199,7 +199,7 @@ struct TirePressureVisualizerCard: View {
         }
         .frame(width: 70)
         .padding(8)
-        .background(.quaternary)
+        .background(Color(white: 1).opacity(0.1))
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 }

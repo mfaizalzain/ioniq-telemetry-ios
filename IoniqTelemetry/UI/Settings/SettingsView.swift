@@ -17,8 +17,7 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                // Vehicle
-                Section("Vehicle") {
+                Section {
                     Button {
                         showVehiclePicker = true
                     } label: {
@@ -31,19 +30,21 @@ struct SettingsView: View {
                                 .foregroundStyle(.tertiary)
                         }
                     }
+                } header: {
+                    Text("Vehicle")
                 }
 
-                // OBD
-                Section("OBD Adapter") {
+                Section {
                     HStack {
                         Text("Status")
                         Spacer()
                         Text("Not Connected")
                             .foregroundStyle(.secondary)
                     }
+                } header: {
+                    Text("OBD Adapter")
                 }
 
-                // AI Assistant
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
@@ -52,7 +53,6 @@ struct SettingsView: View {
                             Text("AI Assistant (BYOK)")
                                 .font(.headline)
                         }
-
                         HStack {
                             TextField("Gemini API Key", text: $geminiKey)
                                 .textFieldStyle(.roundedBorder)
@@ -63,7 +63,6 @@ struct SettingsView: View {
                                     .foregroundStyle(.secondary)
                             }
                         }
-
                         Toggle("Enable AI Coaching", isOn: $aiCoachingEnabled)
                             .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
                     }
@@ -73,45 +72,50 @@ struct SettingsView: View {
                     Text("Bring your own Gemini API key. AI features: trip planning, smart charging advice, thermal insights, driving coaching.")
                 }
 
-                // Routing
-                Section("Routing") {
+                Section {
                     Toggle("Google Maps Routing", isOn: .constant(false))
                         .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
                     Toggle("Charger Occupancy Alerts", isOn: $chargerAlerts)
                         .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
                     TextField("Google Maps API Key", text: $mapsKey)
                         .textFieldStyle(.roundedBorder)
+                } header: {
+                    Text("Routing")
                 } footer: {
                     Text("BYOK — Bring Your Own API Key. Google Maps routing is free with your own key.")
                 }
 
-                // Units
-                Section("Units") {
+                Section {
                     Picker("Unit System", selection: $unitSystem) {
                         Text("km / kWh/100km").tag(Unit.metric)
                         Text("mi / mi/kWh").tag(Unit.imperial)
                     }
                     .pickerStyle(.segmented)
+                } header: {
+                    Text("Units")
                 }
 
-                // Appearance
-                Section("Appearance") {
+                Section {
                     Picker("Theme", selection: .constant("dark")) {
                         Text("System").tag("system")
                         Text("Light").tag("light")
                         Text("Dark").tag("dark")
                     }
+                } header: {
+                    Text("Appearance")
                 }
 
-                // Data
-                Section("Data") {
+                Section {
                     Button("Backup Trips") {}
                     Button("Restore Backup") {}
+                } header: {
+                    Text("Data")
                 }
 
-                // Advanced
-                Section("Advanced") {
+                Section {
                     Button("Console") {}
+                } header: {
+                    Text("Advanced")
                 }
             }
             .scrollContentBackground(.hidden)

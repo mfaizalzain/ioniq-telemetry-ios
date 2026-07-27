@@ -7,15 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0C6B1ADF300322C93745F9F3 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7989C5DE8BAB8D4052549AB7 /* PaywallView.swift */; };
 		0FB17C4EE6D0B8CD05F7FA24 /* DashboardTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = E172EAD23799CCF5F1FB4275 /* DashboardTemplate.swift */; };
+		13BAD2FF5C03019D0DDF41F3 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92C9548673D78AA607E3859 /* PlanView.swift */; };
 		174595709A407F6AB393DC79 /* BackgroundTasks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C099E3944C24DCE57842106B /* BackgroundTasks.framework */; };
 		24C8D39662D6A39F7ACFB79F /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 8BB3F88CBE4887CACB9E40B8 /* CoreDomain */; };
 		2B0F7DBB540A6AC24475378A /* SwiftData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54C12EF4A0F03A94394B3443 /* SwiftData.framework */; };
 		3729A76F447A55EA00F35DAE /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5CD51D249AA7A6761D98B76D /* CarPlay.framework */; };
 		38618D9EAA1DD709A42A9D35 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */; };
+		449483518D023F014ABE7E73 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6ECC04918055FCDD1B2BFB /* SettingsView.swift */; };
 		4D000C0C958F411F7D6A3FF4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 71E75764760802E4E8D492C3 /* Assets.xcassets */; };
+		5E4FEF21B4719E29D022AD31 /* CopilotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1CB89F2E357CB529065A64 /* CopilotView.swift */; };
 		602315C0596033975E43E07F /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E895DF443FCEEE5C5E060871 /* CoreBluetooth.framework */; };
 		65E8F435BBCCED2E88B9C46C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F6099A4448EEBE22D1F18A1 /* StoreKit.framework */; };
+		679881A44DC2201BC2416EB3 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */; };
 		7B55233B7E5EEAA127719D42 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = E478B08AFC2545C89E60B30C /* AppServices.swift */; };
 		7D8AD819E4D270C82B43EE9F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */; };
 		86FD1D0BE18C53A9F2D136FC /* CoreRouting in Frameworks */ = {isa = PBXBuildFile; productRef = 361EBE86862C04F207736117 /* CoreRouting */; };
@@ -25,6 +30,7 @@
 		C806C545266A393FF6046E31 /* CoreData in Frameworks */ = {isa = PBXBuildFile; productRef = CE94BDBFAE6356B793FDC1B5 /* CoreData */; };
 		DDBA760A7159403F6F7ED913 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F928199730EF5D5C4706F89A /* MapKit.framework */; };
 		DE5B89219B64A8133FF439A2 /* CoreUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5D04FA331DABD94427A1A3F /* CoreUI */; };
+		F5358B51092E6DF7F0F23662 /* TripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7CF9643A43B2EB650FBB1C /* TripsView.swift */; };
 		FA542286530179946F914549 /* CoreOBD in Frameworks */ = {isa = PBXBuildFile; productRef = 4B422C736FBB62FCA4883CB1 /* CoreOBD */; };
 /* End PBXBuildFile section */
 
@@ -40,6 +46,7 @@
 
 /* Begin PBXFileReference section */
 		02F27779AB748111ADD5A0EE /* CoreDomain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreDomain; path = Packages/CoreDomain; sourceTree = SOURCE_ROOT; };
+		1B6ECC04918055FCDD1B2BFB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		3BD0F36BBF1F0EC4A7BF4C1D /* CoreUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreUI; path = Packages/CoreUI; sourceTree = SOURCE_ROOT; };
 		3F6099A4448EEBE22D1F18A1 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		54C12EF4A0F03A94394B3443 /* SwiftData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData.framework; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
@@ -47,12 +54,17 @@
 		6F4CB406BD5FDC8C8BFD3789 /* CoreData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreData; path = Packages/CoreData; sourceTree = SOURCE_ROOT; };
 		71E75764760802E4E8D492C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		734AFC3926EFA5634B2080D6 /* IoniqTelemetryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IoniqTelemetryApp.swift; sourceTree = "<group>"; };
+		7989C5DE8BAB8D4052549AB7 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		7B3BD72A95E554A583F634A7 /* IoniqTelemetry.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IoniqTelemetry.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8172C23BE112C6BFD8D27007 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
+		9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		B92C9548673D78AA607E3859 /* PlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
+		BA7CF9643A43B2EB650FBB1C /* TripsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsView.swift; sourceTree = "<group>"; };
 		BCA43C9AD86CFEBC26B1A55D /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		C099E3944C24DCE57842106B /* BackgroundTasks.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = BackgroundTasks.framework; path = System/Library/Frameworks/BackgroundTasks.framework; sourceTree = SDKROOT; };
 		C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		DF1CB89F2E357CB529065A64 /* CopilotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotView.swift; sourceTree = "<group>"; };
 		E172EAD23799CCF5F1FB4275 /* DashboardTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardTemplate.swift; sourceTree = "<group>"; };
 		E478B08AFC2545C89E60B30C /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		E87216F0D499E20E17EFB892 /* CoreRouting */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreRouting; path = Packages/CoreRouting; sourceTree = SOURCE_ROOT; };
@@ -86,12 +98,34 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		31ACCDC6B34C527227CF05CC /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				4676B546C4BF7CBCF04113D1 /* Components */,
+				7F06D6C7D44A1C4C3713DE60 /* Dashboard */,
+				C19C0657CF43D6ABD700DECE /* Paywall */,
+				D6B352999AF9493821D40901 /* Plan */,
+				E8362811379CFDBC4ABEE4A1 /* Settings */,
+				E2527C2881C4105CF0E7D819 /* Trips */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		4676B546C4BF7CBCF04113D1 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				DF1CB89F2E357CB529065A64 /* CopilotView.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
 		4E4814EB891D889E5166DD78 /* IoniqTelemetry */ = {
 			isa = PBXGroup;
 			children = (
 				DC199ACBB4EE629F5B321E67 /* App */,
 				52DF0CE4A18B757E3A1552EA /* CarPlay */,
 				F48AC3DF9A9BF94B384BA561 /* Resources */,
+				31ACCDC6B34C527227CF05CC /* UI */,
 			);
 			path = IoniqTelemetry;
 			sourceTree = "<group>";
@@ -126,6 +160,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		7F06D6C7D44A1C4C3713DE60 /* Dashboard */ = {
+			isa = PBXGroup;
+			children = (
+				9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */,
+			);
+			path = Dashboard;
+			sourceTree = "<group>";
+		};
 		841728492C6D28FCDDDF15C7 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
@@ -140,6 +182,14 @@
 			name = Frameworks;
 			sourceTree = "<group>";
 		};
+		C19C0657CF43D6ABD700DECE /* Paywall */ = {
+			isa = PBXGroup;
+			children = (
+				7989C5DE8BAB8D4052549AB7 /* PaywallView.swift */,
+			);
+			path = Paywall;
+			sourceTree = "<group>";
+		};
 		C8552EFF225ABAD148A49A9D = {
 			isa = PBXGroup;
 			children = (
@@ -149,6 +199,14 @@
 				841728492C6D28FCDDDF15C7 /* Frameworks */,
 				7699C1A1B2022B939B3EBD67 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		D6B352999AF9493821D40901 /* Plan */ = {
+			isa = PBXGroup;
+			children = (
+				B92C9548673D78AA607E3859 /* PlanView.swift */,
+			);
+			path = Plan;
 			sourceTree = "<group>";
 		};
 		DC199ACBB4EE629F5B321E67 /* App */ = {
@@ -170,11 +228,27 @@
 			path = Templates;
 			sourceTree = "<group>";
 		};
+		E2527C2881C4105CF0E7D819 /* Trips */ = {
+			isa = PBXGroup;
+			children = (
+				BA7CF9643A43B2EB650FBB1C /* TripsView.swift */,
+			);
+			path = Trips;
+			sourceTree = "<group>";
+		};
 		E3B07F07FFBF7931162ED362 /* IoniqTelemetryTests */ = {
 			isa = PBXGroup;
 			children = (
 			);
 			path = IoniqTelemetryTests;
+			sourceTree = "<group>";
+		};
+		E8362811379CFDBC4ABEE4A1 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				1B6ECC04918055FCDD1B2BFB /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		F48AC3DF9A9BF94B384BA561 /* Resources */ = {
@@ -184,13 +258,6 @@
 				FEA80BC3B62D16E7B2F8DA9B /* Info.plist */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		"TEMP_1A032AA6-06BA-460A-915D-B3CCD61D589D" /* UI */ = {
-			isa = PBXGroup;
-			children = (
-			);
-			path = UI;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -301,9 +368,15 @@
 				95F25117F336829F31773888 /* AppRootView.swift in Sources */,
 				7B55233B7E5EEAA127719D42 /* AppServices.swift in Sources */,
 				38618D9EAA1DD709A42A9D35 /* CarPlaySceneDelegate.swift in Sources */,
+				5E4FEF21B4719E29D022AD31 /* CopilotView.swift in Sources */,
 				0FB17C4EE6D0B8CD05F7FA24 /* DashboardTemplate.swift in Sources */,
+				679881A44DC2201BC2416EB3 /* DashboardView.swift in Sources */,
 				B1A4DA9B674AAAF6B40425DD /* IoniqTelemetryApp.swift in Sources */,
+				0C6B1ADF300322C93745F9F3 /* PaywallView.swift in Sources */,
+				13BAD2FF5C03019D0DDF41F3 /* PlanView.swift in Sources */,
 				874B3ED90BE25A72BAFE4830 /* SceneDelegate.swift in Sources */,
+				449483518D023F014ABE7E73 /* SettingsView.swift in Sources */,
+				F5358B51092E6DF7F0F23662 /* TripsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

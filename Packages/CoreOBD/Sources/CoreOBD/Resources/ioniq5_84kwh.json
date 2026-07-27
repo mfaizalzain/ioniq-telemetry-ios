@@ -1,0 +1,69 @@
+{
+  "profileId": "ioniq5_84kwh",
+  "displayName": "Ioniq 5 (84 kWh Long Range)",
+  "usableCapacityKwh": 80.0,
+  "requests": [
+    {
+      "id": "bms_01",
+      "header": "7E4",
+      "request": "220101",
+      "pollTier": "FAST",
+      "signals": [
+        {"id": "soc_bms", "startByte": 7, "length": 1, "formula": "A/2", "unit": "%", "min": 0, "max": 100},
+        {"id": "pack_current", "startByte": 13, "length": 2, "formula": "-(A*256+B)/10", "unit": "A", "signed": true, "min": -600, "max": 600},
+        {"id": "pack_voltage", "startByte": 15, "length": 2, "formula": "(A*256+B)/10", "unit": "V", "min": 0, "max": 900},
+        {"id": "temp_max", "startByte": 17, "length": 1, "formula": "A", "unit": "C", "signed": true},
+        {"id": "temp_min", "startByte": 18, "length": 1, "formula": "A", "unit": "C", "signed": true},
+        {"id": "cell_volt_max", "startByte": 26, "length": 1, "formula": "A/50", "unit": "V"},
+        {"id": "cell_volt_min", "startByte": 28, "length": 1, "formula": "A/50", "unit": "V"},
+        {"id": "aux_voltage", "startByte": 32, "length": 1, "formula": "A/10", "unit": "V"}
+      ]
+    },
+    {
+      "id": "bms_05",
+      "header": "7E4",
+      "request": "220105",
+      "pollTier": "MEDIUM",
+      "signals": [
+        {"id": "soh", "startByte": 28, "length": 2, "formula": "(A*256+B)/10", "unit": "%"},
+        {"id": "soc_display", "startByte": 34, "length": 1, "formula": "A/2", "unit": "%"}
+      ]
+    },
+    {
+      "id": "aircon",
+      "header": "7B3",
+      "request": "220100",
+      "pollTier": "FAST",
+      "signals": [
+        {"id": "ambient_temp", "startByte": 8, "length": 1, "formula": "A/2-40", "unit": "C", "min": -40, "max": 70},
+        {"id": "cabin_temp", "startByte": 30, "length": 1, "formula": "A/2-40", "unit": "C", "min": -40, "max": 70},
+        {"id": "set_temp", "startByte": 14, "length": 1, "formula": "A/2", "unit": "C", "min": 15, "max": 32}
+      ]
+    },
+    {
+      "id": "odometer",
+      "header": "7C6",
+      "request": "22B002",
+      "pollTier": "MEDIUM",
+      "signals": [
+        {"id": "odometer_km", "startByte": 9, "length": 3, "formula": "A*65536+B*256+C", "unit": "km", "min": 0, "max": 2000000}
+      ]
+    },
+    {
+      "id": "tpms",
+      "header": "7A0",
+      "request": "22C00B",
+      "pollTier": "SLOW",
+      "signals": [
+        {"id": "tire_fl", "startByte": 7, "length": 1, "formula": "A*1.379", "unit": "kPa"},
+        {"id": "tire_fr", "startByte": 12, "length": 1, "formula": "A*1.379", "unit": "kPa"},
+        {"id": "tire_rl", "startByte": 17, "length": 1, "formula": "A*1.379", "unit": "kPa"},
+        {"id": "tire_rr", "startByte": 22, "length": 1, "formula": "A*1.379", "unit": "kPa"},
+        {"id": "tire_fl_temp", "startByte": 8, "length": 1, "formula": "A-50", "unit": "C", "min": -40, "max": 125},
+        {"id": "tire_fr_temp", "startByte": 13, "length": 1, "formula": "A-50", "unit": "C", "min": -40, "max": 125},
+        {"id": "tire_rl_temp", "startByte": 18, "length": 1, "formula": "A-50", "unit": "C", "min": -40, "max": 125},
+        {"id": "tire_rr_temp", "startByte": 23, "length": 1, "formula": "A-50", "unit": "C", "min": -40, "max": 125}
+      ]
+    }
+  ]
+}

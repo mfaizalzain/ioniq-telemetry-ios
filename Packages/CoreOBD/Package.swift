@@ -7,7 +7,10 @@ let package = Package(
     products: [
         .library(name: "CoreOBD", targets: ["CoreOBD"])
     ],
+    dependencies: [
+        .package(path: "../CoreDomain")
+    ],
     targets: [
-        .target(name: "CoreOBD")
+        .target(name: "CoreOBD", dependencies: ["CoreDomain"])
     ]
 )

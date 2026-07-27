@@ -83,7 +83,7 @@ struct PaywallView: View {
                 }
             }
             .padding(16)
-            .background(.quaternary)
+            .background(Color(white: 1).opacity(0.1))
             .clipShape(RoundedRectangle(cornerRadius: 12))
         }
         .foregroundStyle(.primary)

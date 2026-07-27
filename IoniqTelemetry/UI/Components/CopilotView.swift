@@ -104,15 +104,14 @@ struct ChatBubble: View {
                     .font(.caption)
                     .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
                     .padding(6)
-                    .background(.quaternary)
-                    .clipShape(Circle())
+                    .background(Color(white: 1).opacity(0.1), in: Circle())
             } else {
                 Spacer()
             }
             Text(message.text)
                 .font(.body)
                 .padding(12)
-                .background(message.role == .user ? Color(red: 0.09, green: 0.91, blue: 0.76).opacity(0.2) : .quaternary)
+                .background(message.role == .user ? Color(red: 0.09, green: 0.91, blue: 0.76).opacity(0.2) : Color(white: 1).opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             if message.role == .user {
                 Spacer()

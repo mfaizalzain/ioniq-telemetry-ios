@@ -131,7 +131,7 @@ struct ReserveChip: View {
                 .font(.caption.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(selected == value ? Color(red: 0.09, green: 0.91, blue: 0.76) : .quaternary)
+                .background(selected == value ? Color(red: 0.09, green: 0.91, blue: 0.76) : Color(white: 1).opacity(0.1))
                 .foregroundStyle(selected == value ? .black : .primary)
                 .clipShape(Capsule())
         }
@@ -152,7 +152,7 @@ struct NearbyChargersSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.quaternary.opacity(0.3))
+        .background(Color(white: 1).opacity(0.03))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }
@@ -171,7 +171,7 @@ struct FavoriteTripsSection: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(.quaternary.opacity(0.3))
+        .background(Color(white: 1).opacity(0.03))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 }

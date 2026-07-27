@@ -50,7 +50,7 @@ struct TripSummaryHeader: View {
             statItem(label: "AVG EFF", value: String(format: "%.1f", avgEfficiency))
         }
         .padding(12)
-        .background(.quaternary.opacity(0.5))
+        .background(Color(white: 1).opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
