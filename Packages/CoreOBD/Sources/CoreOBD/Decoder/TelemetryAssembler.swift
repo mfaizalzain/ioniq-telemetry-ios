@@ -63,7 +63,7 @@ public final class TelemetryAssembler: Sendable {
             t.isCharging = charging
 
             if !charging {
-                t.chargeType = .none
+                t.chargeType = ChargeType.none
             } else if abs(current) > 60.0 {
                 t.chargeType = .dc
             } else {
