@@ -3,18 +3,18 @@
   "nonRenewingSubscriptions" : [],
   "products" : [
     {
-      "displayPrice" : "39.99",
+      "displayPrice" : "4.99",
       "familyShareable" : false,
-      "internalID" : "LIFETIME01",
+      "internalID" : "PROLIFETIME01",
       "localizations" : [
         {
           "description" : "One-time purchase. All Pro features, forever.",
-          "displayName" : "Ioniq Telemetry Pro — Lifetime",
+          "displayName" : "Ioniq Telemetry Pro",
           "locale" : "en_US"
         }
       ],
-      "productID" : "ioniq_pro_lifetime",
-      "referenceName" : "Pro Lifetime",
+      "productID" : "ioniq_telemetry_pro",
+      "referenceName" : "Ioniq Telemetry Pro",
       "type" : "NonConsumable"
     }
   ],
@@ -23,57 +23,7 @@
     "_developerTeamID" : "S232V5F699",
     "_lastSynchronizedDate" : 0
   },
-  "subscriptionGroups" : [
-    {
-      "id" : "PROGROUP01",
-      "localizations" : [],
-      "name" : "Ioniq Telemetry Pro",
-      "subscriptions" : [
-        {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "3.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "MONTHLY01",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "All Pro features, billed monthly.",
-              "displayName" : "Pro Monthly",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "ioniq_pro_monthly_sub",
-          "recurringSubscriptionPeriod" : "P1M",
-          "referenceName" : "Pro Monthly",
-          "subscriptionGroupID" : "PROGROUP01",
-          "type" : "RecurringSubscription"
-        },
-        {
-          "adHocOffers" : [],
-          "codeOffers" : [],
-          "displayPrice" : "29.99",
-          "familyShareable" : false,
-          "groupNumber" : 1,
-          "internalID" : "YEARLY01",
-          "introductoryOffer" : null,
-          "localizations" : [
-            {
-              "description" : "All Pro features, billed yearly.",
-              "displayName" : "Pro Yearly",
-              "locale" : "en_US"
-            }
-          ],
-          "productID" : "ioniq_pro_yearly_sub",
-          "recurringSubscriptionPeriod" : "P1Y",
-          "referenceName" : "Pro Yearly",
-          "subscriptionGroupID" : "PROGROUP01",
-          "type" : "RecurringSubscription"
-        }
-      ]
-    }
-  ],
+  "subscriptionGroups" : [],
   "version" : {
     "major" : 4,
     "minor" : 0

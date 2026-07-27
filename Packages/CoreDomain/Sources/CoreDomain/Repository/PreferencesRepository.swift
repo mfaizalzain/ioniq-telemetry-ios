@@ -24,6 +24,18 @@ public enum RoutingProvider: String, Sendable {
     case googleMaps = "GOOGLE_MAPS"
 }
 
+/// Where charger locations are fetched from.
+///
+/// [openChargeMap] is the default and the only free option — the app ships a key,
+/// it covers a bounding box in one request, and it carries price, operator and
+/// access data. [googlePlaces] is bring-your-own-key and billed per request, but
+/// its coverage is better in regions where OCM is thin. Places has no bounding-box
+/// search, so an area is covered by tiled circle queries — the reason it is opt-in.
+public enum ChargerSource: String, Sendable {
+    case openChargeMap = "OPEN_CHARGE_MAP"
+    case googlePlaces = "GOOGLE_PLACES"
+}
+
 public struct UserPreferences: Sendable {
     public var unitSystem: UnitSystem
     public var connectorTypes: Set<ConnectorType>
@@ -67,6 +79,8 @@ public struct UserPreferences: Sendable {
     public var chargerOccupancyAlerts: Bool
     /// Use Google Places API (instead of OpenRouteService geocoding) for POI destination search when key is set.
     public var googlePoiSearch: Bool
+    /// Where charger locations come from. See [ChargerSource].
+    public var chargerSource: ChargerSource
 
     public init(
         unitSystem: UnitSystem = .metric,
@@ -92,7 +106,8 @@ public struct UserPreferences: Sendable {
         geminiApiKey: String? = nil,
         aiCoachingEnabled: Bool = true,
         chargerOccupancyAlerts: Bool = false,
-        googlePoiSearch: Bool = false
+        googlePoiSearch: Bool = false,
+        chargerSource: ChargerSource = .openChargeMap
     ) {
         self.unitSystem = unitSystem
         self.connectorTypes = connectorTypes
@@ -118,6 +133,7 @@ public struct UserPreferences: Sendable {
         self.aiCoachingEnabled = aiCoachingEnabled
         self.chargerOccupancyAlerts = chargerOccupancyAlerts
         self.googlePoiSearch = googlePoiSearch
+        self.chargerSource = chargerSource
     }
 
     /// The API key for [provider], or null when the user hasn't supplied one yet.

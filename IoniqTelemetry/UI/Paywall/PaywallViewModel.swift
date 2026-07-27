@@ -4,21 +4,19 @@ import StoreKit
 
 /// StoreKit 2 purchase flow for Pro.
 ///
-/// Entitlement is derived from `Transaction.currentEntitlements` rather than from
-/// the purchase result alone, so a subscription that lapses or is refunded is
-/// reflected on the next refresh — and a purchase made on another device is
-/// picked up without an explicit restore.
+/// One non-consumable, matching the Android build's single `ioniq_telemetry_pro`
+/// product — buy once, keep it. Entitlement is derived from
+/// `Transaction.currentEntitlements` rather than from the purchase result alone,
+/// so a refund is reflected on the next refresh, and a purchase made on another
+/// device is picked up without an explicit restore.
 @Observable
 @MainActor
 final class PaywallViewModel {
 
-    enum ProductKind: String, CaseIterable {
-        case monthly = "ioniq_pro_monthly_sub"
-        case yearly = "ioniq_pro_yearly_sub"
-        case lifetime = "ioniq_pro_lifetime"
-    }
+    /// The App Store Connect product ID. Same string as the Play Console one.
+    static let productID = "ioniq_telemetry_pro"
 
-    private(set) var products: [Product] = []
+    private(set) var product: Product?
     private(set) var isLoading = false
     private(set) var purchaseInProgress: Product.ID?
     private(set) var errorMessage: String?
@@ -50,16 +48,9 @@ final class PaywallViewModel {
         isLoading = true
         defer { isLoading = false }
         do {
-            let loaded = try await Product.products(for: ProductKind.allCases.map(\.rawValue))
-            // Cheapest first, with lifetime last regardless of price.
-            products = loaded.sorted { lhs, rhs in
-                let lhsLifetime = lhs.id == ProductKind.lifetime.rawValue
-                let rhsLifetime = rhs.id == ProductKind.lifetime.rawValue
-                if lhsLifetime != rhsLifetime { return rhsLifetime }
-                return lhs.price < rhs.price
-            }
-            errorMessage = products.isEmpty
-                ? "No subscriptions are available right now."
+            product = try await Product.products(for: [Self.productID]).first
+            errorMessage = product == nil
+                ? "Pro is not available for purchase right now."
                 : nil
         } catch {
             errorMessage = error.localizedDescription
@@ -113,53 +104,11 @@ final class PaywallViewModel {
         var entitled = false
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
-            if ProductKind(rawValue: transaction.productID) != nil, transaction.revocationDate == nil {
+            if transaction.productID == Self.productID, transaction.revocationDate == nil {
                 entitled = true
             }
         }
         isPro = entitled
         await entitlement.setPro(entitled, token: nil)
-    }
-
-    // MARK: - Presentation
-
-    func title(for product: Product) -> String {
-        switch ProductKind(rawValue: product.id) {
-        case .monthly: return "Monthly"
-        case .yearly: return "Yearly"
-        case .lifetime: return "Lifetime"
-        case nil: return product.displayName
-        }
-    }
-
-    func subtitle(for product: Product) -> String {
-        guard let period = product.subscription?.subscriptionPeriod else {
-            return "One-time purchase"
-        }
-        return "\(product.displayPrice) / \(period.unit.localizedDescription)"
-    }
-
-    /// Yearly savings versus twelve months of the monthly plan, when both exist.
-    var yearlySavingsPercent: Int? {
-        guard
-            let monthly = products.first(where: { $0.id == ProductKind.monthly.rawValue }),
-            let yearly = products.first(where: { $0.id == ProductKind.yearly.rawValue })
-        else { return nil }
-        let twelveMonths = monthly.price * 12
-        guard twelveMonths > 0, yearly.price < twelveMonths else { return nil }
-        let saved = (twelveMonths - yearly.price) / twelveMonths * 100
-        return Int(truncating: saved as NSDecimalNumber)
-    }
-}
-
-private extension Product.SubscriptionPeriod.Unit {
-    var localizedDescription: String {
-        switch self {
-        case .day: return "day"
-        case .week: return "week"
-        case .month: return "month"
-        case .year: return "year"
-        @unknown default: return "period"
-        }
     }
 }

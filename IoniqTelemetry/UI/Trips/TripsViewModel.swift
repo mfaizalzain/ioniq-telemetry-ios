@@ -18,6 +18,7 @@ final class TripsViewModel {
     }
 
     private(set) var trips: [TripEntity] = []
+    private(set) var chargeSessions: [ChargeSessionEntity] = []
     private(set) var summary: TripSummary?
     private(set) var errorMessage: String?
     private(set) var unitSystem: UnitSystem = .metric
@@ -41,6 +42,7 @@ final class TripsViewModel {
     func refresh() {
         do {
             trips = try services.tripLog.trips()
+            chargeSessions = try services.tripLog.chargeSessions()
             summary = try services.tripLog.getTripSummary(from: .distantPast, to: .distantFuture)
             errorMessage = nil
         } catch {
@@ -71,6 +73,17 @@ final class TripsViewModel {
         do {
             try services.tripLog.deleteTrip(id: trip.id)
             recentlyDeleted = trip
+            refresh()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// No undo here, unlike trips: a charge session has no restore path in the
+    /// repository, so the UI confirms before calling this.
+    func deleteChargeSession(_ session: ChargeSessionEntity) {
+        do {
+            try services.tripLog.deleteChargeSession(id: session.id)
             refresh()
         } catch {
             errorMessage = error.localizedDescription
@@ -126,8 +139,16 @@ final class TripsViewModel {
 
     func duration(_ trip: TripEntity) -> String {
         guard let end = trip.endTime else { return "In progress" }
-        let minutes = Int(end.timeIntervalSince(trip.startTime) / 60)
-        return minutes >= 60
+        return formatMinutes(Int(end.timeIntervalSince(trip.startTime) / 60))
+    }
+
+    func duration(_ session: ChargeSessionEntity) -> String {
+        guard let end = session.endTime else { return "Charging…" }
+        return formatMinutes(Int(end.timeIntervalSince(session.startTime) / 60))
+    }
+
+    private func formatMinutes(_ minutes: Int) -> String {
+        minutes >= 60
             ? "\(minutes / 60)h \(minutes % 60)m"
             : "\(minutes)m"
     }

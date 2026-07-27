@@ -38,6 +38,17 @@ public final class GeocodingRepository: Sendable {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return [] }
 
+        // A typed coordinate is already the answer. Handled before any provider so
+        // it costs nothing, needs no key, and cannot be mangled by a geocoder that
+        // treats the digits as a street number.
+        if let coordinate = Self.parseCoordinate(trimmed) {
+            return [PlaceResult(
+                name: String(format: "%.5f, %.5f", coordinate.lat, coordinate.lon),
+                subtitle: "Coordinates",
+                location: coordinate
+            )]
+        }
+
         let prefs = preferences.currentPreferences
         let useGoogle = prefs.routingProvider == .googleMaps || prefs.googlePoiSearch
 
@@ -48,6 +59,49 @@ public final class GeocodingRepository: Sendable {
             return try await orsSearch(trimmed, near: near, key: key)
         }
         throw RoutingError.missingKey(prefs.routingProvider)
+    }
+
+    // MARK: - Coordinates
+
+    /// Reads a decimal-degree pair: `3.139, 101.687`, `3.139 101.687`,
+    /// `3.139°N 101.687°E`, or `N3.139, E101.687`.
+    ///
+    /// Deliberately strict — a bare pair of numbers is only treated as a position
+    /// when both halves are in range and neither carries stray text, so a search for
+    /// a place with digits in its name still goes to the geocoder.
+    static func parseCoordinate(_ text: String) -> LatLon? {
+        let cleaned = text
+            .replacingOccurrences(of: "°", with: " ")
+            .replacingOccurrences(of: ",", with: " ")
+        let parts = cleaned
+            .components(separatedBy: .whitespaces)
+            .filter { !$0.isEmpty }
+        guard parts.count == 2 else { return nil }
+
+        guard let first = component(parts[0], negative: ["s", "S"], positive: ["n", "N"]),
+              let second = component(parts[1], negative: ["w", "W"], positive: ["e", "E"])
+        else { return nil }
+
+        guard (-90...90).contains(first), (-180...180).contains(second) else { return nil }
+        return LatLon(lat: first, lon: second)
+    }
+
+    /// One half of a pair: a number with an optional hemisphere letter on either
+    /// end. The letter, when present, must be the right one for that axis.
+    private static func component(_ raw: String, negative: [String], positive: [String]) -> Double? {
+        var body = raw
+        var hemisphereIsNegative = false
+
+        for letter in negative + positive where body.hasPrefix(letter) || body.hasSuffix(letter) {
+            body = body.replacingOccurrences(of: letter, with: "")
+            hemisphereIsNegative = negative.contains(letter)
+            break
+        }
+
+        // `Double` rejects anything with leftover text, so "3rd" and "101st" stay
+        // words rather than becoming a position.
+        guard let value = Double(body) else { return nil }
+        return hemisphereIsNegative ? -abs(value) : value
     }
 
     // MARK: - OpenRouteService (Pelias)
@@ -108,6 +162,7 @@ public final class GeocodingRepository: Sendable {
         }
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
+        PlacesUsageCounter.shared.record()
         let (data, response) = try await session.data(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw RoutingError.provider(

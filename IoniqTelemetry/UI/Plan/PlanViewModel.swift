@@ -28,6 +28,13 @@ final class PlanViewModel {
         var isSearching = false
     }
 
+    struct ChargerAvailability: Equatable {
+        let available: Int
+        let total: Int
+
+        var isFull: Bool { available == 0 }
+    }
+
     enum Slot: Equatable {
         case origin
         case destination
@@ -56,6 +63,9 @@ final class PlanViewModel {
     private(set) var routePoints: [LatLon] = []
     private(set) var hasElevationData = false
     private(set) var nearbyChargers: [Charger] = []
+    /// Live connector availability by charger id, for the chargers Places could be
+    /// matched to. Absent means "no live status", never "free".
+    private(set) var chargerAvailability: [String: ChargerAvailability] = [:]
     private(set) var savedTrips: [SavedTrip] = []
     private(set) var favoritePlaces: [SavedPlaceEntity] = []
     /// Chargers the driver rejected; excluded from the next solve.
@@ -145,6 +155,13 @@ final class PlanViewModel {
     }
 
     func setQuery(_ text: String, for slot: Slot) {
+        // SwiftUI writes the binding back when the value changes underneath the
+        // field, so filling a slot in code — Current location, a favourite, a saved
+        // trip — arrived here as if the driver had typed it, and the label was sent
+        // to the geocoder. That is where "Current location" came back as a place to
+        // pick. Compose only calls back on real edits, which is why Android never
+        // showed this.
+        guard text != endpoint(for: slot).query else { return }
         update(slot) { $0.query = text }
         search(text, slot: slot)
     }
@@ -230,7 +247,7 @@ final class PlanViewModel {
             errorMessage = "Location unavailable. Check permissions in Settings."
             return
         }
-        select(PlaceResult(name: "Current Location", location: location), for: .origin)
+        select(PlaceResult(name: "Current location", location: location), for: .origin)
     }
 
     /// Uses a nearby charger as the destination — the "drive to this charger" case,
@@ -447,7 +464,7 @@ final class PlanViewModel {
             fallback = selected
         } else {
             fallback = (await locationProvider.currentLocation())
-                .map { PlaceResult(name: "Current Location", location: $0) }
+                .map { PlaceResult(name: "Current location", location: $0) }
         }
 
         let originName = parsed.origin?.trimmingCharacters(in: .whitespaces)
@@ -503,6 +520,14 @@ final class PlanViewModel {
     }
 
     func dismissAiError() { aiError = nil }
+
+    /// Clears the prompt along with the echo of the last parse — leaving the
+    /// interpretation on screen next to an empty box reads as if it still applies.
+    func clearAiInput() {
+        aiInput = ""
+        aiInterpretation = nil
+        aiError = nil
+    }
 
     private func isChargerQuery(_ text: String) -> Bool {
         ["charger", "charging", "near me", "nearby"].contains { text.localizedCaseInsensitiveContains($0) }
@@ -630,6 +655,52 @@ final class PlanViewModel {
         )
     }
 
+    /// Drops a saved place into a stopover slot, reusing a blank one the driver has
+    /// already added rather than leaving an empty field behind it.
+    func addFavoriteAsWaypoint(_ favorite: SavedPlaceEntity) {
+        let blank = waypoints.firstIndex { $0.selected == nil && $0.query.trimmingCharacters(in: .whitespaces).isEmpty }
+        let index: Int
+        if let blank {
+            index = blank
+        } else {
+            addWaypoint()
+            index = waypoints.count - 1
+        }
+        selectFavorite(favorite, for: .waypoint(index))
+    }
+
+    func renameFavorite(_ favorite: SavedPlaceEntity, to newName: String) {
+        try? services.savedPlaces.rename(id: favorite.id, to: newName)
+        // Saved trips embed a copy of the place name, so keep them in sync.
+        try? services.savedTrips.renamePlace(lat: favorite.lat, lon: favorite.lon, to: newName)
+        renameSelectedEndpoints(lat: favorite.lat, lon: favorite.lon, to: newName)
+        reloadSaved()
+    }
+
+    /// Relabels any slot currently holding the renamed place, so the fields on screen
+    /// do not keep showing the old name.
+    private func renameSelectedEndpoints(lat: Double, lon: Double, to newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+
+        func rename(_ endpoint: inout Endpoint) {
+            guard let selected = endpoint.selected,
+                  abs(selected.location.lat - lat) < 0.0001,
+                  abs(selected.location.lon - lon) < 0.0001
+            else { return }
+            endpoint.selected = PlaceResult(
+                name: trimmed,
+                subtitle: selected.subtitle,
+                location: selected.location
+            )
+            endpoint.query = trimmed
+        }
+
+        rename(&origin)
+        rename(&destination)
+        for index in waypoints.indices { rename(&waypoints[index]) }
+    }
+
     func deleteFavorite(_ favorite: SavedPlaceEntity) {
         try? services.savedPlaces.deletePlace(id: favorite.id)
         reloadSaved()
@@ -643,6 +714,47 @@ final class PlanViewModel {
         guard locationProvider.isAuthorized else { return }
         guard let center = await locationProvider.currentLocation() else { return }
         nearbyChargers = (try? await services.chargers.chargersNear(center: center, radiusKm: 25)) ?? []
+        await loadNearbyAvailability(center: center)
+    }
+
+    /// Live connector availability for the nearby list.
+    ///
+    /// One Places request for the whole radius, not one per charger — it bills the
+    /// user's key, so the cost stays flat regardless of how many chargers are
+    /// listed. Requires Pro and a Google key; without them the rows simply carry no
+    /// status, which is honest rather than a guess.
+    private func loadNearbyAvailability(center: LatLon) async {
+        chargerAvailability = [:]
+        guard isPro, let key = preferences.googleMapsApiKey, !key.isEmpty else { return }
+        guard let snapshot = try? await services.occupancy.occupancyNear(
+            center, radiusM: 25_000, apiKey: key
+        ) else { return }
+
+        // Places and Open Charge Map name the same site differently, so match on a
+        // normalised containment rather than equality, and leave anything ambiguous
+        // without status.
+        var matched: [String: ChargerAvailability] = [:]
+        for charger in nearbyChargers {
+            let name = Self.normalized(charger.name)
+            guard !name.isEmpty else { continue }
+            let hit = snapshot.stations.first {
+                let station = Self.normalized($0.name)
+                return station == name || station.contains(name) || name.contains(station)
+            }
+            guard let hit, hit.totalCount > 0 else { continue }
+            matched[charger.id] = ChargerAvailability(
+                available: hit.availableCount,
+                total: hit.totalCount
+            )
+        }
+        chargerAvailability = matched
+    }
+
+    private static func normalized(_ name: String) -> String {
+        name.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 
     func dismissRoutingNotice() { routingNotice = nil }

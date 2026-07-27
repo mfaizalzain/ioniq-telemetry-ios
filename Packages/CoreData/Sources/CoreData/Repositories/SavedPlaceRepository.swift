@@ -46,6 +46,17 @@ public final class SavedPlaceRepository: @unchecked Sendable {
         return targetId
     }
 
+    /// Renames an existing place in place, keeping its id and coordinates.
+    public func rename(id: String, to newName: String) throws {
+        let trimmed = newName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        let descriptor = FetchDescriptor<SavedPlaceEntity>(predicate: #Predicate { $0.id == id })
+        if let entity = try modelContext.fetch(descriptor).first {
+            entity.name = trimmed
+            try modelContext.save()
+        }
+    }
+
     public func deletePlace(id: String) throws {
         let descriptor = FetchDescriptor<SavedPlaceEntity>(predicate: #Predicate { $0.id == id })
         if let entity = try modelContext.fetch(descriptor).first {

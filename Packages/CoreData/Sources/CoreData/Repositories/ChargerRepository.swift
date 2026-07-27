@@ -3,12 +3,17 @@ import CoreDomain
 import Foundation
 import SwiftData
 
-/// Repository for charger data — OCM API fetch + local cache with 7-day TTL.
+/// Repository for charger data — Open Charge Map or Google Places fetch, plus a
+/// local cache with a 7-day TTL shared by both.
 public final class ChargerRepository: @unchecked Sendable {
     private let modelContext: ModelContext
     /// Read per request, not captured at init: the user can paste a key into
     /// Settings at any time and the next lookup must pick it up.
     private let apiKey: @Sendable () -> String
+    /// Which source to fetch from, and the Google key behind the Places option.
+    /// Both are closures for the same reason as `apiKey`.
+    private let source: @Sendable () -> ChargerSource
+    private let googleApiKey: @Sendable () -> String
     private let session: URLSession
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -30,9 +35,33 @@ public final class ChargerRepository: @unchecked Sendable {
         30: .nacs
     ]
 
-    public init(modelContext: ModelContext, apiKey: @escaping @Sendable () -> String) {
+    /// Google's EV connector vocabulary. `EV_CONNECTOR_TYPE_TESLA` is the pre-NACS
+    /// spelling and still appears, so both land on the same pair of cases.
+    private static let googleConnectorMap: [String: ConnectorType] = [
+        "EV_CONNECTOR_TYPE_CCS_COMBO_1": .ccs1,
+        "EV_CONNECTOR_TYPE_CCS_COMBO_2": .ccs2,
+        "EV_CONNECTOR_TYPE_CHADEMO": .chademo,
+        "EV_CONNECTOR_TYPE_TYPE_2": .type2,
+        "EV_CONNECTOR_TYPE_NACS": .nacs,
+        "EV_CONNECTOR_TYPE_TESLA": .teslaSupercharger
+    ]
+
+    /// Places caps a nearby search at 50 km and 20 results, so an area is covered
+    /// by tiled circles. Each tile is one billed request, hence the ceiling.
+    private static let googleTileRadiusM: Double = 15_000
+    private static let googleMaxTiles = 12
+    private static let googleMaxResults = 20
+
+    public init(
+        modelContext: ModelContext,
+        apiKey: @escaping @Sendable () -> String,
+        source: @escaping @Sendable () -> ChargerSource = { .openChargeMap },
+        googleApiKey: @escaping @Sendable () -> String = { "" }
+    ) {
         self.modelContext = modelContext
         self.apiKey = apiKey
+        self.source = source
+        self.googleApiKey = googleApiKey
         self.session = URLSession.shared
     }
 
@@ -43,7 +72,9 @@ public final class ChargerRepository: @unchecked Sendable {
         let dLon = radiusKm / (111.0 * max(cos(center.lat * .pi / 180.0), 0.2))
         let chargers = try await loadArea(
             minLat: center.lat - dLat, minLon: center.lon - dLon,
-            maxLat: center.lat + dLat, maxLon: center.lon + dLon
+            maxLat: center.lat + dLat, maxLon: center.lon + dLon,
+            // One circle covers a radius search directly — no tiling needed.
+            googleCenters: [center]
         )
         return chargers
             .filter { !$0.isRestricted && approxDistanceKm(center, LatLon(lat: $0.lat, lon: $0.lon)) <= radiusKm }
@@ -57,7 +88,12 @@ public final class ChargerRepository: @unchecked Sendable {
         let minLon = routePoints.map(\.lon).min()! - corridorKm / 85.0
         let maxLon = routePoints.map(\.lon).max()! + corridorKm / 85.0
 
-        let chargers = try await loadArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+        let chargers = try await loadArea(
+            minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon,
+            // Follow the road rather than tiling the whole bounding box: a route's
+            // box is mostly empty countryside, and every tile is a billed request.
+            googleCenters: sampleAlongRoute(routePoints)
+        )
         return chargers.filter { charger in
             !charger.isRestricted && routePoints.contains { p in
                 approxDistanceKm(p, LatLon(lat: charger.lat, lon: charger.lon)) <= corridorKm
@@ -74,7 +110,13 @@ public final class ChargerRepository: @unchecked Sendable {
 
     // MARK: - Private
 
-    private func loadArea(minLat: Double, minLon: Double, maxLat: Double, maxLon: Double) async throws -> [Charger] {
+    private func loadArea(
+        minLat: Double,
+        minLon: Double,
+        maxLat: Double,
+        maxLon: Double,
+        googleCenters: [LatLon]
+    ) async throws -> [Charger] {
         let prefixes = Geohash.coveringPrefixes(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon, precision: 4)
         let now = Date()
 
@@ -86,7 +128,12 @@ public final class ChargerRepository: @unchecked Sendable {
         var refreshError: (any Error)?
         if stale {
             do {
-                try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+                switch source() {
+                case .openChargeMap:
+                    try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+                case .googlePlaces:
+                    try await refreshGooglePlaces(centers: googleCenters)
+                }
             } catch {
                 // Cached data is better than an error, so hold this and only throw
                 // if the cache turns out to be empty too.
@@ -165,18 +212,164 @@ public final class ChargerRepository: @unchecked Sendable {
         }
     }
 
+    // MARK: - Google Places
+
+    /// Thins a route down to the circle centres worth querying.
+    ///
+    /// Tiles overlap slightly at this spacing so a charger sitting between two
+    /// samples is still inside one of them. Long routes are decimated to the tile
+    /// ceiling rather than refused — a sparse result beats a bill for 300 requests.
+    private func sampleAlongRoute(_ points: [LatLon]) -> [LatLon] {
+        guard let first = points.first else { return [] }
+        let spacingKm = Self.googleTileRadiusM / 1000 * 1.6
+
+        var centers: [LatLon] = [first]
+        for point in points.dropFirst() {
+            guard let last = centers.last else { break }
+            if approxDistanceKm(last, point) >= spacingKm { centers.append(point) }
+        }
+        if let last = points.last, centers.last.map({ approxDistanceKm($0, last) > spacingKm / 2 }) == true {
+            centers.append(last)
+        }
+
+        guard centers.count > Self.googleMaxTiles else { return centers }
+        // Keep the ends and spread the rest evenly, so the thinning shows up as
+        // coarser coverage over the whole route rather than a truncated one.
+        let stride = Double(centers.count - 1) / Double(Self.googleMaxTiles - 1)
+        return (0..<Self.googleMaxTiles).map { centers[Int((Double($0) * stride).rounded())] }
+    }
+
+    private func refreshGooglePlaces(centers: [LatLon]) async throws {
+        let key = googleApiKey().trimmingCharacters(in: .whitespaces)
+        guard !key.isEmpty else {
+            _servingCachedData.value = true
+            throw ChargerError.missingGoogleKey
+        }
+        guard !centers.isEmpty else { return }
+
+        let now = Date()
+        var inserted = 0
+        var lastError: (any Error)?
+
+        for center in centers.prefix(Self.googleMaxTiles) {
+            do {
+                inserted += try await fetchGoogleCircle(center: center, key: key, now: now)
+            } catch {
+                // One tile failing shouldn't discard the tiles that worked.
+                lastError = error
+            }
+        }
+
+        if inserted == 0, let lastError {
+            _servingCachedData.value = true
+            throw lastError
+        }
+        try modelContext.save()
+        _servingCachedData.value = false
+    }
+
+    private func fetchGoogleCircle(center: LatLon, key: String, now: Date) async throws -> Int {
+        var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchNearby")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(key, forHTTPHeaderField: "X-Goog-Api-Key")
+        // The field mask decides the billing SKU. `evChargeOptions` is what makes
+        // these places usable as chargers rather than pins on a map.
+        request.setValue(
+            "places.id,places.displayName,places.location,places.evChargeOptions,places.businessStatus",
+            forHTTPHeaderField: "X-Goog-FieldMask"
+        )
+        request.httpBody = try encoder.encode(PlacesNearbyRequest(
+            includedTypes: ["electric_vehicle_charging_station"],
+            maxResultCount: Self.googleMaxResults,
+            locationRestriction: .init(circle: .init(
+                center: .init(latitude: center.lat, longitude: center.lon),
+                radius: Self.googleTileRadiusM
+            ))
+        ))
+
+        do {
+            PlacesUsageCounter.shared.record()
+            let (data, response) = try await session.data(for: request)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                throw ChargerError.googleHttpStatus(http.statusCode)
+            }
+            let decoded = try decoder.decode(PlacesNearbyResponse.self, from: data)
+            var count = 0
+            for place in decoded.places {
+                guard let entity = placeToEntity(place, now: now) else { continue }
+                modelContext.insert(entity)
+                count += 1
+            }
+            return count
+        } catch let error as ChargerError {
+            throw error
+        } catch {
+            throw ChargerError.transport(error)
+        }
+    }
+
+    private func placeToEntity(_ place: PlacesNearbyResponse.Place, now: Date) -> ChargerEntity? {
+        guard let id = place.id,
+              let lat = place.location?.latitude,
+              let lon = place.location?.longitude
+        else { return nil }
+
+        let aggregation = place.evChargeOptions?.connectorAggregation ?? []
+        let connectors: [Connector] = aggregation.compactMap { entry in
+            guard let type = entry.type.flatMap({ Self.googleConnectorMap[$0] }) else { return nil }
+            return Connector(
+                type: type,
+                powerKw: Float(entry.maxChargeRateKw ?? 0),
+                count: entry.count ?? 1
+            )
+        }
+        // A place with no recognised connector is a charging location Google knows
+        // nothing useful about — routing can't reason about it, so drop it.
+        guard !connectors.isEmpty else { return nil }
+
+        let connectorsJson = (try? encoder.encode(connectors)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
+
+        return ChargerEntity(
+            id: "gp-\(id)",
+            name: place.displayName?.text ?? "Charger",
+            lat: lat,
+            lon: lon,
+            geohash: Geohash.encode(lat: lat, lon: lon, precision: 6),
+            maxPowerKw: connectors.map(\.powerKw).max() ?? 0,
+            connectorsJson: connectorsJson,
+            // Places reports no network operator, price or access policy, so those
+            // stay empty rather than being guessed at.
+            operator: nil,
+            isOperational: place.businessStatus.map { $0 == "OPERATIONAL" } ?? true,
+            pricePerKwh: nil,
+            cachedAt: now,
+            isRestricted: false,
+            usageTypeId: nil,
+            usageCost: nil
+        )
+    }
+
     // MARK: - Errors
 
 public enum ChargerError: LocalizedError {
     case missingApiKey
+    case missingGoogleKey
     case badRequest
     case httpStatus(Int)
+    case googleHttpStatus(Int)
     case transport(any Error)
 
     public var errorDescription: String? {
         switch self {
         case .missingApiKey:
             return "Add an Open Charge Map key in Settings to look up chargers."
+        case .missingGoogleKey:
+            return "Add a Google Maps key in Settings to look up chargers with Google Places."
+        case .googleHttpStatus(let code) where code == 401 || code == 403:
+            return "Google rejected the key. Check that the Places API (New) is enabled for it."
+        case .googleHttpStatus(let code):
+            return "Google Places returned an error (HTTP \(code))."
         case .badRequest:
             return "Could not build the charger request."
         case .httpStatus(let code) where code == 401 || code == 403:
@@ -280,6 +473,62 @@ public enum ChargerError: LocalizedError {
         let dLat = (a.lat - b.lat) * 111.0
         let dLon = (a.lon - b.lon) * 111.0 * cos((a.lat + b.lat) / 2 * .pi / 180.0)
         return sqrt(dLat * dLat + dLon * dLon)
+    }
+}
+
+// MARK: - Google Places API Models
+
+private struct PlacesNearbyRequest: Encodable {
+    struct LocationRestriction: Encodable {
+        struct Circle: Encodable {
+            struct Center: Encodable {
+                let latitude: Double
+                let longitude: Double
+            }
+            let center: Center
+            let radius: Double
+        }
+        let circle: Circle
+    }
+
+    let includedTypes: [String]
+    let maxResultCount: Int
+    let locationRestriction: LocationRestriction
+}
+
+private struct PlacesNearbyResponse: Decodable {
+    struct Place: Decodable {
+        struct DisplayName: Decodable { let text: String? }
+        struct Location: Decodable {
+            let latitude: Double?
+            let longitude: Double?
+        }
+        struct EvChargeOptions: Decodable {
+            struct ConnectorAggregation: Decodable {
+                let type: String?
+                let maxChargeRateKw: Double?
+                let count: Int?
+                let availableCount: Int?
+            }
+            let connectorCount: Int?
+            let connectorAggregation: [ConnectorAggregation]?
+        }
+
+        let id: String?
+        let displayName: DisplayName?
+        let location: Location?
+        let evChargeOptions: EvChargeOptions?
+        let businessStatus: String?
+    }
+
+    let places: [Place]
+
+    private enum CodingKeys: String, CodingKey { case places }
+
+    /// Places omits the array entirely when nothing matches.
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        places = try container.decodeIfPresent([Place].self, forKey: .places) ?? []
     }
 }
 

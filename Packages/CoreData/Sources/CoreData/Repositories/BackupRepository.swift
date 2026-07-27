@@ -225,6 +225,7 @@ private struct BackupSettings: Codable {
     var aiCoachingEnabled: Bool?
     var chargerOccupancyAlerts: Bool?
     var googlePoiSearch: Bool?
+    var chargerSource: String?
     var estimatedSohPercent: Float?
     var estimatedSohTimestamp: Int64?
 
@@ -245,6 +246,7 @@ private struct BackupSettings: Codable {
         aiCoachingEnabled = prefs.aiCoachingEnabled
         chargerOccupancyAlerts = prefs.chargerOccupancyAlerts
         googlePoiSearch = prefs.googlePoiSearch
+        chargerSource = prefs.chargerSource.rawValue
         estimatedSohPercent = prefs.estimatedSohPercent
         estimatedSohTimestamp = prefs.estimatedSohTimestamp
     }
@@ -271,6 +273,9 @@ private struct BackupSettings: Codable {
         if let aiCoachingEnabled { next.aiCoachingEnabled = aiCoachingEnabled }
         if let chargerOccupancyAlerts { next.chargerOccupancyAlerts = chargerOccupancyAlerts }
         if let googlePoiSearch { next.googlePoiSearch = googlePoiSearch }
+        if let chargerSource, let value = ChargerSource(rawValue: chargerSource) {
+            next.chargerSource = value
+        }
         next.estimatedSohPercent = estimatedSohPercent ?? current.estimatedSohPercent
         if let estimatedSohTimestamp { next.estimatedSohTimestamp = estimatedSohTimestamp }
         return next

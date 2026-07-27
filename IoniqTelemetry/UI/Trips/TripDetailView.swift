@@ -41,6 +41,7 @@ struct TripDetailView: View {
                     )
                     .frame(height: 180)
                 } else {
+                    DriveAnalyticsCard(analytics: analyzeDrive(samples: samples))
                     TraceChart(title: "STATE OF CHARGE", unit: "%", samples: samples) { $0.soc }
                     TraceChart(title: "SPEED", unit: "km/h", samples: samples) { $0.speedKph }
                     TraceChart(title: "POWER", unit: "kW", samples: samples) { $0.powerKw }
@@ -112,12 +113,85 @@ struct TripDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(Color.appAccent)
+                    // The system's label choice on the bright accent is unreadable.
+                    .foregroundStyle(Color.appOnAccent)
                 }
             }
             .padding(12)
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(label)
+                .font(.ioniqCaption)
+                .foregroundStyle(.secondary)
+                .ioniqStatLabel()
+            Text(value)
+                .font(.system(size: 14, weight: .semibold))
+                .minimumScaleFactor(0.6)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// How much of the energy drawn from the pack came back through regen.
+///
+/// Integrated from this trip's samples, so recovered, net and share all share one
+/// basis — the Android build's "Drive Analytics" card.
+private struct DriveAnalyticsCard: View {
+    let analytics: DriveAnalytics
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("DRIVE ANALYTICS", systemImage: "battery.100.bolt")
+                    .font(.ioniqCaption)
+                    .foregroundStyle(.secondary)
+                    .ioniqStatLabel()
+
+                if analytics.hasData {
+                    HStack(spacing: 0) {
+                        stat("RECOVERED", String(format: "%.1f kWh", analytics.regenKwh))
+                        stat("REGEN SHARE", String(format: "%.0f%%", analytics.regenSharePercent))
+                        stat("NET ENERGY", String(format: "%.1f kWh", analytics.netConsumedKwh))
+                        stat("RATING", analytics.regenRating)
+                    }
+
+                    shareBar
+
+                    Text("Regenerative braking recovered \(String(format: "%.0f", analytics.regenSharePercent))% of the energy drawn from the battery. Higher is more efficient — smoother, anticipatory driving recovers more.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Not enough power telemetry was logged for this trip to analyze regen.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(12)
+        }
+        .padding(.horizontal)
+        .backgroundStyle(.ultraThinMaterial)
+    }
+
+    /// Recovered energy as a proportion of gross draw.
+    private var shareBar: some View {
+        GeometryReader { geometry in
+            let fraction = min(max(Double(analytics.regenSharePercent) / 100, 0), 1)
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.appSurfaceVariant)
+                Capsule()
+                    .fill(Color.appGreen)
+                    .frame(width: geometry.size.width * fraction)
+            }
+        }
+        .frame(height: 8)
+        .accessibilityHidden(true)
     }
 
     private func stat(_ label: String, _ value: String) -> some View {

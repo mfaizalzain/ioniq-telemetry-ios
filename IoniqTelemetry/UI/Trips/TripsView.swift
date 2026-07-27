@@ -4,24 +4,48 @@ import CoreUI
 import SwiftUI
 
 struct TripsView: View {
+    private enum HistoryTab: Hashable { case trips, charging }
+
     @Environment(AppServices.self) private var services
     @State private var viewModel: TripsViewModel?
     @State private var pendingDelete: TripEntity?
+    @State private var pendingSessionDelete: ChargeSessionEntity?
+    @State private var tab: HistoryTab = .trips
 
     var body: some View {
         NavigationStack {
             Group {
                 if let viewModel {
-                    if viewModel.trips.isEmpty {
-                        EmptyTripsView()
-                    } else {
-                        tripList(viewModel)
+                    VStack(spacing: 0) {
+                        Picker("History", selection: $tab) {
+                            Text("Drives (\(viewModel.trips.count))").tag(HistoryTab.trips)
+                            Text("Charging (\(viewModel.chargeSessions.count))").tag(HistoryTab.charging)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+
+                        switch tab {
+                        case .trips:
+                            if viewModel.trips.isEmpty {
+                                EmptyTripsView()
+                            } else {
+                                tripList(viewModel)
+                            }
+                        case .charging:
+                            if viewModel.chargeSessions.isEmpty {
+                                EmptyChargeHistoryView()
+                            } else {
+                                chargeList(viewModel)
+                            }
+                        }
                     }
                 } else {
                     ProgressView()
                 }
             }
             .background(Color.appBackground)
+            // Kept in step with the bottom tab bar's label, which still says Trips.
             .navigationTitle("Trips")
             .overlay(alignment: .bottom) {
                 if let viewModel, viewModel.recentlyDeleted != nil {
@@ -44,6 +68,15 @@ struct TripsView: View {
                 }
             } message: {
                 Text("You can undo this right after.")
+            }
+            .alert("Delete this charge session?", isPresented: .constant(pendingSessionDelete != nil)) {
+                Button("Cancel", role: .cancel) { pendingSessionDelete = nil }
+                Button("Delete", role: .destructive) {
+                    if let session = pendingSessionDelete { viewModel?.deleteChargeSession(session) }
+                    pendingSessionDelete = nil
+                }
+            } message: {
+                Text("This can't be undone.")
             }
         }
         .task {
@@ -80,6 +113,25 @@ struct TripsView: View {
                 }
                 .listRowBackground(Color.appSurface)
             }
+        }
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .refreshable { viewModel.refresh() }
+    }
+
+    private func chargeList(_ viewModel: TripsViewModel) -> some View {
+        List {
+            ForEach(viewModel.chargeSessions, id: \.id) { session in
+                ChargeSessionCard(session: session, viewModel: viewModel)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            pendingSessionDelete = session
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+            .listRowBackground(Color.appSurface)
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
@@ -155,6 +207,77 @@ struct TripCard: View {
             }
 
             SocBar(startSoc: trip.startSoc, endSoc: trip.endSoc)
+        }
+        .padding(.vertical, 6)
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.ioniqCaption)
+                .foregroundStyle(.secondary)
+                .ioniqStatLabel()
+            Text(value)
+                .font(.system(size: 14, weight: .semibold))
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Charge Session Card
+
+/// One logged charge session. Sessions are captured automatically by
+/// `TripLogRepository` whenever the car draws power while stationary.
+struct ChargeSessionCard: View {
+    let session: ChargeSessionEntity
+    let viewModel: TripsViewModel
+
+    private var isDC: Bool { session.chargeType.localizedCaseInsensitiveContains("DC") }
+
+    private var socGain: Int? {
+        guard let end = session.endSoc, end >= session.startSoc else { return nil }
+        return Int(end - session.startSoc)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 12) {
+                Image(systemName: isDC ? "bolt.fill" : "powerplug.fill")
+                    .font(.system(size: 15))
+                    .foregroundStyle(Color.appGreen)
+                    .frame(width: 36, height: 36)
+                    .background(Color.appGreen.opacity(0.15))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.startTime, format: .dateTime.weekday(.abbreviated).day().month().hour().minute())
+                        .font(.subheadline.weight(.medium))
+                    Text(isDC ? "DC fast charge" : "AC charge")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            Divider()
+
+            HStack(spacing: 0) {
+                stat("ADDED", String(format: "+%.1f kWh", session.energyAddedKwh))
+                stat("PEAK", String(format: "%.1f kW", session.peakPowerKw))
+                stat("AVERAGE", String(format: "%.1f kW", session.avgPowerKw))
+                stat("DURATION", viewModel.duration(session))
+            }
+
+            SocBar(startSoc: session.startSoc, endSoc: session.endSoc)
+
+            if let socGain {
+                Text("+\(socGain)% state of charge")
+                    .font(.caption)
+                    .foregroundStyle(Color.appGreen)
+            }
         }
         .padding(.vertical, 6)
     }
@@ -254,6 +377,26 @@ struct EmptyTripsView: View {
                 .font(.title2.weight(.medium))
                 .foregroundStyle(.secondary)
             Text("Trips are logged automatically whenever the vehicle ignition is active. Start driving and they'll appear here.")
+                .font(.body)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            Spacer()
+        }
+    }
+}
+
+struct EmptyChargeHistoryView: View {
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "bolt.badge.clock")
+                .font(.system(size: 56))
+                .foregroundStyle(.tertiary)
+            Text("No Charge History Yet")
+                .font(.title2.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text("Charging sessions are logged automatically whenever the adapter is connected and the car is charging.")
                 .font(.body)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

@@ -18,8 +18,10 @@ struct PaywallView: View {
                     if let viewModel {
                         if viewModel.isPro {
                             ActiveProCard()
-                        } else {
-                            ProductList(viewModel: viewModel)
+                        } else if let product = viewModel.product {
+                            ProductButton(product: product, viewModel: viewModel)
+                        } else if viewModel.isLoading {
+                            ProgressView()
                         }
 
                         if let error = viewModel.errorMessage {
@@ -78,7 +80,7 @@ struct PaywallView: View {
 
 private struct FeatureList: View {
     private static let features: [(icon: String, title: String, detail: String)] = [
-        ("sparkles", "AI Assistant", "Plain-language diagnostics and energy coaching"),
+        ("sparkles", "AI Assistant", "Plain-language diagnostics and energy insights"),
         ("bell.badge", "Charger Occupancy Alerts", "Know before you arrive at a full charger"),
         ("map", "Live Charger Availability", "Real-time status along your route"),
         ("calendar", "365-Day Trip History", "Up from 90 days on the free tier"),
@@ -111,33 +113,12 @@ private struct FeatureList: View {
     }
 }
 
-// MARK: - Products
+// MARK: - Product
 
-private struct ProductList: View {
-    let viewModel: PaywallViewModel
-
-    var body: some View {
-        VStack(spacing: 10) {
-            if viewModel.isLoading && viewModel.products.isEmpty {
-                ProgressView()
-            }
-            ForEach(viewModel.products) { product in
-                ProductButton(
-                    product: product,
-                    viewModel: viewModel,
-                    badge: product.id == PaywallViewModel.ProductKind.yearly.rawValue
-                        ? viewModel.yearlySavingsPercent.map { "SAVE \($0)%" }
-                        : nil
-                )
-            }
-        }
-    }
-}
-
+/// The single non-consumable unlock. No plan picker — there is one price, paid once.
 private struct ProductButton: View {
     let product: Product
     let viewModel: PaywallViewModel
-    let badge: String?
 
     var body: some View {
         Button {
@@ -145,19 +126,9 @@ private struct ProductButton: View {
         } label: {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 6) {
-                        Text(viewModel.title(for: product))
-                            .font(.headline)
-                        if let badge {
-                            Text(badge)
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 2)
-                                .background(Color.appGreen.opacity(0.2), in: Capsule())
-                                .foregroundStyle(Color.appGreen)
-                        }
-                    }
-                    Text(viewModel.subtitle(for: product))
+                    Text("Unlock Pro")
+                        .font(.headline)
+                    Text("One-time purchase")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -202,10 +173,17 @@ private struct ActiveProCard: View {
 private struct LegalLinks: View {
     var body: some View {
         VStack(spacing: 6) {
-            Text("Subscriptions renew automatically until cancelled. Manage them in your Apple Account settings.")
+            Text("Pro is a one-time purchase — no subscription, nothing to renew or cancel.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
+
+            HStack(spacing: 16) {
+                Link("Privacy Policy", destination: AppLinks.privacyPolicy)
+                Link("Terms of Use", destination: AppLinks.termsOfUse)
+            }
+            .font(.caption2)
+            .tint(Color.appAccent)
         }
         .padding(.top, 4)
     }

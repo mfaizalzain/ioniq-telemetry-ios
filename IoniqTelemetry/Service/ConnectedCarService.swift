@@ -95,6 +95,7 @@ final class ConnectedCarService {
                     self.location.start()
                 } else if state == .disconnected || state == .error {
                     self.location.stop()
+                    self.finalizeActiveTrip()
                     self.driveMonitor.reset()
                     self.parkedEvaluator.reset()
                     self.parkedState = .unknown
@@ -107,12 +108,41 @@ final class ConnectedCarService {
         isRunning = false
         cancellables.removeAll()
         location.stop()
+        finalizeActiveTrip()
         driveMonitor.reset()
         parkedEvaluator.reset()
         // Without this, a service torn down mid-drive leaves `.driving` latched and
         // every gated surface stays locked with nothing left running to unlock it.
         parkedState = .unknown
         isTripActive = false
+    }
+
+    /// Closes an in-progress trip when the adapter drops or the pipeline is torn down.
+    ///
+    /// `DriveMonitor` only emits `.end` from a telemetry frame, and once the adapter
+    /// is gone no further frames arrive — so its 90 s disconnect grace never gets to
+    /// fire and the trip is left at its 0 km / no-end-time start defaults, showing as
+    /// "in progress" forever. `endTrip` is idempotent (it no-ops without an active
+    /// trip id), so racing the frame-driven path here cannot finalize twice.
+    private func finalizeActiveTrip() {
+        let wasActive = driveMonitor.tripActive
+        let telemetry = lastTelemetry
+        isTripActive = false
+
+        let tripLog = services.tripLog
+        Task {
+            do {
+                if wasActive {
+                    try await tripLog.endTrip(telemetry: telemetry)
+                } else {
+                    // No trip to close, but samples may still be buffered from one
+                    // the frame-driven path already ended.
+                    try tripLog.flushPendingSamples()
+                }
+            } catch {
+                print("[ConnectedCarService] finalizeActiveTrip failed: \(error.localizedDescription)")
+            }
+        }
     }
 
     // MARK: - Pipeline

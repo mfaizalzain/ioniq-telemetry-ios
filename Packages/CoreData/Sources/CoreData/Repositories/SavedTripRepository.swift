@@ -99,6 +99,42 @@ public final class SavedTripRepository: @unchecked Sendable {
         return targetId
     }
 
+    /// Renames every endpoint or waypoint sitting at `lat`/`lon` across all saved trips,
+    /// so renaming a saved place stays visible in the trips that use it. The trips' own
+    /// names are user-chosen and are left alone. Returns the number of trips changed.
+    @discardableResult
+    public func renamePlace(lat: Double, lon: Double, to newName: String) throws -> Int {
+        let trimmed = newName.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return 0 }
+
+        func renamed(_ place: SavedPlaceDef) -> SavedPlaceDef {
+            guard abs(place.lat - lat) < 0.0001, abs(place.lon - lon) < 0.0001 else { return place }
+            return SavedPlaceDef(name: trimmed, lat: place.lat, lon: place.lon)
+        }
+
+        var updated = 0
+        for entity in try modelContext.fetch(FetchDescriptor<SavedTripEntity>()) {
+            guard let data = entity.planJson.data(using: .utf8),
+                  let def = try? decoder.decode(SavedTripDef.self, from: data)
+            else { continue }
+
+            let newDef = SavedTripDef(
+                origin: renamed(def.origin),
+                destination: renamed(def.destination),
+                waypoints: def.waypoints.map { renamed($0) },
+                arrivalSocTarget: def.arrivalSocTarget
+            )
+            guard newDef != def else { continue }
+
+            let jsonData = try encoder.encode(newDef)
+            entity.planJson = String(data: jsonData, encoding: .utf8) ?? entity.planJson
+            updated += 1
+        }
+
+        if updated > 0 { try modelContext.save() }
+        return updated
+    }
+
     public func delete(id: String) throws {
         let descriptor = FetchDescriptor<SavedTripEntity>(predicate: #Predicate { $0.id == id })
         if let entity = try modelContext.fetch(descriptor).first {

@@ -15,6 +15,9 @@ final class SettingsViewModel {
 
     private(set) var preferences = UserPreferences()
     private(set) var isPro = false
+    /// Billed Google Places requests since launch — charger lookup, POI search and
+    /// occupancy alerts all land on the user's own key.
+    private(set) var placesApiCalls = 0
 
     // MARK: - Adapter
 
@@ -53,6 +56,11 @@ final class SettingsViewModel {
         services.telemetry.connectionState
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.connectionState = $0 }
+            .store(in: &cancellables)
+
+        PlacesUsageCounter.shared.count
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.placesApiCalls = $0 }
             .store(in: &cancellables)
 
         services.bleScanner.devices
@@ -135,10 +143,17 @@ final class SettingsViewModel {
     func setAiCoaching(_ value: Bool) { update { $0.aiCoachingEnabled = value } }
     func setGoogleMapsKey(_ value: String) { update { $0.googleMapsApiKey = value.isEmpty ? nil : value } }
     func setOrsKey(_ value: String) { update { $0.orsApiKey = value.isEmpty ? nil : value } }
-    func setOpenChargeMapKey(_ value: String) { update { $0.openChargeMapApiKey = value.isEmpty ? nil : value } }
     func setRoutingProvider(_ value: RoutingProvider) { update { $0.routingProvider = value } }
     func setChargerOccupancyAlerts(_ value: Bool) { update { $0.chargerOccupancyAlerts = value } }
     func setGooglePoiSearch(_ value: Bool) { update { $0.googlePoiSearch = value } }
+
+    /// Switching source invalidates the cache: rows from the old provider would
+    /// otherwise keep satisfying the 7-day TTL and the change would look inert.
+    func setChargerSource(_ value: ChargerSource) {
+        guard value != preferences.chargerSource else { return }
+        update { $0.chargerSource = value }
+        try? services.chargers.clearCache()
+    }
     func setReserveSoc(_ value: Float) { update { $0.reserveSocPercent = value } }
     func setTargetArrivalSoc(_ value: Float) { update { $0.targetArrivalSocPercent = value } }
 

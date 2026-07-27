@@ -65,6 +65,9 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         prefs.chargerOccupancyAlerts = defaults.bool(forKey: "chargerOccupancyAlerts", default: false)
         prefs.googlePoiSearch = defaults.bool(forKey: "googlePoiSearch", default: false)
 
+        if let raw = defaults.string(forKey: "chargerSource"),
+           let val = ChargerSource(rawValue: raw) { prefs.chargerSource = val }
+
         return prefs
     }
 
@@ -93,6 +96,7 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(prefs.aiCoachingEnabled, forKey: "aiCoachingEnabled")
         defaults.set(prefs.chargerOccupancyAlerts, forKey: "chargerOccupancyAlerts")
         defaults.set(prefs.googlePoiSearch, forKey: "googlePoiSearch")
+        defaults.set(prefs.chargerSource.rawValue, forKey: "chargerSource")
     }
 
     private static func setFloatOrNil(_ value: Float?, forKey key: String, in defaults: UserDefaults) {

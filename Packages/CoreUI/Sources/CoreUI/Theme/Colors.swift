@@ -135,6 +135,15 @@ public extension UIColor {
             : UIColor(red: 0x00 / 255.0, green: 0x6B / 255.0, blue: 0x58 / 255.0, alpha: 1)
     }
 
+    /// Label colour for anything filled with `appAccent`.
+    ///
+    /// The dark theme's accent is a bright teal, and the system's own choice of
+    /// label colour against it lands near 1.3:1 — legible only if you already know
+    /// what it says. Deep navy on that teal is about 11:1.
+    static let appOnAccent = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .deepNavy : .white
+    }
+
     /// Healthy / connected, contrast-safe in both themes.
     static let appGreen = UIColor { traits in
         traits.userInterfaceStyle == .dark
@@ -150,5 +159,6 @@ public extension Color {
     static let appOnSurface = Color(uiColor: .appOnSurface)
     static let appOutline = Color(uiColor: .appOutline)
     static let appAccent = Color(uiColor: .appAccent)
+    static let appOnAccent = Color(uiColor: .appOnAccent)
     static let appGreen = Color(uiColor: .appGreen)
 }

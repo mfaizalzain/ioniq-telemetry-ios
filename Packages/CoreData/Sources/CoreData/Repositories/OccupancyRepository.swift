@@ -1,3 +1,4 @@
+import Combine
 import CoreDomain
 import Foundation
 
@@ -27,6 +28,30 @@ public struct OccupancySnapshot: Sendable, Equatable {
 
     /// True when every station reporting status has zero free connectors.
     public var allOccupied: Bool { hasStatus && stations.allSatisfy(\.isOccupied) }
+}
+
+/// Counts billed Google Places requests for the current app run.
+///
+/// Places bills per call against the user's own key, and nothing in the app made
+/// that visible — the first sign of a runaway poll was the Cloud console bill. Not
+/// persisted: it answers "what is this session costing me", and a lifetime total
+/// would need reconciling with Google's own metering to mean anything.
+public final class PlacesUsageCounter: @unchecked Sendable {
+    public static let shared = PlacesUsageCounter()
+
+    private let lock = NSLock()
+    private let subject = CurrentValueSubject<Int, Never>(0)
+
+    public var count: AnyPublisher<Int, Never> { subject.eraseToAnyPublisher() }
+    public var currentCount: Int { subject.value }
+
+    public func record(_ requests: Int = 1) {
+        lock.withLock { subject.value += requests }
+    }
+
+    public func reset() {
+        lock.withLock { subject.value = 0 }
+    }
 }
 
 public final class OccupancyRepository: Sendable {
@@ -62,6 +87,7 @@ public final class OccupancyRepository: Sendable {
             ))
         ))
 
+        PlacesUsageCounter.shared.record()
         let (data, response) = try await session.data(for: request)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw OccupancyError.requestFailed(

@@ -21,7 +21,7 @@ struct AiSection: View {
             }
 
             SecretField(
-                placeholder: "API key",
+                placeholder: "Gemini API key",
                 initialValue: viewModel.preferences.geminiApiKey ?? "",
                 onCommit: { viewModel.setGeminiKey($0) },
                 helpTitle: KeyHelp.geminiTitle,
@@ -29,7 +29,7 @@ struct AiSection: View {
             )
             .disabled(!viewModel.isPro)
 
-            Toggle("Enable AI coaching", isOn: Binding(
+            Toggle("Enable AI", isOn: Binding(
                 get: { viewModel.preferences.aiCoachingEnabled },
                 set: { viewModel.setAiCoaching($0) }
             ))
@@ -76,10 +76,68 @@ struct RoutingSection: View {
             }
 
             RoutingKeyField(viewModel: viewModel)
+            GooglePoiSearchToggle(viewModel: viewModel)
+            GoogleKeyField(viewModel: viewModel)
         } header: {
             Text("Routing")
         } footer: {
             RoutingFooter(missingKey: viewModel.missingRoutingKey)
+        }
+    }
+}
+
+/// Opt-in Google Places destination search while still routing with OpenRouteService
+/// — the Android build's "Google POI search" switch. Not shown for Google routing,
+/// which already searches with Google.
+private struct GooglePoiSearchToggle: View {
+    let viewModel: SettingsViewModel
+
+    var body: some View {
+        if viewModel.preferences.routingProvider == .openRouteService {
+            Toggle("Google POI search", isOn: Binding(
+                get: { viewModel.preferences.googlePoiSearch },
+                set: { viewModel.setGooglePoiSearch($0) }
+            ))
+        }
+    }
+}
+
+/// The one and only Google key field.
+///
+/// Routing, POI search, charger data and occupancy alerts all authenticate with the
+/// same Google Cloud key, so each feature owning its own entry box meant the same
+/// string typed in several places. It appears as soon as any of them needs it.
+struct GoogleKeyField: View {
+    let viewModel: SettingsViewModel
+
+    private var isNeeded: Bool {
+        viewModel.preferences.routingProvider == .googleMaps
+            || viewModel.preferences.googlePoiSearch
+            || viewModel.preferences.chargerOccupancyAlerts
+            || viewModel.preferences.chargerSource == .googlePlaces
+    }
+
+    var body: some View {
+        if isNeeded {
+            // Routing already shows its own key field for the Google provider.
+            if viewModel.preferences.routingProvider != .googleMaps {
+                SecretField(
+                    placeholder: "Google Maps API key",
+                    initialValue: viewModel.preferences.googleMapsApiKey ?? "",
+                    onCommit: { viewModel.setGoogleMapsKey($0) },
+                    helpTitle: KeyHelp.googleTitle,
+                    helpURL: KeyHelp.google
+                )
+            }
+
+            if (viewModel.preferences.googleMapsApiKey ?? "").isEmpty {
+                Label(
+                    "Google POI search and occupancy alerts need a key with the Places API enabled. Search falls back to OpenRouteService without one.",
+                    systemImage: "exclamationmark.triangle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(Color.amberWarn)
+            }
         }
     }
 }
@@ -136,12 +194,49 @@ struct SecretField: View {
     var helpTitle: String? = nil
     var helpURL: URL? = nil
 
-    @State private var text = ""
+    /// Seeded here rather than in `onAppear`. A section that adds or drops a row
+    /// around this one — buying Pro removes the unlock button above the AI key
+    /// field — reshuffles List row identity and hands the field fresh state; with
+    /// `onAppear` seeding that fires only once per slot, the stored key silently
+    /// vanished from the box.
+    @State private var text: String
     @State private var isRevealed = false
+
+    init(
+        placeholder: String,
+        initialValue: String,
+        onCommit: @escaping (String) -> Void,
+        helpTitle: String? = nil,
+        helpURL: URL? = nil
+    ) {
+        self.placeholder = placeholder
+        self.initialValue = initialValue
+        self.onCommit = onCommit
+        self.helpTitle = helpTitle
+        self.helpURL = helpURL
+        _text = State(initialValue: initialValue)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            // The name of the key is a label in its own right. Leaving it as the
+            // field's placeholder made an empty field read as a greyed-out caption,
+            // with nothing to suggest it could be typed into.
+            HStack(spacing: 6) {
+                Text(placeholder.uppercased())
+                    .font(.ioniqCaption)
+                    .foregroundStyle(.secondary)
+                    .ioniqStatLabel()
+                if !text.isEmpty {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(Color.appGreen)
+                        .accessibilityLabel("Key saved")
+                }
+            }
+
             field
+
             if let helpTitle, let helpURL {
                 Link(destination: helpURL) {
                     HStack(spacing: 4) {
@@ -153,19 +248,32 @@ struct SecretField: View {
                 .tint(Color.appAccent)
             }
         }
+        .padding(.vertical, 4)
     }
 
     private var field: some View {
-        HStack {
+        HStack(spacing: 8) {
             Group {
                 if isRevealed {
-                    TextField(placeholder, text: $text)
+                    TextField("Tap to paste your key", text: $text)
                 } else {
-                    SecureField(placeholder, text: $text)
+                    SecureField("Tap to paste your key", text: $text)
                 }
             }
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
+            .font(.system(size: 15, design: .monospaced))
+
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.tertiary)
+                .accessibilityLabel("Clear key")
+            }
 
             Button {
                 isRevealed.toggle()
@@ -176,8 +284,22 @@ struct SecretField: View {
             .foregroundStyle(.secondary)
             .accessibilityLabel(isRevealed ? "Hide key" : "Show key")
         }
-        .onAppear { text = initialValue }
+        // A visible box, so the row looks like something you can type into.
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.appOutline, lineWidth: 1)
+        )
+        // Only real edits commit: the seed above is applied before the view is
+        // installed, so it never round-trips through the repository.
         .onChange(of: text) { onCommit(text) }
+        // A key pasted in from restore or another field while this one is on
+        // screen still needs to show up.
+        .onChange(of: initialValue) { _, new in
+            if new != text { text = new }
+        }
     }
 }
 
@@ -192,35 +314,47 @@ enum KeyHelp {
 
     static let googleTitle = "Create a key in Google Cloud Console"
     static let google = URL(string: "https://console.cloud.google.com/apis/credentials")!
-
-    static let ocmTitle = "Get a free key at openchargemap.org"
-    static let ocm = URL(string: "https://openchargemap.org/site/developerinfo")!
 }
 
 
 // MARK: - Charger data
 
-/// The Open Charge Map key behind charger lookup.
+/// Where charger locations come from.
 ///
-/// Its own section, and deliberately outside the Pro gate: finding chargers is a
-/// free feature, and OCM rejects unauthenticated requests outright, so without a
-/// key the Plan screen can only ever report "no chargers found".
-struct ChargerDataSection: View {
+/// Open Charge Map is the default and costs the user nothing — the app ships a
+/// key. Google Places is offered because OCM coverage is thin in some regions, but
+/// it bills the user's own key per request, so the trade is stated plainly rather
+/// than buried.
+struct ChargerSourceSection: View {
     let viewModel: SettingsViewModel
+
+    private var usesGoogle: Bool { viewModel.preferences.chargerSource == .googlePlaces }
 
     var body: some View {
         Section {
-            SecretField(
-                placeholder: "Open Charge Map key",
-                initialValue: viewModel.preferences.openChargeMapApiKey ?? "",
-                onCommit: { viewModel.setOpenChargeMapKey($0) },
-                helpTitle: KeyHelp.ocmTitle,
-                helpURL: KeyHelp.ocm
-            )
+            Picker("Source", selection: Binding(
+                get: { viewModel.preferences.chargerSource },
+                set: { viewModel.setChargerSource($0) }
+            )) {
+                Text("Open Charge Map").tag(ChargerSource.openChargeMap)
+                Text("Google Places").tag(ChargerSource.googlePlaces)
+            }
+
+            if usesGoogle {
+                GoogleKeyField(viewModel: viewModel)
+            }
+
+            if viewModel.placesApiCalls > 0 {
+                LabeledContent("Places calls this session", value: "\(viewModel.placesApiCalls)")
+            }
         } header: {
             Text("Charger Data")
         } footer: {
-            Text("Charger locations come from Open Charge Map, which requires a key. The app ships with one; add your own here to use your own quota instead.")
+            if usesGoogle {
+                Text("Google Places covers areas where Open Charge Map is thin, and reports connector types and power. It has no price, network operator or access information, and it cannot search a bounding box — a route is covered by up to 12 circle queries, each one billed to your key.")
+            } else {
+                Text("Charger locations come from Open Charge Map, using a key that ships with the app. Free, and it carries price, operator and access data.")
+            }
         }
     }
 }
@@ -229,10 +363,8 @@ struct ChargerDataSection: View {
 
 /// Live charger occupancy.
 ///
-/// Its own section rather than a row under Routing: it is powered by the Google
-/// Places API, not by the routing provider, and nesting it there meant its key
-/// field was hidden whenever the user routed with OpenRouteService — so the
-/// feature could never be switched on from the default settings.
+/// Just the switch: the Google key it authenticates with is entered once in the
+/// Routing section, which reveals the field as soon as this is turned on.
 struct ChargerAvailabilitySection: View {
     let viewModel: SettingsViewModel
     @Binding var showPaywall: Bool
@@ -244,14 +376,6 @@ struct ChargerAvailabilitySection: View {
                     get: { viewModel.preferences.chargerOccupancyAlerts },
                     set: { viewModel.setChargerOccupancyAlerts($0) }
                 ))
-
-                SecretField(
-                    placeholder: "Google Places API key",
-                    initialValue: viewModel.preferences.googleMapsApiKey ?? "",
-                    onCommit: { viewModel.setGoogleMapsKey($0) },
-                    helpTitle: KeyHelp.googleTitle,
-                    helpURL: KeyHelp.google
-                )
             } else {
                 Button {
                     showPaywall = true
@@ -285,7 +409,7 @@ private struct ChargerAvailabilityFooter: View {
             Text(reason)
                 .foregroundStyle(Color.amberWarn)
         } else {
-            Text("Warns you when every charger with live status near your next stop is occupied.\n\nNeeds a Google Cloud key with the \u{201C}Places API (New)\u{201D} enabled — the same key works for Google Maps routing. Calls are billed to your account, so this stays off until you switch it on.")
+            Text("Warns you when every charger with live status near your next stop is occupied.\n\nNeeds a Google Cloud key with the \u{201C}Places API (New)\u{201D} enabled — enter it once under Routing, where it also covers Google routing and POI search. Calls are billed to your account, so this stays off until you switch it on.")
         }
     }
 }

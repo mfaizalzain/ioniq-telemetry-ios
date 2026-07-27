@@ -69,10 +69,15 @@ final class AppServices {
         // Captured weakly through a box so the repository always sees the current
         // preference rather than whatever was set at launch.
         let preferencesRef = preferences
-        chargers = ChargerRepository(modelContext: modelContext) {
-            let userKey = preferencesRef.currentPreferences.openChargeMapApiKey ?? ""
-            return userKey.isEmpty ? Secrets.openChargeMapKey : userKey
-        }
+        chargers = ChargerRepository(
+            modelContext: modelContext,
+            apiKey: {
+                let userKey = preferencesRef.currentPreferences.openChargeMapApiKey ?? ""
+                return userKey.isEmpty ? Secrets.openChargeMapKey : userKey
+            },
+            source: { preferencesRef.currentPreferences.chargerSource },
+            googleApiKey: { preferencesRef.currentPreferences.googleMapsApiKey ?? "" }
+        )
         savedTrips = SavedTripRepository(modelContext: modelContext)
         savedPlaces = SavedPlaceRepository(modelContext: modelContext)
         routing = RouteRepository(preferences: preferences)

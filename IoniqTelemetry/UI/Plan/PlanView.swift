@@ -98,32 +98,51 @@ private struct RoutingNoticeBar: View {
 private struct AiPlanCard: View {
     let viewModel: PlanViewModel
 
-    private static let examples = [
-        "KL to Penang, stop in Ipoh",
-        "Drive home arriving with 30%",
-        "Chargers near me"
-    ]
+    /// One chip, matching Android: the others were guesses at phrasing the parser
+    /// may not handle, and a suggestion that fails reads as the feature being broken.
+    private static let quickPrompt = "Find chargers near me"
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles").foregroundStyle(Color.appAccent)
-                    Text("Plan by conversation")
+                    Text("AI Assistant")
                         .font(.subheadline.weight(.semibold))
+                    Text("GEMINI AI")
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.appAccent.opacity(0.15), in: Capsule())
+                        .foregroundStyle(Color.appAccent)
                     Spacer()
                 }
 
                 HStack(spacing: 8) {
-                    TextField("Describe your trip…", text: Binding(
-                        get: { viewModel.aiInput },
-                        set: { viewModel.aiInput = $0 }
-                    ), axis: .vertical)
-                    .lineLimit(1...3)
-                    .textFieldStyle(.plain)
+                    HStack(spacing: 6) {
+                        TextField("e.g. Find chargers near me, or drive to Penang with 30% reserve…", text: Binding(
+                            get: { viewModel.aiInput },
+                            set: { viewModel.aiInput = $0 }
+                        ), axis: .vertical)
+                        .lineLimit(1...3)
+                        .textFieldStyle(.plain)
+                        .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
+
+                        // A long dictated sentence is tedious to clear a character
+                        // at a time, and the parse it produced is stale anyway.
+                        if !viewModel.aiInput.isEmpty {
+                            Button {
+                                viewModel.clearAiInput()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.tertiary)
+                            .accessibilityLabel("Clear")
+                        }
+                    }
                     .padding(10)
                     .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
-                    .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
 
                     Button {
                         Task { await viewModel.planFromNaturalLanguage() }
@@ -139,23 +158,18 @@ private struct AiPlanCard: View {
                     .accessibilityLabel("Plan this trip")
                 }
 
-                if viewModel.aiInput.isEmpty && viewModel.aiInterpretation == nil {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 6) {
-                            ForEach(Self.examples, id: \.self) { example in
-                                Button {
-                                    viewModel.aiInput = example
-                                } label: {
-                                    Text(example)
-                                        .font(.caption)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(Color.appSurface, in: Capsule())
-                                }
-                                .tint(.primary)
-                            }
-                        }
+                if viewModel.aiInput.isEmpty && !viewModel.aiBusy && viewModel.aiInterpretation == nil {
+                    Button {
+                        viewModel.aiInput = Self.quickPrompt
+                        Task { await viewModel.planFromNaturalLanguage() }
+                    } label: {
+                        Text(Self.quickPrompt)
+                            .font(.caption)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.appSurface, in: Capsule())
                     }
+                    .tint(.primary)
                 }
 
                 if let interpretation = viewModel.aiInterpretation {
@@ -329,6 +343,8 @@ private struct EndpointField: View {
 
 private struct FavoritePlaceChips: View {
     let viewModel: PlanViewModel
+    @State private var renaming: SavedPlaceEntity?
+    @State private var draftName = ""
 
     var body: some View {
         if !viewModel.favoritePlaces.isEmpty {
@@ -338,6 +354,11 @@ private struct FavoritePlaceChips: View {
                         Menu {
                             Button("Set as origin") { viewModel.selectFavorite(place, for: .origin) }
                             Button("Set as destination") { viewModel.selectFavorite(place, for: .destination) }
+                            Button("Add as stopover") { viewModel.addFavoriteAsWaypoint(place) }
+                            Button("Rename…") {
+                                draftName = place.name
+                                renaming = place
+                            }
                             Button("Remove", role: .destructive) { viewModel.deleteFavorite(place) }
                         } label: {
                             HStack(spacing: 5) {
@@ -352,6 +373,17 @@ private struct FavoritePlaceChips: View {
                     }
                 }
                 .padding(.horizontal)
+            }
+            .alert("Rename place", isPresented: Binding(
+                get: { renaming != nil },
+                set: { if !$0 { renaming = nil } }
+            )) {
+                TextField("Name", text: $draftName)
+                Button("Cancel", role: .cancel) { renaming = nil }
+                Button("Save") {
+                    if let place = renaming { viewModel.renameFavorite(place, to: draftName) }
+                    renaming = nil
+                }
             }
         }
     }
@@ -460,15 +492,22 @@ private struct PlanActionSection: View {
                 Task { await viewModel.plan() }
             } label: {
                 HStack {
-                    if viewModel.isPlanning { ProgressView().tint(.white) }
+                    if viewModel.isPlanning { ProgressView().tint(Color.appOnAccent) }
                     Text(viewModel.isPlanning ? (viewModel.statusMessage ?? "Planning…") : "Plan Route")
                         .fontWeight(.semibold)
                 }
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 6)
+                .padding(.vertical, 14)
+                // Explicit fill and label rather than `.borderedProminent` + tint:
+                // the system pairs the bright accent with a light label, which is
+                // unreadable on it.
+                .foregroundStyle(viewModel.canPlan ? Color.appOnAccent : Color.appOnSurface.opacity(0.4))
+                .background(
+                    viewModel.canPlan ? Color.appAccent : Color.appSurfaceVariant,
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
             }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.appAccent)
+            .buttonStyle(.plain)
             .disabled(!viewModel.canPlan)
 
             if let error = viewModel.errorMessage {
@@ -500,6 +539,16 @@ private struct PlanActionsRow: View {
                 }
                 .tint(Color.appAccent)
             }
+            if let plan = viewModel.plan {
+                Button {
+                    MapsNavigation.navigateTrip(plan)
+                } label: {
+                    Label("Navigate this trip", systemImage: "arrow.triangle.turn.up.right.circle.fill")
+                        .font(.footnote.weight(.medium))
+                }
+                .tint(Color.appAccent)
+            }
+
             HStack {
                 Button {
                     showSaveTrip = true
@@ -518,6 +567,37 @@ private struct PlanActionsRow: View {
 
 // MARK: - Itinerary
 
+/// Route elevation, led by the figure that actually drives consumption.
+///
+/// The provider's ascent and descent are cumulative over every sampled point, and
+/// the elevation model it samples is noisy — a flat trunk road across Peninsular
+/// Malaysia can total several kilometres of "climb" from metre-scale wobble that no
+/// driver would call a hill. Only the net change moves the energy estimate
+/// (`TripSolver` uses `RouteElevation.netM`), so that goes first and the cumulative
+/// pair is labelled as the rolling total it is.
+private struct ElevationLine: View {
+    let elevation: RouteElevation
+
+    private var netText: String {
+        let net = Int(elevation.netM.rounded())
+        if net > 0 { return "Net climb \(net) m" }
+        if net < 0 { return "Net descent \(abs(net)) m" }
+        return "Net level"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(netText)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text("Rolling total +\(Int(elevation.ascendM)) m / −\(Int(elevation.descendM)) m")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct ItineraryTimeline: View {
     let plan: TripPlan
     let viewModel: PlanViewModel
@@ -527,9 +607,7 @@ private struct ItineraryTimeline: View {
             VStack(alignment: .leading, spacing: 0) {
                 summary
                 if viewModel.hasElevationData, let elevation = plan.elevation {
-                    Text("Elevation: +\(Int(elevation.ascendM)) m / −\(Int(elevation.descendM)) m")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    ElevationLine(elevation: elevation)
                         .padding(.top, 6)
                 }
 
@@ -538,11 +616,24 @@ private struct ItineraryTimeline: View {
                 TimelineRow(
                     icon: "flag.fill", tint: .appGreen, title: "Departure",
                     detail: String(format: "%.0f%% charge", plan.legs.first?.startSoc ?? 0),
-                    isLast: plan.stops.isEmpty
+                    isLast: waypointsAndStops.isEmpty
                 )
 
-                ForEach(Array(plan.stops.enumerated()), id: \.offset) { _, stop in
-                    ChargeStopRow(stop: stop, viewModel: viewModel)
+                // Stopovers and charge stops share one timeline in route order —
+                // listing only the charge stops made a stopover the driver had
+                // explicitly asked for vanish from the plan.
+                ForEach(Array(waypointsAndStops.enumerated()), id: \.offset) { _, entry in
+                    switch entry {
+                    case .stop(let stop):
+                        ChargeStopRow(stop: stop, viewModel: viewModel)
+                    case .waypoint(let waypoint):
+                        TimelineRow(
+                            icon: "mappin.and.ellipse", tint: .appAccent,
+                            title: waypoint.name,
+                            detail: String(format: "Stopover · %.0f km from start", waypoint.distanceFromOriginKm),
+                            isLast: false
+                        )
+                    }
                 }
 
                 TimelineRow(
@@ -555,6 +646,24 @@ private struct ItineraryTimeline: View {
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
+    }
+
+    /// One entry per intermediate point, ordered by distance from the origin.
+    private enum TimelineEntry {
+        case waypoint(UserWaypoint)
+        case stop(ChargeStop)
+
+        var distanceKm: Float {
+            switch self {
+            case .waypoint(let waypoint): return waypoint.distanceFromOriginKm
+            case .stop(let stop): return stop.distanceFromOriginKm
+            }
+        }
+    }
+
+    private var waypointsAndStops: [TimelineEntry] {
+        (plan.userWaypoints.map(TimelineEntry.waypoint) + plan.stops.map(TimelineEntry.stop))
+            .sorted { $0.distanceKm < $1.distanceKm }
     }
 
     private var summary: some View {
@@ -720,6 +829,46 @@ private struct SavedTripsSection: View {
 
 // MARK: - Nearby chargers
 
+/// Tariff for a charger row.
+///
+/// Prefers the parsed per-kWh figure and falls back to whatever free-text tariff
+/// the source gave, trimmed — many entries are only ever a sentence. Google Places
+/// carries no pricing at all, so rows from that source show nothing here.
+private enum ChargerPrice {
+    static func label(for charger: Charger) -> String? {
+        if let price = charger.pricePerKwh {
+            return price == 0 ? "Free" : String(format: "%.2f/kWh", price)
+        }
+        guard let cost = charger.usageCost?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !cost.isEmpty
+        else { return nil }
+        return cost.count > 24 ? String(cost.prefix(24)) + "…" : cost
+    }
+}
+
+/// Live connector availability. Only shown when Places actually reported it —
+/// there is no "assumed free" state.
+private struct AvailabilityBadge: View {
+    let status: PlanViewModel.ChargerAvailability
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(status.isFull ? Color.redAlert : Color.appGreen)
+                .frame(width: 6, height: 6)
+            Text(status.isFull
+                 ? "All \(status.total) in use"
+                 : "\(status.available) of \(status.total) free")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(status.isFull ? Color.redAlert : Color.appGreen)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(status.isFull
+                            ? "All \(status.total) connectors in use"
+                            : "\(status.available) of \(status.total) connectors free")
+    }
+}
+
 private struct NearbyChargersSection: View {
     let viewModel: PlanViewModel
 
@@ -732,10 +881,20 @@ private struct NearbyChargersSection: View {
 
                     ForEach(viewModel.nearbyChargers.prefix(6)) { charger in
                         HStack {
-                            VStack(alignment: .leading, spacing: 2) {
+                            VStack(alignment: .leading, spacing: 3) {
                                 Text(charger.name).font(.subheadline).lineLimit(1)
-                                if let op = charger.operator {
-                                    Text(op).font(.caption).foregroundStyle(.secondary)
+                                HStack(spacing: 6) {
+                                    if let op = charger.operator {
+                                        Text(op).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                    }
+                                    if let price = ChargerPrice.label(for: charger) {
+                                        Text(price)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                if let status = viewModel.chargerAvailability[charger.id] {
+                                    AvailabilityBadge(status: status)
                                 }
                             }
                             Spacer()
