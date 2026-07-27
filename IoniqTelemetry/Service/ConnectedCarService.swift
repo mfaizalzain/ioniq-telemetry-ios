@@ -273,8 +273,10 @@ final class ConnectedCarService {
     /// Feeds a simulated 10 km drive through the pipeline — trip starts, GPS
     /// distance accumulates, and the trip saves with non-zero distance.
     func simulateTrip() {
+        print("[ConnectedCar] simulateTrip() called")
         let simulator = DebugSimulator()
         Task { [weak self] in
+            print("[ConnectedCar] simulation task started")
             var lastTelemetry = VehicleTelemetry()
             await simulator.start { [weak self] (telemetry: VehicleTelemetry, fix: Fix) in
                 guard let self else { return }
