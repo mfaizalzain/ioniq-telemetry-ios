@@ -170,6 +170,8 @@ final class SettingsViewModel {
     /// The routing key required by the selected provider, if it's still missing.
     var missingRoutingKey: String? {
         switch preferences.routingProvider {
+        case .appleMaps:
+            return nil
         case .openRouteService:
             return (preferences.orsApiKey ?? "").isEmpty ? "OpenRouteService" : nil
         case .googleMaps:

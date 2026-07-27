@@ -1,5 +1,6 @@
 import CoreDomain
 import Foundation
+import MapKit
 
 /// A routed path between points, before charging stops are placed on it.
 public struct BaseRoute: Sendable, Equatable {
@@ -75,12 +76,19 @@ public final class RouteRepository: Sendable {
 
         let prefs = preferences.currentPreferences
         let provider = prefs.routingProvider
+
+        // Apple Maps needs no key.
+        if provider == .appleMaps {
+            return try await appleMapsRoute(points: points)
+        }
+
         let key: String? = provider == .openRouteService ? prefs.orsApiKey : prefs.googleMapsApiKey
         guard let key, !key.trimmingCharacters(in: .whitespaces).isEmpty else {
             throw RoutingError.missingKey(provider)
         }
 
         switch provider {
+        case .appleMaps: fatalError("handled above")
         case .openRouteService: return try await orsRoute(points: points, key: key)
         case .googleMaps: return try await googleRoute(points: points, key: key)
         }
@@ -173,6 +181,55 @@ public final class RouteRepository: Sendable {
             let suffix = detail.map { " (\($0))" } ?? ""
             return "Google Maps error: \(status ?? "unknown")\(suffix)"
         }
+    }
+
+    // MARK: - Apple Maps
+
+    private func appleMapsRoute(points: [LatLon]) async throws -> BaseRoute {
+        var totalDistance: CLLocationDistance = 0
+        var totalSeconds: TimeInterval = 0
+        var allPoints: [CLLocationCoordinate2D] = []
+
+        for i in 0..<(points.count - 1) {
+            let request = MKDirections.Request()
+            request.source = MKMapItem(placemark: MKPlacemark(
+                coordinate: CLLocationCoordinate2D(latitude: points[i].lat, longitude: points[i].lon)
+            ))
+            request.destination = MKMapItem(placemark: MKPlacemark(
+                coordinate: CLLocationCoordinate2D(latitude: points[i + 1].lat, longitude: points[i + 1].lon)
+            ))
+            request.transportType = .automobile
+            request.requestsAlternateRoutes = false
+
+            let directions = MKDirections(request: request)
+            let response = try await directions.calculate()
+            guard let route = response.routes.first else { throw RoutingError.noRoute }
+
+            totalDistance += route.distance
+            totalSeconds += route.expectedTravelTime
+            // Polyline points from MapKit's encoded data — re-encode from the
+            // decoded coordinates for a consistent format.
+            let coords = UnsafeMutablePointer<CLLocationCoordinate2D>.allocate(capacity: route.polyline.pointCount)
+            defer { coords.deallocate() }
+            route.polyline.getCoordinates(coords, range: NSRange(location: 0, length: route.polyline.pointCount))
+            for j in 0..<route.polyline.pointCount {
+                allPoints.append(coords[j])
+            }
+        }
+
+        let latLons = allPoints.map { LatLon(lat: $0.latitude, lon: $0.longitude) }
+        // MapKit doesn't return an encoded polyline string, so encode it ourselves.
+        let polylineStr = Polyline.encode(points: latLons)
+
+        return BaseRoute(
+            points: latLons,
+            distanceKm: Float(totalDistance / 1000),
+            driveMinutes: Int(totalSeconds / 60),
+            ascendM: 0,
+            descendM: 0,
+            encodedPolyline: polylineStr,
+            hasElevationData: false
+        )
     }
 }
 

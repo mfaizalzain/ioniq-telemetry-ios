@@ -11,6 +11,10 @@ let package = Package(
         .package(path: "../CoreDomain")
     ],
     targets: [
-        .target(name: "CoreData", dependencies: ["CoreDomain"])
+        .target(
+            name: "CoreData",
+            dependencies: ["CoreDomain"],
+            linkerSettings: [.linkedFramework("MapKit")]
+        )
     ]
 )

@@ -20,6 +20,8 @@ public enum ThemeMode: String, Sendable {
 /// [openRouteService] is the recommended default — signup is an email and a token,
 /// no card, and one key also covers geocoding and returns elevation gain.
 public enum RoutingProvider: String, Sendable {
+    /// Built-in MapKit — no key needed. No elevation data.
+    case appleMaps = "APPLE_MAPS"
     case openRouteService = "OPEN_ROUTE_SERVICE"
     case googleMaps = "GOOGLE_MAPS"
 }
@@ -33,7 +35,9 @@ public enum RoutingProvider: String, Sendable {
 /// search, so an area is covered by tiled circle queries — the reason it is opt-in.
 public enum ChargerSource: String, Sendable {
     case openChargeMap = "OPEN_CHARGE_MAP"
+    case appleMaps = "APPLE_MAPS"
     case googlePlaces = "GOOGLE_PLACES"
+    case combined = "COMBINED"
 }
 
 public struct UserPreferences: Sendable {
@@ -102,7 +106,7 @@ public struct UserPreferences: Sendable {
         googleMapsApiKey: String? = nil,
         orsApiKey: String? = nil,
         openChargeMapApiKey: String? = nil,
-        routingProvider: RoutingProvider = .openRouteService,
+        routingProvider: RoutingProvider = .appleMaps,
         geminiApiKey: String? = nil,
         aiCoachingEnabled: Bool = true,
         chargerOccupancyAlerts: Bool = false,
@@ -139,17 +143,21 @@ public struct UserPreferences: Sendable {
     /// The API key for [provider], or null when the user hasn't supplied one yet.
     public func routingKeyFor(provider: RoutingProvider? = nil) -> String? {
         let target = provider ?? routingProvider
-        let key = switch target {
-        case .openRouteService: orsApiKey
-        case .googleMaps: googleMapsApiKey
+        switch target {
+        case .appleMaps: return nil
+        case .openRouteService:
+            guard let key = orsApiKey, !key.isEmpty else { return nil }
+            return key
+        case .googleMaps:
+            guard let key = googleMapsApiKey, !key.isEmpty else { return nil }
+            return key
         }
-        guard let key, !key.isEmpty else { return nil }
-        return key
     }
 
     /// True when the selected routing provider has a usable key.
     public var canPlanRoutes: Bool {
-        routingKeyFor() != nil
+        if routingProvider == .appleMaps { return true }
+        return routingKeyFor() != nil
     }
 
     /// True when a free-text place search can reach *some* geocoder.

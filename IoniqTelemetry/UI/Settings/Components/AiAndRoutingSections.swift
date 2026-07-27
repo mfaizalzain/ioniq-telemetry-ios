@@ -71,13 +71,16 @@ struct RoutingSection: View {
                 get: { viewModel.preferences.routingProvider },
                 set: { viewModel.setRoutingProvider($0) }
             )) {
+                Text("Apple Maps").tag(RoutingProvider.appleMaps)
                 Text("OpenRouteService").tag(RoutingProvider.openRouteService)
                 Text("Google Maps").tag(RoutingProvider.googleMaps)
             }
 
-            RoutingKeyField(viewModel: viewModel)
-            GooglePoiSearchToggle(viewModel: viewModel)
-            GoogleKeyField(viewModel: viewModel)
+            if viewModel.preferences.routingProvider != .appleMaps {
+                RoutingKeyField(viewModel: viewModel)
+                GooglePoiSearchToggle(viewModel: viewModel)
+                GoogleKeyField(viewModel: viewModel)
+            }
         } header: {
             Text("Routing")
         } footer: {
@@ -185,7 +188,7 @@ private struct RoutingFooter: View {
             Text("Route planning needs a \(missingKey) key. Both providers have a free tier.")
                 .foregroundStyle(Color.amberWarn)
         } else {
-            Text("OpenRouteService is the easier option — signup is an email and a token, no card, and it returns elevation. Google Maps needs a Cloud project with the Directions API enabled and billing set up.\n\nEither way the key is yours, so requests count against your own quota.")
+            Text("Apple Maps is the default — no key, no billing. Switch to OpenRouteService or Google Maps for elevation data or broader POI search.\\n\\nOpenRouteService is free with a quick signup. Google Maps needs a Cloud project with billing set up. Either way the key is yours, so requests count against your own quota.")
         }
     }
 }
@@ -337,19 +340,19 @@ enum KeyHelp {
 struct ChargerSourceSection: View {
     let viewModel: SettingsViewModel
 
-    private var usesGoogle: Bool { viewModel.preferences.chargerSource == .googlePlaces }
-
     var body: some View {
         Section {
             Picker("Source", selection: Binding(
                 get: { viewModel.preferences.chargerSource },
                 set: { viewModel.setChargerSource($0) }
             )) {
+                Text("OCM + Apple Maps").tag(ChargerSource.combined)
                 Text("Open Charge Map").tag(ChargerSource.openChargeMap)
+                Text("Apple Maps").tag(ChargerSource.appleMaps)
                 Text("Google Places").tag(ChargerSource.googlePlaces)
             }
 
-            if usesGoogle {
+            if viewModel.preferences.chargerSource == .googlePlaces {
                 GoogleKeyField(viewModel: viewModel)
             }
 
@@ -359,10 +362,15 @@ struct ChargerSourceSection: View {
         } header: {
             Text("Charger Data")
         } footer: {
-            if usesGoogle {
+            switch viewModel.preferences.chargerSource {
+            case .googlePlaces:
                 Text("Google Places covers areas where Open Charge Map is thin, and reports connector types and power. It has no price, network operator or access information, and it cannot search a bounding box — a route is covered by up to 12 circle queries, each one billed to your key.")
-            } else {
+            case .appleMaps:
+                Text("Apple Maps shows nearby charging stations with no key, no billing, and no quota. Location and name only — no pricing, connector or operator data.")
+            case .openChargeMap:
                 Text("Charger locations come from Open Charge Map. Free, and it carries price, operator and access data.")
+            case .combined:
+                Text("Merges Open Charge Map (pricing, connectors, operator) with Apple Maps (broader coverage). Duplicates within 200 m are removed, keeping OCM's richer data.")
             }
         }
     }

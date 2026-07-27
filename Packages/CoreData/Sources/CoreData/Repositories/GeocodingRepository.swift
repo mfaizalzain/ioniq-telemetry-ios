@@ -1,5 +1,6 @@
 import CoreDomain
 import Foundation
+import MapKit
 
 /// A place the driver can pick as an endpoint or stopover.
 public struct PlaceResult: Sendable, Identifiable, Equatable {
@@ -18,9 +19,8 @@ public struct PlaceResult: Sendable, Identifiable, Equatable {
 
 /// Place search for the trip planner.
 ///
-/// Uses whichever provider the user configured for routing, so one key covers both
-/// — except that Google POI search is opt-in (`googlePoiSearch`), because Places
-/// Text Search bills per request while Directions is far cheaper.
+/// Apple Maps is the free default — no key needed. Falls back to ORS or Google
+/// only when the user explicitly configured those providers.
 public final class GeocodingRepository: Sendable {
 
     private let session: URLSession
@@ -38,9 +38,6 @@ public final class GeocodingRepository: Sendable {
         let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count >= 2 else { return [] }
 
-        // A typed coordinate is already the answer. Handled before any provider so
-        // it costs nothing, needs no key, and cannot be mangled by a geocoder that
-        // treats the digits as a street number.
         if let coordinate = Self.parseCoordinate(trimmed) {
             return [PlaceResult(
                 name: String(format: "%.5f, %.5f", coordinate.lat, coordinate.lon),
@@ -55,20 +52,14 @@ public final class GeocodingRepository: Sendable {
         if useGoogle, let key = prefs.googleMapsApiKey, !key.isEmpty {
             return try await googleSearch(trimmed, near: near, key: key)
         }
-        if let key = prefs.orsApiKey, !key.isEmpty {
+        if let key = prefs.orsApiKey, !key.isEmpty, prefs.routingProvider == .openRouteService {
             return try await orsSearch(trimmed, near: near, key: key)
         }
-        throw RoutingError.missingKey(prefs.routingProvider)
+        return try await appleMapsSearch(trimmed, near: near)
     }
 
     // MARK: - Coordinates
 
-    /// Reads a decimal-degree pair: `3.139, 101.687`, `3.139 101.687`,
-    /// `3.139°N 101.687°E`, or `N3.139, E101.687`.
-    ///
-    /// Deliberately strict — a bare pair of numbers is only treated as a position
-    /// when both halves are in range and neither carries stray text, so a search for
-    /// a place with digits in its name still goes to the geocoder.
     static func parseCoordinate(_ text: String) -> LatLon? {
         let cleaned = text
             .replacingOccurrences(of: "°", with: " ")
@@ -86,8 +77,6 @@ public final class GeocodingRepository: Sendable {
         return LatLon(lat: first, lon: second)
     }
 
-    /// One half of a pair: a number with an optional hemisphere letter on either
-    /// end. The letter, when present, must be the right one for that axis.
     private static func component(_ raw: String, negative: [String], positive: [String]) -> Double? {
         var body = raw
         var hemisphereIsNegative = false
@@ -98,8 +87,6 @@ public final class GeocodingRepository: Sendable {
             break
         }
 
-        // `Double` rejects anything with leftover text, so "3rd" and "101st" stay
-        // words rather than becoming a position.
         guard let value = Double(body) else { return nil }
         return hemisphereIsNegative ? -abs(value) : value
     }
@@ -109,8 +96,6 @@ public final class GeocodingRepository: Sendable {
     private func orsSearch(_ query: String, near: LatLon?, key: String) async throws -> [PlaceResult] {
         var components = URLComponents(string: "https://api.openrouteservice.org/geocode/search")!
         var items: [URLQueryItem] = [
-            // The Pelias-backed geocoder takes the key as a query parameter, unlike
-            // directions, which authenticates via a header.
             .init(name: "api_key", value: key),
             .init(name: "text", value: query),
             .init(name: "size", value: "10")
@@ -132,7 +117,6 @@ public final class GeocodingRepository: Sendable {
                 name: properties.name ?? query,
                 subtitle: [properties.locality, properties.region, properties.country]
                     .compactMap { $0 }.joined(separator: ", "),
-                // GeoJSON is [lon, lat].
                 location: LatLon(lat: feature.geometry.coordinates[1], lon: feature.geometry.coordinates[0])
             )
         }
@@ -145,7 +129,6 @@ public final class GeocodingRepository: Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(key, forHTTPHeaderField: "X-Goog-Api-Key")
-        // The field mask is mandatory and determines what the call is billed at.
         request.setValue(
             "places.id,places.displayName,places.formattedAddress,places.location",
             forHTTPHeaderField: "X-Goog-FieldMask"
@@ -178,6 +161,36 @@ public final class GeocodingRepository: Sendable {
                 name: place.displayName?.text ?? query,
                 subtitle: place.formattedAddress ?? "",
                 location: LatLon(lat: location.latitude, lon: location.longitude)
+            )
+        }
+    }
+
+    // MARK: - Apple Maps
+
+    private func appleMapsSearch(_ query: String, near: LatLon?) async throws -> [PlaceResult] {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = query
+        request.resultTypes = [.pointOfInterest, .address]
+        if let near {
+            request.region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: near.lat, longitude: near.lon),
+                latitudinalMeters: 50_000,
+                longitudinalMeters: 50_000
+            )
+        }
+        let search = MKLocalSearch(request: request)
+        let response = try await search.start()
+        return response.mapItems.map { item in
+            let loc = item.placemark.location?.coordinate
+            return PlaceResult(
+                id: UUID().uuidString,
+                name: item.name ?? query,
+                subtitle: [
+                    item.placemark.locality,
+                    item.placemark.administrativeArea,
+                    item.placemark.country
+                ].compactMap { $0 }.joined(separator: ", "),
+                location: LatLon(lat: loc?.latitude ?? 0, lon: loc?.longitude ?? 0)
             )
         }
     }

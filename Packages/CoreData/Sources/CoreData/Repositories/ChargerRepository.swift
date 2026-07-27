@@ -1,6 +1,7 @@
 import Combine
 import CoreDomain
 import Foundation
+import MapKit
 import SwiftData
 
 /// Repository for charger data — Open Charge Map or Google Places fetch, plus a
@@ -133,6 +134,16 @@ public final class ChargerRepository: @unchecked Sendable {
                     try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
                 case .googlePlaces:
                     try await refreshGooglePlaces(centers: googleCenters)
+                case .appleMaps:
+                    try await refreshAppleMaps(centers: googleCenters)
+                case .combined:
+                    try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+                    try await refreshAppleMaps(centers: googleCenters)
+                }
+                // Deduplicate combined results: Apple Maps duplicates close to OCM
+                // entries are removed, keeping OCM's richer data.
+                if source() == .combined {
+                    try deduplicateCombined()
                 }
             } catch {
                 // Cached data is better than an error, so hold this and only throw
@@ -473,6 +484,92 @@ public enum ChargerError: LocalizedError {
         let dLat = (a.lat - b.lat) * 111.0
         let dLon = (a.lon - b.lon) * 111.0 * cos((a.lat + b.lat) / 2 * .pi / 180.0)
         return sqrt(dLat * dLat + dLon * dLon)
+    }
+
+    // MARK: - Apple Maps
+
+    /// Searches for EV chargers near each centre point via MKLocalSearch and
+    /// persists results (name, location only — Apple's POI data has no pricing,
+    /// connector type or operator information).
+    private func refreshAppleMaps(centers: [LatLon]) async throws {
+        let now = Date()
+        var inserted = 0
+        for center in centers {
+            let request = MKLocalSearch.Request()
+            request.naturalLanguageQuery = "EV charger"
+            request.region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: center.lat, longitude: center.lon),
+                latitudinalMeters: 30_000,
+                longitudinalMeters: 30_000
+            )
+            request.resultTypes = [.pointOfInterest]
+            let search = MKLocalSearch(request: request)
+            let response = try? await search.start()
+            guard let items = response?.mapItems else { continue }
+            for item in items {
+                guard let loc = item.placemark.location else { continue }
+                let lat = loc.coordinate.latitude
+                let lon = loc.coordinate.longitude
+                let name = item.name ?? "EV Charger"
+                let id = "apple-\(Geohash.encode(lat: lat, lon: lon, precision: 10))"
+                // Skip if already cached (dedup across tiles and future refreshes)
+                let existing = try modelContext.fetch(
+                    FetchDescriptor<ChargerEntity>(
+                        predicate: #Predicate { $0.id == id }
+                    )
+                )
+                guard existing.isEmpty else { continue }
+                let entity = ChargerEntity(
+                    id: id,
+                    name: name,
+                    lat: lat,
+                    lon: lon,
+                    geohash: Geohash.encode(lat: lat, lon: lon, precision: 6),
+                    maxPowerKw: 0,
+                    connectorsJson: "[]",
+                    operator: nil,
+                    isOperational: true,
+                    pricePerKwh: nil,
+                    cachedAt: now,
+                    isRestricted: false,
+                    usageTypeId: nil,
+                    usageCost: nil
+                )
+                modelContext.insert(entity)
+                inserted += 1
+            }
+        }
+        print("[ChargerRepo] Apple Maps: \(inserted) chargers found near \(centers.count) centre(s)")
+        try modelContext.save()
+    }
+
+    /// Removes Apple Maps entries that are within 200m of an OCM entry.
+    /// OCM has richer data (pricing, connectors), so Apple Maps duplicates
+    /// are dropped to keep results clean.
+    private func deduplicateCombined() throws {
+        let all = try modelContext.fetch(FetchDescriptor<ChargerEntity>())
+        let ocm = all.filter { $0.id.hasPrefix("ocm-") }
+        let apple = all.filter { $0.id.hasPrefix("apple-") }
+        var toDelete = Set<ChargerEntity>()
+        for a in apple {
+            for o in ocm {
+                let d = approxDistanceKm(
+                    LatLon(lat: a.lat, lon: a.lon),
+                    LatLon(lat: o.lat, lon: o.lon)
+                )
+                if d < 0.2 { // 200m
+                    toDelete.insert(a)
+                    break
+                }
+            }
+        }
+        for entity in toDelete {
+            modelContext.delete(entity)
+        }
+        if !toDelete.isEmpty {
+            print("[ChargerRepo] Dedup: removed \(toDelete.count) Apple Maps chargers near OCM entries")
+        }
+        try modelContext.save()
     }
 }
 
