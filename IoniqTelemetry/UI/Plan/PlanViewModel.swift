@@ -687,7 +687,7 @@ final class PlanViewModel {
     func renameFavorite(_ favorite: SavedPlaceEntity, to newName: String) {
         try? services.savedPlaces.rename(id: favorite.id, to: newName)
         // Saved trips embed a copy of the place name, so keep them in sync.
-        try? services.savedTrips.renamePlace(lat: favorite.lat, lon: favorite.lon, to: newName)
+        _ = try? services.savedTrips.renamePlace(lat: favorite.lat, lon: favorite.lon, to: newName)
         renameSelectedEndpoints(lat: favorite.lat, lon: favorite.lon, to: newName)
         reloadSaved()
     }
