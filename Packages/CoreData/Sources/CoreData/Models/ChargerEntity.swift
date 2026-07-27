@@ -15,6 +15,8 @@ public final class ChargerEntity {
     public var pricePerKwh: Float?
     public var cachedAt: Date
     public var isRestricted: Bool
+    /// OCM UsageType.ID, kept so access rules can be re-evaluated without a refetch.
+    public var usageTypeId: Int?
     public var usageCost: String?
 
     public init(
@@ -30,6 +32,7 @@ public final class ChargerEntity {
         pricePerKwh: Float? = nil,
         cachedAt: Date = Date(),
         isRestricted: Bool = false,
+        usageTypeId: Int? = nil,
         usageCost: String? = nil
     ) {
         self.id = id
@@ -44,6 +47,7 @@ public final class ChargerEntity {
         self.pricePerKwh = pricePerKwh
         self.cachedAt = cachedAt
         self.isRestricted = isRestricted
+        self.usageTypeId = usageTypeId
         self.usageCost = usageCost
     }
 }

@@ -205,12 +205,11 @@ public enum ChargerError: LocalizedError {
 
         let connectorsJson = (try? encoder.encode(connectors)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         let maxPower = connections.compactMap(\.PowerKW).max() ?? 0
-        let isRestricted: Bool = {
-            if let usageType = poi.UsageType {
-                if usageType.ID == 2 || usageType.ID == 3 || usageType.IsAccessKeyRequired == true { return true }
-            }
-            return isRestrictedName(poi.AddressInfo?.Title)
-        }()
+        let isRestricted = ChargerAccess.isRestricted(
+            usageTypeId: poi.UsageType?.ID,
+            isAccessKeyRequired: poi.UsageType?.IsAccessKeyRequired,
+            name: poi.AddressInfo?.Title
+        )
 
         return ChargerEntity(
             id: "ocm-\(id)",
@@ -225,6 +224,7 @@ public enum ChargerError: LocalizedError {
             pricePerKwh: parsePricePerKwh(poi.UsageCost),
             cachedAt: now,
             isRestricted: isRestricted,
+            usageTypeId: poi.UsageType?.ID,
             usageCost: poi.UsageCost
         )
     }
@@ -249,16 +249,18 @@ public enum ChargerError: LocalizedError {
             isOperational: entity.isOperational,
             pricePerKwh: entity.pricePerKwh,
             lastVerified: entity.cachedAt,
-            isRestricted: entity.isRestricted || isRestrictedName(entity.name),
+            // Re-evaluated on read so rows cached under an older rule are corrected
+            // immediately rather than after the 7-day TTL expires.
+            isRestricted: entity.isRestricted || ChargerAccess.isRestricted(
+                usageTypeId: entity.usageTypeId,
+                isAccessKeyRequired: nil,
+                name: entity.name
+            ),
             usageCost: entity.usageCost
         )
     }
 
     // MARK: - Helpers
-
-    private func isRestrictedName(_ name: String?) -> Bool {
-        name?.localizedCaseInsensitiveContains("restricted") == true
-    }
 
     /// Best-effort parse of an OCM cost string like "£0.45/kWh" → 0.45.
     private func parsePricePerKwh(_ cost: String?) -> Float? {
