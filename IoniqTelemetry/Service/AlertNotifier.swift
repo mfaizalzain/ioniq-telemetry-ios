@@ -54,7 +54,7 @@ final class AlertNotifier {
             // Time-sensitive so charge-complete and low-tyre alerts can break
             // through a Focus mode, which is the whole point of them.
             return (try? await center.requestAuthorization(
-                options: [.alert, .sound, .timeSensitive]
+                options: [.alert, .sound]
             )) ?? false
         @unknown default:
             return false
