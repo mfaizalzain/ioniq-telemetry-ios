@@ -186,7 +186,7 @@
 			path = Resources;
 			sourceTree = "<group>";
 		};
-		"TEMP_D2395853-35E9-4563-99B1-C459DAB7D7B4" /* UI */ = {
+		"TEMP_91C9ED52-33A7-44E7-B160-E48A6FB189C4" /* UI */ = {
 			isa = PBXGroup;
 			children = (
 			);
