@@ -24,7 +24,6 @@ struct DashboardView: View {
 
                     // Debug: simulate a trip without driving
                     Button {
-                        print("[Dashboard] simulate button tapped")
                         services.connectedCar.simulateTrip()
                     } label: {
                         Label("Simulate 10 km drive", systemImage: "car.fill")
