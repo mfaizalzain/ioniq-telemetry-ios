@@ -82,7 +82,7 @@ private struct FeatureList: View {
         ("bell.badge", "Charger Occupancy Alerts", "Know before you arrive at a full charger"),
         ("map", "Live Charger Availability", "Real-time status along your route"),
         ("calendar", "365-Day Trip History", "Up from 90 days on the free tier"),
-        ("rectangle.slash", "No Ads", "")
+        ("square.and.arrow.down", "Backup & Restore", "Export your trips, routes and settings")
     ]
 
     var body: some View {

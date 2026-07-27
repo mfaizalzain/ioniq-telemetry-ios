@@ -32,6 +32,8 @@ final class AppServices {
     let savedPlaces: SavedPlaceRepository
     let backup: BackupRepository
     let occupancy = OccupancyRepository()
+    let routing: RouteRepository
+    let geocoding: GeocodingRepository
     let activePlan = ActivePlanHolderImpl()
 
     // MARK: - OBD
@@ -73,6 +75,8 @@ final class AppServices {
         }
         savedTrips = SavedTripRepository(modelContext: modelContext)
         savedPlaces = SavedPlaceRepository(modelContext: modelContext)
+        routing = RouteRepository(preferences: preferences)
+        geocoding = GeocodingRepository(preferences: preferences)
         backup = BackupRepository(modelContext: modelContext, preferences: preferences)
 
         obdManager = ObdManager(

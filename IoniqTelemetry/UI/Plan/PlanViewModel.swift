@@ -1,47 +1,69 @@
 import Combine
+import CoreData
 import CoreDomain
 import CoreLocation
 import CoreRouting
 import Foundation
-import MapKit
 
-/// Trip planning: place search → base route → chargers along the corridor →
+/// Trip planning: place search → routed path → chargers along the corridor →
 /// `TripSolver` for the charge stops.
 ///
-/// The base route comes from MapKit rather than the BYOK routing providers. It
-/// needs no key, so planning works out of the box; the ORS/Google keys in
-/// Settings remain for elevation-aware routing, which MapKit does not expose.
+/// Routing and geocoding go through the user's configured provider
+/// (OpenRouteService or Google), matching the Android build — OpenRouteService
+/// returns ascent/descent, which is what lets `ConsumptionModel` do real grade
+/// physics instead of assuming flat ground.
 @Observable
 @MainActor
 final class PlanViewModel {
 
-    // MARK: - Input
+    // MARK: - Endpoints
 
-    var originQuery = ""
-    var destinationQuery = ""
-    var departureSoc: Float = 80
+    /// One origin/destination/stopover slot: what the user typed, what they picked,
+    /// and the suggestions currently offered for it.
+    struct Endpoint: Identifiable {
+        let id = UUID()
+        var query: String = ""
+        var selected: PlaceResult?
+        var suggestions: [PlaceResult] = []
+        var isSearching = false
+    }
+
+    enum Slot: Equatable {
+        case origin
+        case destination
+        case waypoint(Int)
+    }
+
+    var origin = Endpoint()
+    var destination = Endpoint()
+    /// Stopovers, routed through in order between origin and destination.
+    private(set) var waypoints: [Endpoint] = []
+    private(set) var activeSlot: Slot?
+
+    // MARK: - Parameters
+
+    private(set) var departureSoc: Float = 80
     var arrivalReserve: Float = 20
+    /// How far off the line a charger may sit and still be considered.
+    private(set) var corridorRadiusKm: Float = 5
+
+    /// True while the departure SOC tracks the car instead of the slider.
+    private(set) var usesLiveSoc = true
 
     // MARK: - Output
 
-    private(set) var originPlace: Place?
-    private(set) var destinationPlace: Place?
-    private(set) var suggestions: [Place] = []
-    private(set) var activeField: Field?
     private(set) var plan: TripPlan?
+    private(set) var routePoints: [LatLon] = []
+    private(set) var hasElevationData = false
     private(set) var nearbyChargers: [Charger] = []
+    private(set) var savedTrips: [SavedTrip] = []
+    private(set) var favoritePlaces: [SavedPlaceEntity] = []
+    /// Chargers the driver rejected; excluded from the next solve.
+    private(set) var excludedChargerIds: Set<String> = []
     private(set) var isPlanning = false
     private(set) var statusMessage: String?
     private(set) var errorMessage: String?
-
-    enum Field { case origin, destination }
-
-    struct Place: Identifiable, Equatable {
-        let id = UUID()
-        let name: String
-        let subtitle: String
-        let location: LatLon
-    }
+    private(set) var routingNotice: String?
 
     private let services: AppServices
     private let solver = TripSolver()
@@ -50,6 +72,9 @@ final class PlanViewModel {
     private var preferences = UserPreferences()
     private var searchTask: Task<Void, Never>?
     private var cancellables = Set<AnyCancellable>()
+    /// Cached so a re-route doesn't re-request the route and burn another API call.
+    private var lastRoute: BaseRoute?
+    private var lastRouteChargers: [RouteCharger] = []
 
     init(services: AppServices) {
         self.services = services
@@ -59,8 +84,10 @@ final class PlanViewModel {
             .sink { [weak self] sample in
                 guard let self else { return }
                 self.telemetry = sample
-                // Seed departure SOC from the car until the user overrides it.
-                if !self.hasEditedSoc, let soc = sample.socDisplay ?? sample.socBms {
+                // Track the car until the driver takes the slider.
+                if self.usesLiveSoc,
+                   sample.connectionState == .connected,
+                   let soc = sample.socDisplay ?? sample.socBms {
                     self.departureSoc = soc
                 }
             }
@@ -68,81 +95,113 @@ final class PlanViewModel {
 
         services.preferences.preferences
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] prefs in
-                guard let self else { return }
-                self.preferences = prefs
-                if !self.hasEditedReserve {
-                    self.arrivalReserve = prefs.targetArrivalSocPercent
-                }
-            }
+            .sink { [weak self] in self?.preferences = $0 }
             .store(in: &cancellables)
+
+        preferences = services.userPreferences
+        arrivalReserve = preferences.targetArrivalSocPercent
+        reloadSaved()
     }
 
-    private var hasEditedSoc = false
-    private var hasEditedReserve = false
+    var canPlan: Bool {
+        origin.selected != nil && destination.selected != nil && !isPlanning
+    }
 
-    func socEdited() { hasEditedSoc = true }
-    func reserveEdited() { hasEditedReserve = true }
+    /// Every routed point in order: origin, stopovers, destination.
+    private var routeStops: [LatLon] {
+        ([origin.selected] + waypoints.map(\.selected) + [destination.selected])
+            .compactMap { $0?.location }
+    }
 
-    var canPlan: Bool { originPlace != nil && destinationPlace != nil && !isPlanning }
+    // MARK: - Slots
+
+    func endpoint(for slot: Slot) -> Endpoint {
+        switch slot {
+        case .origin: return origin
+        case .destination: return destination
+        case .waypoint(let index): return waypoints.indices.contains(index) ? waypoints[index] : Endpoint()
+        }
+    }
+
+    func setQuery(_ text: String, for slot: Slot) {
+        update(slot) { $0.query = text }
+        search(text, slot: slot)
+    }
+
+    func addWaypoint() {
+        waypoints.append(Endpoint())
+    }
+
+    func removeWaypoint(at index: Int) {
+        guard waypoints.indices.contains(index) else { return }
+        waypoints.remove(at: index)
+        invalidatePlan()
+    }
+
+    func swapEndpoints() {
+        swap(&origin, &destination)
+        invalidatePlan()
+    }
+
+    private func update(_ slot: Slot, _ mutate: (inout Endpoint) -> Void) {
+        switch slot {
+        case .origin: mutate(&origin)
+        case .destination: mutate(&destination)
+        case .waypoint(let index):
+            guard waypoints.indices.contains(index) else { return }
+            mutate(&waypoints[index])
+        }
+    }
 
     // MARK: - Place search
 
-    /// Debounced so typing doesn't fire a search per keystroke.
-    func search(_ query: String, field: Field) {
-        activeField = field
+    /// Debounced so typing doesn't fire a request per keystroke — these are billed.
+    private func search(_ query: String, slot: Slot) {
+        activeSlot = slot
         searchTask?.cancel()
+
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 3 else {
-            suggestions = []
+            update(slot) { $0.suggestions = [] }
             return
         }
+
         searchTask = Task { [weak self] in
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            await self?.runSearch(trimmed)
+            try? await Task.sleep(for: .milliseconds(350))
+            guard !Task.isCancelled, let self else { return }
+            await self.runSearch(trimmed, slot: slot)
         }
     }
 
-    private func runSearch(_ query: String) async {
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = query
-        if let center = await locationProvider.currentLocation() {
-            request.region = MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: center.lat, longitude: center.lon),
-                latitudinalMeters: 200_000,
-                longitudinalMeters: 200_000
-            )
+    private func runSearch(_ query: String, slot: Slot) async {
+        update(slot) { $0.isSearching = true }
+        defer { update(slot) { $0.isSearching = false } }
+
+        // `??` can't short-circuit an async call, so resolve it explicitly.
+        let near: LatLon?
+        if let selected = origin.selected {
+            near = selected.location
+        } else {
+            near = await locationProvider.currentLocation()
         }
         do {
-            let response = try await MKLocalSearch(request: request).start()
-            suggestions = response.mapItems.prefix(8).map { item in
-                Place(
-                    name: item.name ?? query,
-                    subtitle: Self.subtitle(for: item.placemark),
-                    location: LatLon(
-                        lat: item.placemark.coordinate.latitude,
-                        lon: item.placemark.coordinate.longitude
-                    )
-                )
-            }
+            let results = try await services.geocoding.search(query, near: near)
+            update(slot) { $0.suggestions = results }
+            routingNotice = results.isEmpty ? "No places matched \u{201C}\(query)\u{201D}." : nil
         } catch {
-            // A failed lookup shouldn't nag: the user is still typing.
-            suggestions = []
+            update(slot) { $0.suggestions = [] }
+            routingNotice = error.localizedDescription
         }
     }
 
-    func select(_ place: Place) {
-        switch activeField {
-        case .origin:
-            originPlace = place
-            originQuery = place.name
-        case .destination, nil:
-            destinationPlace = place
-            destinationQuery = place.name
+    func select(_ place: PlaceResult, for slot: Slot) {
+        update(slot) {
+            $0.selected = place
+            $0.query = place.name
+            $0.suggestions = []
         }
-        suggestions = []
-        activeField = nil
+        activeSlot = nil
+        invalidatePlan()
     }
 
     func useCurrentLocation() async {
@@ -150,70 +209,149 @@ final class PlanViewModel {
             errorMessage = "Location unavailable. Check permissions in Settings."
             return
         }
-        originPlace = Place(name: "Current Location", subtitle: "", location: location)
-        originQuery = "Current Location"
+        select(PlaceResult(name: "Current Location", location: location), for: .origin)
     }
 
-    /// Drops the active plan, so the replan and occupancy monitors stop watching.
-    func clearPlan() {
-        plan = nil
-        services.activePlan.clearPlan()
-    }
-
-    func swapEndpoints() {
-        swap(&originPlace, &destinationPlace)
-        swap(&originQuery, &destinationQuery)
+    /// Uses a nearby charger as the destination — the "drive to this charger" case,
+    /// which is otherwise impossible to express through search.
+    func setDestination(charger: Charger) {
+        select(
+            PlaceResult(
+                name: charger.name,
+                subtitle: charger.operator ?? "",
+                location: LatLon(lat: charger.lat, lon: charger.lon)
+            ),
+            for: .destination
+        )
     }
 
     // MARK: - Planning
 
     func plan() async {
-        guard let origin = originPlace, let destination = destinationPlace else { return }
+        guard canPlan else { return }
         isPlanning = true
         errorMessage = nil
-        plan = nil
+        routingNotice = nil
         defer { isPlanning = false }
 
         do {
             statusMessage = "Finding route…"
-            let route = try await route(from: origin.location, to: destination.location)
+            let route = try await services.routing.route(points: routeStops)
+            lastRoute = route
+            routePoints = route.points
+            hasElevationData = route.hasElevationData
+            if !route.hasElevationData {
+                routingNotice = "This provider reports no elevation, so consumption assumes flat ground. OpenRouteService returns it."
+            }
 
             statusMessage = "Looking for chargers…"
             let chargers = try await services.chargers.chargersAlongRoute(
-                routePoints: route.sampledPoints,
-                corridorKm: 5
+                routePoints: route.points,
+                corridorKm: Double(corridorRadiusKm)
             )
             guard !chargers.isEmpty else {
-                errorMessage = "No chargers found along this route."
+                errorMessage = "No usable chargers within \(Int(corridorRadiusKm)) km of this route. Try widening the corridor."
                 statusMessage = nil
                 return
             }
+            lastRouteChargers = Self.project(chargers: chargers, onto: route)
 
             statusMessage = "Planning stops…"
-            let routeChargers = Self.project(chargers: chargers, onto: route)
-            let solved = solver.solve(
-                origin: origin.location,
-                destination: destination.location,
-                totalRouteKm: route.distanceKm,
-                chargers: routeChargers,
-                params: solverParams
-            )
-
-            if let solved {
-                plan = solved
-                // Publish so the drive service can watch progress against it and
-                // CarPlay can show the same itinerary.
-                services.activePlan.setPlan(solved)
-                services.activePlan.setRoute(route.sampledPoints)
-                statusMessage = nil
-            } else {
-                errorMessage = "Couldn't find a workable charging plan. Try a higher departure charge or a lower arrival reserve."
-                statusMessage = nil
-            }
+            solve()
         } catch {
             errorMessage = error.localizedDescription
             statusMessage = nil
         }
+    }
+
+    /// Solves against the cached route and charger set, honouring exclusions. Used
+    /// by both the initial plan and every re-route, so rejecting a charger costs no
+    /// extra routing or charger API calls.
+    private func solve() {
+        guard let route = lastRoute,
+              let originPlace = origin.selected,
+              let destinationPlace = destination.selected else { return }
+
+        let candidates = lastRouteChargers.filter { !excludedChargerIds.contains($0.charger.id) }
+        guard !candidates.isEmpty else {
+            errorMessage = "Every charger on this route has been excluded."
+            statusMessage = nil
+            return
+        }
+
+        let solved = solver.solve(
+            origin: originPlace.location,
+            destination: destinationPlace.location,
+            totalRouteKm: route.distanceKm,
+            chargers: candidates,
+            params: solverParams,
+            userWaypoints: userWaypoints(along: route),
+            elevation: route.elevation
+        )
+
+        statusMessage = nil
+        if let solved {
+            plan = solved
+            services.activePlan.setPlan(solved)
+            services.activePlan.setRoute(route.points)
+            errorMessage = nil
+        } else {
+            errorMessage = excludedChargerIds.isEmpty
+                ? "Couldn't find a workable charging plan. Try a higher departure charge or a lower arrival reserve."
+                : "No plan works without the excluded chargers. Restore them and try again."
+        }
+    }
+
+    /// Re-plans around a charger the driver rejected — occupied, closed, or simply
+    /// somewhere they'd rather not stop.
+    func excludeChargerAndReplan(_ chargerId: String) {
+        excludedChargerIds.insert(chargerId)
+        solve()
+    }
+
+    func restoreExcludedChargers() {
+        guard !excludedChargerIds.isEmpty else { return }
+        excludedChargerIds.removeAll()
+        solve()
+    }
+
+    func clearPlan() {
+        plan = nil
+        routePoints = []
+        lastRoute = nil
+        lastRouteChargers = []
+        excludedChargerIds.removeAll()
+        services.activePlan.clearPlan()
+    }
+
+    /// A change to the inputs makes the cached route stale.
+    private func invalidatePlan() {
+        guard plan != nil || lastRoute != nil else { return }
+        plan = nil
+        lastRoute = nil
+        lastRouteChargers = []
+        excludedChargerIds.removeAll()
+        services.activePlan.clearPlan()
+    }
+
+    func setCorridorRadius(_ km: Float) {
+        corridorRadiusKm = km
+        invalidatePlan()
+    }
+
+    func setDepartureSoc(_ soc: Float) {
+        usesLiveSoc = false
+        departureSoc = soc
+    }
+
+    /// Hands the slider back to the car.
+    func useLiveSoc() {
+        usesLiveSoc = true
+        if let soc = telemetry.socDisplay ?? telemetry.socBms { departureSoc = soc }
+    }
+
+    var liveSocAvailable: Bool {
+        telemetry.connectionState == .connected && (telemetry.socDisplay ?? telemetry.socBms) != nil
     }
 
     private var solverParams: SolverParams {
@@ -234,117 +372,121 @@ final class PlanViewModel {
         )
     }
 
+    /// Stopovers as solver waypoints, placed at their nearest point along the route.
+    private func userWaypoints(along route: BaseRoute) -> [UserWaypoint] {
+        waypoints.compactMap { endpoint in
+            guard let place = endpoint.selected else { return nil }
+            let (alongKm, _) = RouteGeo.projectOntoRoute(
+                points: route.points,
+                lat: place.location.lat,
+                lon: place.location.lon,
+                totalKm: route.distanceKm
+            )
+            return UserWaypoint(name: place.name, location: place.location, distanceFromOriginKm: alongKm)
+        }
+    }
+
+    // MARK: - Saved trips and places
+
+    func reloadSaved() {
+        savedTrips = (try? services.savedTrips.all()) ?? []
+        favoritePlaces = (try? services.savedPlaces.all()) ?? []
+    }
+
+    var canSaveTrip: Bool { origin.selected != nil && destination.selected != nil }
+
+    func saveTrip(named name: String) {
+        guard let originPlace = origin.selected, let destinationPlace = destination.selected else { return }
+        let def = SavedTripDef(
+            origin: SavedPlaceDef(name: originPlace.name, lat: originPlace.location.lat, lon: originPlace.location.lon),
+            destination: SavedPlaceDef(
+                name: destinationPlace.name,
+                lat: destinationPlace.location.lat,
+                lon: destinationPlace.location.lon
+            ),
+            waypoints: waypoints.compactMap(\.selected).map {
+                SavedPlaceDef(name: $0.name, lat: $0.location.lat, lon: $0.location.lon)
+            },
+            arrivalSocTarget: arrivalReserve
+        )
+        _ = try? services.savedTrips.save(name: name, def: def)
+        reloadSaved()
+    }
+
+    func loadTrip(_ trip: SavedTrip) {
+        let def = trip.def
+        origin = Endpoint(query: def.origin.name, selected: PlaceResult(
+            name: def.origin.name, location: LatLon(lat: def.origin.lat, lon: def.origin.lon)
+        ))
+        destination = Endpoint(query: def.destination.name, selected: PlaceResult(
+            name: def.destination.name, location: LatLon(lat: def.destination.lat, lon: def.destination.lon)
+        ))
+        waypoints = def.waypoints.map { stop in
+            Endpoint(query: stop.name, selected: PlaceResult(
+                name: stop.name, location: LatLon(lat: stop.lat, lon: stop.lon)
+            ))
+        }
+        arrivalReserve = def.arrivalSocTarget
+        invalidatePlan()
+    }
+
+    func deleteTrip(_ trip: SavedTrip) {
+        try? services.savedTrips.delete(id: trip.id)
+        reloadSaved()
+    }
+
+    func toggleFavorite(_ place: PlaceResult) {
+        try? services.savedPlaces.toggleFavorite(name: place.name, location: place.location)
+        reloadSaved()
+    }
+
+    func isFavorite(_ place: PlaceResult?) -> Bool {
+        guard let place else { return false }
+        return favoritePlaces.contains {
+            abs($0.lat - place.location.lat) < 0.0001 && abs($0.lon - place.location.lon) < 0.0001
+        }
+    }
+
+    func selectFavorite(_ favorite: SavedPlaceEntity, for slot: Slot) {
+        select(
+            PlaceResult(name: favorite.name, location: LatLon(lat: favorite.lat, lon: favorite.lon)),
+            for: slot
+        )
+    }
+
+    func deleteFavorite(_ favorite: SavedPlaceEntity) {
+        try? services.savedPlaces.deletePlace(id: favorite.id)
+        reloadSaved()
+    }
+
     // MARK: - Nearby chargers
 
-    /// Only runs once location is already authorized. Opening the tab must not
-    /// trigger the permission prompt — that belongs to an explicit user action.
+    /// Only runs once location is already authorized — opening the tab must not
+    /// trigger the permission prompt.
     func loadNearbyChargers() async {
         guard locationProvider.isAuthorized else { return }
         guard let center = await locationProvider.currentLocation() else { return }
         nearbyChargers = (try? await services.chargers.chargersNear(center: center, radiusKm: 25)) ?? []
     }
 
-    // MARK: - Routing
+    func dismissRoutingNotice() { routingNotice = nil }
 
-    private struct Route {
-        let distanceKm: Float
-        let durationMinutes: Int
-        let sampledPoints: [LatLon]
-    }
-
-    private func route(from origin: LatLon, to destination: LatLon) async throws -> Route {
-        let request = MKDirections.Request()
-        request.source = MKMapItem(placemark: MKPlacemark(
-            coordinate: CLLocationCoordinate2D(latitude: origin.lat, longitude: origin.lon)
-        ))
-        request.destination = MKMapItem(placemark: MKPlacemark(
-            coordinate: CLLocationCoordinate2D(latitude: destination.lat, longitude: destination.lon)
-        ))
-        request.transportType = .automobile
-
-        let response = try await MKDirections(request: request).calculate()
-        guard let route = response.routes.first else {
-            throw PlanError.noRoute
-        }
-
-        return Route(
-            distanceKm: Float(route.distance / 1000),
-            durationMinutes: Int(route.expectedTravelTime / 60),
-            sampledPoints: Self.sample(polyline: route.polyline)
-        )
-    }
-
-    /// Thins the polyline to roughly one point per kilometre — enough shape for a
-    /// corridor query without shipping thousands of coordinates.
-    private static func sample(polyline: MKPolyline) -> [LatLon] {
-        var coordinates = [CLLocationCoordinate2D](
-            repeating: kCLLocationCoordinate2DInvalid,
-            count: polyline.pointCount
-        )
-        polyline.getCoordinates(&coordinates, range: NSRange(location: 0, length: polyline.pointCount))
-
-        var result: [LatLon] = []
-        var lastKept: CLLocation?
-        for coordinate in coordinates {
-            let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-            if let lastKept, lastKept.distance(from: location) < 1000 { continue }
-            lastKept = location
-            result.append(LatLon(lat: coordinate.latitude, lon: coordinate.longitude))
-        }
-        return result
-    }
+    // MARK: - Geometry
 
     /// Places each charger along the route by nearest sampled point, and measures
     /// the detour as the straight-line hop off the corridor.
-    private static func project(chargers: [Charger], onto route: Route) -> [RouteCharger] {
-        let points = route.sampledPoints
-        guard !points.isEmpty else { return [] }
-        let kmPerPoint = points.count > 1 ? route.distanceKm / Float(points.count - 1) : 0
-
-        return chargers.compactMap { charger in
-            var bestIndex = 0
-            var bestDistance = Double.greatestFiniteMagnitude
-            for (index, point) in points.enumerated() {
-                let distance = haversineKm(point, LatLon(lat: charger.lat, lon: charger.lon))
-                if distance < bestDistance {
-                    bestDistance = distance
-                    bestIndex = index
-                }
-            }
-            return RouteCharger(
-                charger: charger,
-                distanceAlongRouteKm: Float(bestIndex) * kmPerPoint,
-                detourKm: Float(bestDistance)
+    private static func project(chargers: [Charger], onto route: BaseRoute) -> [RouteCharger] {
+        guard !route.points.isEmpty else { return [] }
+        return chargers.map { charger in
+            let (alongKm, detourKm) = RouteGeo.projectOntoRoute(
+                points: route.points,
+                lat: charger.lat,
+                lon: charger.lon,
+                totalKm: route.distanceKm
             )
+            return RouteCharger(charger: charger, distanceAlongRouteKm: alongKm, detourKm: detourKm)
         }
         .sorted { $0.distanceAlongRouteKm < $1.distanceAlongRouteKm }
-    }
-
-    /// Street + locality when available, so "Shell" rows are distinguishable.
-    private static func subtitle(for placemark: MKPlacemark) -> String {
-        [placemark.thoroughfare, placemark.locality, placemark.administrativeArea]
-            .compactMap { $0 }
-            .joined(separator: ", ")
-    }
-
-    private static func haversineKm(_ a: LatLon, _ b: LatLon) -> Double {
-        let earthRadiusKm = 6371.0
-        let dLat = (b.lat - a.lat) * .pi / 180
-        let dLon = (b.lon - a.lon) * .pi / 180
-        let lat1 = a.lat * .pi / 180
-        let lat2 = b.lat * .pi / 180
-        let h = sin(dLat / 2) * sin(dLat / 2)
-            + sin(dLon / 2) * sin(dLon / 2) * cos(lat1) * cos(lat2)
-        return 2 * earthRadiusKm * asin(min(1, sqrt(h)))
-    }
-
-    enum PlanError: LocalizedError {
-        case noRoute
-        var errorDescription: String? {
-            switch self {
-            case .noRoute: return "No driving route between those places."
-            }
-        }
     }
 }
 
