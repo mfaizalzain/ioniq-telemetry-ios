@@ -62,7 +62,7 @@ public final class PidSweeper: @unchecked Sendable {
     private func requestFind(header: String, requestHex: String) async -> Finding {
         let framed = isoTpSingleFrame(requestHex: requestHex)
         let raw = try? await transport.send(command: framed, timeoutMs: 600)
-        await recorder?.record(command: framed, rawResponse: raw ?? "")
+        recorder?.record(command: framed, rawResponse: raw ?? "")
 
         let lines = raw.map { cleanResponse(raw: $0, sentCommand: framed) } ?? []
             .filter { $0.caseInsensitiveCompare("NO DATA") != .orderedSame }
