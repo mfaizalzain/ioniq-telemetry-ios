@@ -281,6 +281,7 @@ public final class TripLogRepository: @unchecked Sendable {
             } else {
                 lastLat = lat
                 lastLon = lon
+                print("[TripLog] GPS first fix lat=\(lat) lon=\(lon) for trip \(tripId)")
             }
         }
 
@@ -349,6 +350,7 @@ public final class TripLogRepository: @unchecked Sendable {
             if gpsDistanceKm > 0 { return max(Float(gpsDistanceKm), sampleDist) }
             return sampleDist
         }()
+        print("[TripLog] endTrip \(tripId): odoDelta=\(odoDelta ?? -1) odoStart=\(startOdometerKm ?? -1) odoEnd=\(odoEnd ?? -1) gpsDistance=\(gpsDistanceKm) sampleDist=\(sampleDist) samples=\(samples.count) lat=\(samples.first?.lat ?? -1)")
 
         let ambientAvg: Float? = {
             let temps = samples.compactMap(\.ambientTempC)
