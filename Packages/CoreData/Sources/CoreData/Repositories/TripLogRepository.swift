@@ -586,7 +586,7 @@ public final class TripLogRepository: @unchecked Sendable {
     // MARK: - Private: Charge Session
 
     private func updateChargeSession(telemetry: VehicleTelemetry, now: Date, inVehicle: Bool) {
-        let isCharging = telemetry.isCharging || (telemetry.chargeType != nil && telemetry.chargeType != .none)
+        let isCharging = telemetry.isCharging || telemetry.chargeType == .ac || telemetry.chargeType == .dc
         let currentPowerKw = telemetry.powerKw.map { abs($0) } ?? 0
         let speed = telemetry.speedKph
         let stationary = speed == nil || speed! <= 3
