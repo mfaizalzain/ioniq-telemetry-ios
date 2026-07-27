@@ -126,9 +126,9 @@ final class ConnectedCarService {
             rawIsCharging: raw.isCharging,
             rawChargeType: raw.chargeType,
             odometerKm: raw.odometerKm,
-            fix: location.latestFix,
+            fix: location.latestFix ?? location.simulatedFix,
             inVehicle: location.isInVehicle,
-            hasLocationPermission: location.hasLocationPermission,
+            hasLocationPermission: location.hasLocationPermission || location.simulatedFix != nil,
             hasMotionPermission: location.hasMotionPermission,
             now: Date()
         )
