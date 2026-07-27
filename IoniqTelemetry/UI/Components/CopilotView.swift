@@ -1,121 +1,193 @@
-import SwiftUI
 import CoreUI
+import SwiftUI
 
 struct CopilotView: View {
+    @Environment(AppServices.self) private var services
     @Environment(\.dismiss) private var dismiss
-    @State private var inputText = ""
-    @State private var messages: [CopilotMessage] = [
-        CopilotMessage(role: .assistant, text: "Hi! I'm your AI Assistant. Ask me about trip planning, battery health, or nearby chargers.")
-    ]
-    @State private var isListening = false
-
-    struct CopilotMessage: Identifiable {
-        let id = UUID()
-        var role: Role
-        var text: String
-        var timestamp: Date = Date()
-        enum Role { case user, assistant }
-    }
+    @State private var viewModel: CopilotViewModel?
 
     var body: some View {
         NavigationStack {
-            VStack {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 12) {
-                            ForEach(messages) { message in
-                                ChatBubble(message: message)
-                                    .id(message.id)
-                            }
-                        }
-                        .padding()
-                    }
-                    .onChange(of: messages.count) {
-                        if let last = messages.last { proxy.scrollTo(last.id, anchor: .bottom) }
-                    }
+            VStack(spacing: 0) {
+                if let viewModel {
+                    transcript(viewModel)
+                    Divider()
+                    Composer(viewModel: viewModel)
+                } else {
+                    ProgressView()
+                        .frame(maxHeight: .infinity)
                 }
-
-                // Input
-                HStack {
-                    TextField("Ask AI Assistant...", text: $inputText)
-                        .textFieldStyle(.roundedBorder)
-
-                    Button {
-                        send()
-                    } label: {
-                        Image(systemName: "arrow.up.circle.fill")
-                            .font(.title2)
-                            .foregroundStyle(Color.electricTeal)
-                    }
-                    .disabled(inputText.isEmpty)
-
-                    Button {
-                        isListening.toggle()
-                    } label: {
-                        Image(systemName: isListening ? "mic.fill" : "mic")
-                            .font(.title2)
-                            .foregroundStyle(isListening ? Color.redAlert : .secondary)
-                    }
-                }
-                .padding()
             }
             .background(Color.deepNavy)
             .navigationTitle("AI Assistant")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Clear") { viewModel?.clear() }
+                        .disabled(viewModel?.messages.isEmpty ?? true)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
         }
-    }
-
-    func send() {
-        guard !inputText.isEmpty else { return }
-        messages.append(CopilotMessage(role: .user, text: inputText))
-        let query = inputText
-        inputText = ""
-
-        // Simulate AI response
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            let response = generateResponse(for: query)
-            messages.append(CopilotMessage(role: .assistant, text: response))
+        .task {
+            if viewModel == nil { viewModel = CopilotViewModel(services: services) }
         }
     }
 
-    func generateResponse(for query: String) -> String {
-        if query.lowercased().contains("charger") || query.lowercased().contains("charging") {
-            return "I found 3 nearby charging stations:\n\n1. **Shell Recharge KL East** — 150 kW, 2/4 available, £0.45/kWh\n2. **ChargEV Pavilion** — 50 kW, 1/2 available, RM1.20/kWh\n3. **Petronas Solaris** — 180 kW, 3/3 available, RM1.50/kWh\n\nWould you like me to navigate to one of these?"
+    private func transcript(_ viewModel: CopilotViewModel) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 12) {
+                    if viewModel.messages.isEmpty {
+                        SuggestionsView(viewModel: viewModel)
+                    }
+                    ForEach(viewModel.messages) { message in
+                        ChatBubble(message: message)
+                            .id(message.id)
+                    }
+                    if viewModel.isSending {
+                        TypingIndicator()
+                    }
+                    if let error = viewModel.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.redAlert)
+                            .padding(.horizontal)
+                    }
+                }
+                .padding()
+            }
+            .onChange(of: viewModel.messages.count) {
+                withAnimation { proxy.scrollTo(viewModel.messages.last?.id, anchor: .bottom) }
+            }
         }
-        if query.lowercased().contains("trip") || query.lowercased().contains("plan") || query.lowercased().contains("navigate") {
-            return "I can help plan your trip! Where would you like to go? Tell me the destination and I'll find the best charging stops along the way."
-        }
-        return "Your battery is at 78%, cell delta is a healthy 18 mV, and pack temperature is optimal at 31°C. Range is estimated at 312 km. Is there anything specific you'd like to know?"
     }
 }
 
-struct ChatBubble: View {
-    var message: CopilotView.CopilotMessage
+// MARK: - Bubble
+
+private struct ChatBubble: View {
+    let message: CopilotViewModel.Message
+
+    private var isUser: Bool { message.role == .user }
 
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            if message.role == .assistant {
-                Image(systemName: "sparkles")
-                    .font(.caption)
-                    .foregroundStyle(Color.electricTeal)
-                    .padding(6)
-                    .background(Color(white: 1).opacity(0.1), in: Circle())
-            } else {
-                Spacer()
-            }
+        HStack {
+            if isUser { Spacer(minLength: 40) }
             Text(message.text)
                 .font(.body)
-                .padding(12)
-                .background(message.role == .user ? Color.electricTeal.opacity(0.2) : Color(white: 1).opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-            if message.role == .user {
-                Spacer()
+                .foregroundStyle(isUser ? Color.deepNavy : Color.onSurface)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(
+                    isUser ? Color.electricTeal : Color.surfaceVariant,
+                    in: RoundedRectangle(cornerRadius: 16)
+                )
+                .textSelection(.enabled)
+            if !isUser { Spacer(minLength: 40) }
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(isUser ? "You said" : "Assistant said")
+        .accessibilityValue(message.text)
+    }
+}
+
+private struct TypingIndicator: View {
+    @State private var phase = 0.0
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<3, id: \.self) { index in
+                Circle()
+                    .fill(Color.onSurfaceVariant)
+                    .frame(width: 6, height: 6)
+                    .opacity(phase == Double(index) ? 1 : 0.35)
             }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.surfaceVariant, in: RoundedRectangle(cornerRadius: 16))
+        .task {
+            // Plain timer rather than repeatForever: the view is torn down when the
+            // reply lands, and a detached animation would outlive it.
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(350))
+                phase = (phase + 1).truncatingRemainder(dividingBy: 3)
+            }
+        }
+        .accessibilityLabel("Assistant is typing")
+    }
+}
+
+// MARK: - Suggestions
+
+private struct SuggestionsView: View {
+    let viewModel: CopilotViewModel
+
+    private static let prompts = [
+        "Why is my charging speed slow?",
+        "How's my battery health?",
+        "Explain my current energy use",
+        "Should I precondition before charging?"
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Ask about your car")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+            ForEach(Self.prompts, id: \.self) { prompt in
+                Button {
+                    viewModel.inputText = prompt
+                } label: {
+                    HStack {
+                        Text(prompt)
+                            .multilineTextAlignment(.leading)
+                        Spacer()
+                        Image(systemName: "arrow.up.left")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(12)
+                    .background(Color.surfaceNavy, in: RoundedRectangle(cornerRadius: 10))
+                }
+                .tint(.primary)
+            }
+        }
+    }
+}
+
+// MARK: - Composer
+
+private struct Composer: View {
+    let viewModel: CopilotViewModel
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TextField("Ask about your car…", text: Binding(
+                get: { viewModel.inputText },
+                set: { viewModel.inputText = $0 }
+            ), axis: .vertical)
+            .lineLimit(1...4)
+            .textFieldStyle(.plain)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Color.surfaceVariant, in: Capsule())
+            .onSubmit { Task { await viewModel.send() } }
+
+            Button {
+                Task { await viewModel.send() }
+            } label: {
+                Image(systemName: "arrow.up.circle.fill")
+                    .font(.system(size: 30))
+            }
+            .tint(Color.electricTeal)
+            .disabled(!viewModel.canSend)
+            .accessibilityLabel("Send")
+        }
+        .padding()
+        .background(Color.deepNavy)
     }
 }

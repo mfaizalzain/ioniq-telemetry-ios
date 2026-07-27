@@ -68,3 +68,40 @@ public enum Ioniq5Constants {
             ?? 77.4 // default
     }
 }
+
+// MARK: - Decoder profile resolution
+
+public extension Ioniq5Constants {
+    /// The five decoder profiles bundled with CoreOBD.
+    ///
+    /// E-GMP packs share a BMS PID layout across capacities, so all 16 catalog
+    /// entries decode with one profile per model line — capacity comes from the
+    /// catalog (`usableKwhForProfile`), not the profile.
+    static let bundledProfileAssets: Set<String> = [
+        "ioniq5_2022_77kwh",
+        "ioniq5_84kwh",
+        "ioniq6_77kwh",
+        "ev6_77kwh",
+        "gv60_77kwh"
+    ]
+
+    /// Resolves any catalog vehicle id *or* OBD profile id to the bundled decoder
+    /// profile that can read it. Returns nil only for ids outside the catalog.
+    static func decoderProfileAsset(for id: String) -> String? {
+        if bundledProfileAssets.contains(id) { return id }
+
+        let vehicle = allVehicles.first { $0.id == id }
+            ?? allVehicles.first { $0.obdProfileId == id }
+        guard let vehicle else { return nil }
+
+        // The 84 kWh pack has a distinct cell count, so it keeps its own profile.
+        if vehicle.usableKwh >= 84 && vehicle.make != .genesis { return "ioniq5_84kwh" }
+
+        switch vehicle.make {
+        case .genesis: return "gv60_77kwh"
+        case .kia: return "ev6_77kwh"          // EV6 and EV9 share the E-GMP BMS layout
+        case .hyundai:
+            return vehicle.model.contains("6") ? "ioniq6_77kwh" : "ioniq5_2022_77kwh"
+        }
+    }
+}

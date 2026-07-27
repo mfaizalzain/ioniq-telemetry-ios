@@ -36,6 +36,9 @@ targets:
       - sdk: SwiftData.framework
       - sdk: StoreKit.framework
       - sdk: BackgroundTasks.framework
+      - sdk: Charts.framework
+      - sdk: Speech.framework
+      - sdk: AVFoundation.framework
   IoniqTelemetryTests:
     type: bundle.unit-test
     platform: iOS

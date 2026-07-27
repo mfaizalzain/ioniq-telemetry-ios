@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CoreData",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "CoreData", targets: ["CoreData"])
     ],

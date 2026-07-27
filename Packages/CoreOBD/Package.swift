@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "CoreOBD",
-    platforms: [.iOS(.v17)],
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "CoreOBD", targets: ["CoreOBD"])
     ],
@@ -15,6 +15,7 @@ let package = Package(
             name: "CoreOBD",
             dependencies: ["CoreDomain"],
             resources: [.process("Resources")]
-        )
+        ),
+        .testTarget(name: "CoreOBDTests", dependencies: ["CoreOBD"])
     ]
 )

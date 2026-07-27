@@ -1,42 +1,58 @@
-import SwiftUI
+import CoreDomain
 import CoreUI
+import SwiftUI
 
 struct DashboardView: View {
     @Environment(AppServices.self) private var services
+    @State private var viewModel: DashboardViewModel?
+    @State private var showCopilot = false
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 16) {
-                    // Header
-                    HStack {
-                        Text("IONIQ 5")
-                            .font(.headline.weight(.medium))
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        ConnectionBadge(state: .offline)
-                    }
-                    .padding(.horizontal)
+                if let viewModel {
+                    LazyVStack(spacing: 16) {
+                        HStack {
+                            Text(viewModel.vehicleName.uppercased())
+                                .font(.headline.weight(.medium))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            ConnectionBadge(state: ConnectionState(viewModel.connectionState))
+                        }
+                        .padding(.horizontal)
 
-                    BatteryHeroCard()
-                    MetricTilesGrid()
-                    TirePressureVisualizerCard()
-                    ThermalTipCard()
+                        BatteryHeroCard(viewModel: viewModel)
+                        MetricTilesGrid(viewModel: viewModel)
+                        TirePressureVisualizerCard(viewModel: viewModel)
+
+                        if let tip = viewModel.thermalTip {
+                            ThermalTipCard(tip: tip)
+                        }
+                    }
+                    .padding(.vertical)
                 }
-                .padding(.vertical)
             }
             .background(Color.deepNavy)
             .navigationTitle("Dashboard")
             .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        // AI Copilot FAB placeholder
-                    } label: {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(Color.electricTeal)
+                if viewModel?.canUseCopilot == true {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showCopilot = true
+                        } label: {
+                            Image(systemName: "sparkles")
+                        }
+                        .tint(Color.electricTeal)
+                        .accessibilityLabel("AI Assistant")
                     }
                 }
             }
+            .sheet(isPresented: $showCopilot) {
+                CopilotView()
+            }
+        }
+        .task {
+            if viewModel == nil { viewModel = DashboardViewModel(services: services) }
         }
     }
 }
@@ -44,23 +60,22 @@ struct DashboardView: View {
 // MARK: - Battery Hero Card
 
 struct BatteryHeroCard: View {
-    var socPercent: Float = 78
+    let viewModel: DashboardViewModel
 
     /// Gauge geometry, shared with the Android build: a 220° arc starting at 160°,
     /// leaving a 140° gap centred at the bottom.
     private static let startAngle: Double = 160
     private static let sweepFraction: CGFloat = 220.0 / 360.0
 
-    private var fillFraction: Float { min(max(socPercent / 100, 0), 1) }
+    private var socPercent: Float? { viewModel.socPercent }
+    private var fillFraction: Float { min(max((socPercent ?? 0) / 100, 0), 1) }
 
     var body: some View {
         GroupBox {
             VStack(spacing: 10) {
-                // SOC ring
                 ZStack {
-                    // Dim track. SwiftUI trims clockwise from 3 o'clock, so the
-                    // 160° rotation puts the 140° gap centred at the bottom —
-                    // matching the Android gauge (start 160°, sweep 220°).
+                    // SwiftUI trims clockwise from 3 o'clock, so the 160° rotation
+                    // puts the 140° gap centred at the bottom.
                     Circle()
                         .trim(from: 0, to: Self.sweepFraction)
                         .stroke(Color.outlineVariant, style: StrokeStyle(lineWidth: 12, lineCap: .round))
@@ -80,10 +95,10 @@ struct BatteryHeroCard: View {
                         )
                         .rotationEffect(.degrees(Self.startAngle))
                         .frame(width: 120, height: 120)
-                        .animation(.easeOut(duration: 0.4), value: socPercent)
+                        .animation(.easeOut(duration: 0.4), value: fillFraction)
 
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
-                        Text(String(format: "%.0f", socPercent))
+                        Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
                             .font(.system(size: 32, weight: .bold))
                             .tracking(-1.5)
                         Text("%")
@@ -93,13 +108,26 @@ struct BatteryHeroCard: View {
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("State of charge")
-                .accessibilityValue("\(Int(socPercent.rounded())) percent")
+                .accessibilityValue(socPercent.map { "\(Int($0.rounded())) percent" } ?? "No data")
 
-                // Stats row
+                if viewModel.telemetry.isCharging {
+                    ChargingChip(viewModel: viewModel)
+                }
+
                 HStack(spacing: 16) {
-                    statBadge(label: "BMS SOC", value: "76.5%")
-                    statBadge(label: "HEALTH SOH", value: "98%")
-                    statBadge(label: "PACK TEMP", value: "31°C")
+                    statBadge(
+                        label: "BMS SOC",
+                        value: viewModel.telemetry.socBms.map { String(format: "%.1f%%", $0) } ?? "—"
+                    )
+                    statBadge(
+                        label: "HEALTH SOH",
+                        value: viewModel.telemetry.soh.map { String(format: "%.0f%%", $0) } ?? "—"
+                    )
+                    statBadge(
+                        label: "PACK TEMP",
+                        value: viewModel.temperature(viewModel.packTempC.map(Float.init)),
+                        color: .packTemp(viewModel.packTempC)
+                    )
                 }
             }
             .padding(20)
@@ -108,7 +136,7 @@ struct BatteryHeroCard: View {
         .backgroundStyle(.ultraThinMaterial)
     }
 
-    func statBadge(label: String, value: String) -> some View {
+    private func statBadge(label: String, value: String, color: Color = .onSurface) -> some View {
         VStack(spacing: 4) {
             Text(label)
                 .font(.ioniqCaption)
@@ -116,51 +144,87 @@ struct BatteryHeroCard: View {
                 .ioniqStatLabel()
             Text(value)
                 .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(color)
         }
         .frame(maxWidth: .infinity)
         .padding(8)
-        .background(Color(white: 1).opacity(0.1))
+        .background(Color.surfaceVariant.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .combine)
     }
 }
 
-// MARK: - Metric Tiles Grid
+private struct ChargingChip: View {
+    let viewModel: DashboardViewModel
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "bolt.fill")
+            Text(viewModel.telemetry.chargeType?.rawValue ?? "Charging")
+            if let power = viewModel.telemetry.powerKw {
+                Text(String(format: "%.1f kW", abs(power)))
+                    .fontWeight(.semibold)
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(Color.greenOk)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color.greenOk.opacity(0.15))
+        .clipShape(Capsule())
+        .accessibilityElement(children: .combine)
+    }
+}
+
+// MARK: - Metric Tiles
 
 struct MetricTilesGrid: View {
+    let viewModel: DashboardViewModel
+
+    private var telemetry: VehicleTelemetry { viewModel.telemetry }
+
     var body: some View {
         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
             MetricTile(
                 icon: "bolt.fill",
-                label: "POWER",
-                value: "45 kW",
-                valueColor: .white
+                label: viewModel.isRegenerating ? "POWER · REGEN" : "POWER",
+                value: DashboardViewModel.format(telemetry.powerKw, unit: "kW", decimals: 1),
+                valueColor: viewModel.isRegenerating ? .greenOk : .onSurface
             )
             MetricTile(
                 icon: "chart.line.uptrend.xyaxis",
                 label: "CELL Δ",
-                value: "18 mV",
-                valueColor: Color.greenOk
+                // cellVoltDelta is in volts; millivolts is the readable unit here.
+                value: telemetry.cellVoltDelta.map { String(format: "%.0f mV", $0 * 1000) } ?? "—",
+                valueColor: .cellDelta(telemetry.cellVoltDelta)
             )
             MetricTile(
                 icon: "battery.100percent.bolt",
                 label: "HV VOLTAGE",
-                value: "782 V",
-                valueColor: Color.electricTeal
+                value: DashboardViewModel.format(telemetry.packVoltage, unit: "V", decimals: 0),
+                valueColor: .electricTeal
             )
             MetricTile(
                 icon: "battery.25percent",
                 label: "AUX BATTERY",
-                value: "12.6 V",
-                valueColor: Color.greenOk
+                value: DashboardViewModel.format(telemetry.auxVoltage, unit: "V", decimals: 1),
+                // Below ~12.0 V the 12 V battery is draining faster than the DC-DC
+                // replaces it — the classic E-GMP no-start warning.
+                valueColor: (telemetry.auxVoltage ?? 12.6) < 12.0 ? .amberWarn : .greenOk
             )
         }
         .padding(.horizontal, 12)
     }
 }
 
-// MARK: - Tire Pressure Card
+// MARK: - Tire Pressure
 
 struct TirePressureVisualizerCard: View {
+    let viewModel: DashboardViewModel
+
+    /// Below this an E-GMP tire is meaningfully under-inflated.
+    private static let lowPressureKpa: Float = 220
+
     var body: some View {
         GroupBox {
             VStack(spacing: 8) {
@@ -173,21 +237,24 @@ struct TirePressureVisualizerCard: View {
                 }
                 .foregroundStyle(.secondary)
 
+                let pressures = viewModel.telemetry.tirePressuresKpa
+                let temps = viewModel.telemetry.tireTempsC
+
                 HStack(spacing: 12) {
-                    tireSquare(label: "FL", pressure: "36", temp: "32°C")
+                    tireSquare("FL", pressures?.fl, temps?.fl)
                     Spacer()
                     Image(systemName: "car.fill")
                         .font(.title)
                         .foregroundStyle(.secondary)
                     Spacer()
-                    tireSquare(label: "FR", pressure: "35", temp: "31°C")
+                    tireSquare("FR", pressures?.fr, temps?.fr)
                 }
                 HStack(spacing: 12) {
-                    tireSquare(label: "RL", pressure: "37", temp: "33°C")
+                    tireSquare("RL", pressures?.rl, temps?.rl)
                     Spacer()
                     Spacer().frame(width: 32)
                     Spacer()
-                    tireSquare(label: "RR", pressure: "36", temp: "32°C")
+                    tireSquare("RR", pressures?.rr, temps?.rr)
                 }
             }
             .padding(16)
@@ -196,36 +263,47 @@ struct TirePressureVisualizerCard: View {
         .backgroundStyle(.ultraThinMaterial)
     }
 
-    func tireSquare(label: String, pressure: String, temp: String) -> some View {
-        VStack(spacing: 2) {
+    private func tireSquare(_ label: String, _ kpa: Float?, _ tempC: Float?) -> some View {
+        let isLow = (kpa ?? .greatestFiniteMagnitude) < Self.lowPressureKpa
+        return VStack(spacing: 2) {
             Text(label)
                 .font(.ioniqCaption.weight(.bold))
-            Text(pressure)
+            Text(viewModel.tirePressure(kpa))
                 .font(.system(size: 18, weight: .bold))
-            Text("PSI")
+                .foregroundStyle(isLow ? Color.redAlert : Color.onSurface)
+            Text(viewModel.tirePressureUnit)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
-            Text(temp)
+            Text(viewModel.temperature(tempC))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
-        .frame(width: 70)
+        .frame(minWidth: 70)
         .padding(8)
-        .background(Color(white: 1).opacity(0.1))
+        .background(Color.surfaceVariant.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(label) tire")
+        .accessibilityValue(
+            kpa == nil
+                ? "No data"
+                : "\(viewModel.tirePressure(kpa)) \(viewModel.tirePressureUnit)\(isLow ? ", low" : "")"
+        )
     }
 }
 
-// MARK: - Thermal Tip Card
+// MARK: - Thermal Tip
 
 struct ThermalTipCard: View {
+    let tip: String
+
     var body: some View {
         GroupBox {
             HStack(spacing: 12) {
                 Image(systemName: "thermometer.medium")
                     .font(.title2)
-                    .foregroundStyle(.orange)
-                Text("Battery temperature optimal for peak performance.")
+                    .foregroundStyle(Color.amberWarn)
+                Text(tip)
                     .font(.ioniqBody)
                     .foregroundStyle(.secondary)
             }
@@ -233,5 +311,6 @@ struct ThermalTipCard: View {
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
+        .accessibilityElement(children: .combine)
     }
 }

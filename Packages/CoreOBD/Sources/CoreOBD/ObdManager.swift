@@ -54,29 +54,11 @@ public final class ObdManager: @unchecked Sendable {
     // MARK: - Profile loading
 
     public func loadProfile(profileId: String) {
-        loadProfile(profileId: profileId, from: .module)
+        loadProfile(profileId: profileId, from: ProfileParser.resourceBundle)
     }
 
     public func loadProfile(profileId: String, from bundle: Bundle) {
-        let assetNames: [String: String] = [
-            "ioniq5_2022_77kwh": "ioniq5_2022_77kwh",
-            "ioniq5_84kwh": "ioniq5_84kwh",
-            "ioniq6_77kwh": "ioniq6_77kwh",
-            "ev6_77kwh": "ev6_77kwh",
-            "gv60_77kwh": "gv60_77kwh",
-            "ioniq5_84": "ioniq5_84kwh",
-            "ioniq5n_84": "ioniq5_84kwh",
-            "ev6_84": "ioniq5_84kwh",
-            "ev9_99": "ioniq5_84kwh",
-            "ioniq5_77": "ioniq5_2022_77kwh",
-            "ioniq6_77": "ioniq6_77kwh",
-            "ev6_77": "ev6_77kwh",
-            "ev6gt_77": "ev6_77kwh",
-            "ev9_76": "gv60_77kwh",
-            "gv60_77": "gv60_77kwh",
-        ]
-
-        guard let assetName = assetNames[profileId] else {
+        guard let assetName = Ioniq5Constants.decoderProfileAsset(for: profileId) else {
             lastProfileError = "Unknown vehicle profile '\(profileId)' — keeping \(activeProfile.profileId)."
             return
         }

@@ -1,51 +1,45 @@
-import SwiftUI
 import CoreUI
+import StoreKit
+import SwiftUI
 
 struct PaywallView: View {
+    @Environment(AppServices.self) private var services
     @Environment(\.dismiss) private var dismiss
+    @State private var viewModel: PaywallViewModel?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 8) {
-                        Image(systemName: "bolt.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(Color.electricTeal)
+                    header
 
-                        Text("Unlock Pro")
-                            .font(.largeTitle.bold())
+                    FeatureList()
 
-                        Text("Supports all E-GMP vehicles.")
-                            .foregroundStyle(.secondary)
+                    if let viewModel {
+                        if viewModel.isPro {
+                            ActiveProCard()
+                        } else {
+                            ProductList(viewModel: viewModel)
+                        }
+
+                        if let error = viewModel.errorMessage {
+                            Label(error, systemImage: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(Color.amberWarn)
+                                .multilineTextAlignment(.center)
+                        }
+
+                        Button("Restore Purchases") {
+                            Task { await viewModel.restore() }
+                        }
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .disabled(viewModel.isLoading)
+
+                        LegalLinks()
+                    } else {
+                        ProgressView()
                     }
-                    .padding(.top, 32)
-
-                    // Feature list
-                    VStack(alignment: .leading, spacing: 12) {
-                        FeatureRow(icon: "sparkles", text: "AI Assistant — trip planning & coaching")
-                        FeatureRow(icon: "xmark.circle", text: "Remove Ads")
-                        FeatureRow(icon: "bell.fill", text: "Charger Occupancy Alerts")
-                        FeatureRow(icon: "calendar", text: "365-Day Trip Retention")
-                    }
-                    .padding(20)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                    // Products
-                    VStack(spacing: 12) {
-                        productButton(title: "Monthly", price: "$1.99/mo", badge: nil)
-                        productButton(title: "Yearly", price: "$19.99/yr", badge: "Save 16%")
-                        productButton(title: "Lifetime", price: "$49.99", badge: "Best Value")
-                    }
-
-                    // Restore
-                    Button("Restore Purchases") {
-                        // Restore
-                    }
-                    .foregroundStyle(.secondary)
-                    .font(.subheadline)
                 }
                 .padding()
             }
@@ -57,51 +51,162 @@ struct PaywallView: View {
                 }
             }
         }
+        .task {
+            if viewModel == nil {
+                viewModel = PaywallViewModel(entitlement: services.entitlement)
+            }
+            await viewModel?.load()
+        }
     }
 
-    func productButton(title: String, price: String, badge: String?) -> some View {
-        Button {
-            // Purchase
-        } label: {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(title)
-                        .font(.headline)
-                    Text(price)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if let badge = badge {
-                    Text(badge)
-                        .font(.caption.weight(.bold))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.electricTeal)
-                        .foregroundStyle(.black)
-                        .clipShape(Capsule())
-                }
-            }
-            .padding(16)
-            .background(Color(white: 1).opacity(0.1))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+    private var header: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(Color.electricTeal)
+            Text("Unlock Pro")
+                .font(.largeTitle.bold())
+            Text("Supports all E-GMP vehicles.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
-        .foregroundStyle(.primary)
+        .padding(.top, 8)
     }
 }
 
-struct FeatureRow: View {
-    var icon: String
-    var text: String
+// MARK: - Features
+
+private struct FeatureList: View {
+    private static let features: [(icon: String, title: String, detail: String)] = [
+        ("sparkles", "AI Assistant", "Plain-language diagnostics and energy coaching"),
+        ("bell.badge", "Charger Occupancy Alerts", "Know before you arrive at a full charger"),
+        ("map", "Live Charger Availability", "Real-time status along your route"),
+        ("calendar", "365-Day Trip History", "Up from 90 days on the free tier"),
+        ("rectangle.slash", "No Ads", "")
+    ]
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            ForEach(Self.features, id: \.title) { feature in
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: feature.icon)
+                        .foregroundStyle(Color.electricTeal)
+                        .frame(width: 24)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(feature.title)
+                            .font(.subheadline.weight(.medium))
+                        if !feature.detail.isEmpty {
+                            Text(feature.detail)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .padding()
+        .background(Color.surfaceNavy, in: RoundedRectangle(cornerRadius: 14))
+    }
+}
+
+// MARK: - Products
+
+private struct ProductList: View {
+    let viewModel: PaywallViewModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            if viewModel.isLoading && viewModel.products.isEmpty {
+                ProgressView()
+            }
+            ForEach(viewModel.products) { product in
+                ProductButton(
+                    product: product,
+                    viewModel: viewModel,
+                    badge: product.id == PaywallViewModel.ProductKind.yearly.rawValue
+                        ? viewModel.yearlySavingsPercent.map { "SAVE \($0)%" }
+                        : nil
+                )
+            }
+        }
+    }
+}
+
+private struct ProductButton: View {
+    let product: Product
+    let viewModel: PaywallViewModel
+    let badge: String?
+
+    var body: some View {
+        Button {
+            Task { await viewModel.purchase(product) }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text(viewModel.title(for: product))
+                            .font(.headline)
+                        if let badge {
+                            Text(badge)
+                                .font(.caption2.weight(.bold))
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.greenOk.opacity(0.2), in: Capsule())
+                                .foregroundStyle(Color.greenOk)
+                        }
+                    }
+                    Text(viewModel.subtitle(for: product))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                if viewModel.purchaseInProgress == product.id {
+                    ProgressView()
+                } else {
+                    Text(product.displayPrice)
+                        .font(.headline)
+                }
+            }
+            .padding()
+            .background(Color.surfaceVariant, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .tint(.primary)
+        .disabled(viewModel.purchaseInProgress != nil)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct ActiveProCard: View {
+    var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: icon)
-                .frame(width: 24)
-                .foregroundStyle(Color.electricTeal)
-            Text(text)
-                .font(.body)
+            Image(systemName: "checkmark.seal.fill")
+                .font(.title2)
+                .foregroundStyle(Color.greenOk)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Pro is active")
+                    .font(.headline)
+                Text("Thanks for supporting development.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Spacer()
         }
+        .padding()
+        .background(Color.greenOk.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+private struct LegalLinks: View {
+    var body: some View {
+        VStack(spacing: 6) {
+            Text("Subscriptions renew automatically until cancelled. Manage them in your Apple Account settings.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top, 4)
     }
 }
