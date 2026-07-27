@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreDomain
 import CoreUI
 
 struct AppRootView: View {
@@ -23,6 +24,17 @@ struct AppRootView: View {
                 .tabItem { Label(AppTab.settings.rawValue, systemImage: AppTab.settings.icon) }
                 .tag(AppTab.settings)
         }
-        .tint(Color.electricTeal)
+        .tint(Color.appAccent)
+        // Honours the Theme picker in Settings. `.system` maps to nil so the OS
+        // setting wins, which is what "System" has to mean.
+        .preferredColorScheme(colorScheme)
+    }
+
+    private var colorScheme: ColorScheme? {
+        switch services.userPreferences.themeMode {
+        case .light: return .light
+        case .dark: return .dark
+        case .system: return nil
+        }
     }
 }

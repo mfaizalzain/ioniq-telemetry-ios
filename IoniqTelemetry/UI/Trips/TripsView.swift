@@ -21,7 +21,7 @@ struct TripsView: View {
                     ProgressView()
                 }
             }
-            .background(Color.deepNavy)
+            .background(Color.appBackground)
             .navigationTitle("Trips")
             .overlay(alignment: .bottom) {
                 if let viewModel, viewModel.recentlyDeleted != nil {
@@ -58,7 +58,7 @@ struct TripsView: View {
                 Section {
                     TripSummaryHeader(summary: summary, viewModel: viewModel)
                 }
-                .listRowBackground(Color.surfaceNavy)
+                .listRowBackground(Color.appSurface)
             }
 
             ForEach(viewModel.monthGroups) { group in
@@ -78,7 +78,7 @@ struct TripsView: View {
                         }
                     }
                 }
-                .listRowBackground(Color.surfaceNavy)
+                .listRowBackground(Color.appSurface)
             }
         }
         .listStyle(.insetGrouped)
@@ -131,9 +131,9 @@ struct TripCard: View {
             HStack(spacing: 12) {
                 Image(systemName: "car.fill")
                     .font(.system(size: 15))
-                    .foregroundStyle(Color.electricTeal)
+                    .foregroundStyle(Color.appAccent)
                     .frame(width: 36, height: 36)
-                    .background(Color.electricTeal.opacity(0.15))
+                    .background(Color.appAccent.opacity(0.15))
                     .clipShape(Circle())
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -185,13 +185,13 @@ struct SocBar: View {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.outlineVariant)
+                        .fill(Color.appOutline)
                     Capsule()
-                        .fill(Color.electricTeal)
+                        .fill(Color.appAccent)
                         .frame(width: geometry.size.width * CGFloat(min(max(startSoc, 0), 100) / 100))
                     if let endSoc {
                         Capsule()
-                            .fill(Color.electricTeal.opacity(0.35))
+                            .fill(Color.appAccent.opacity(0.35))
                             .frame(width: geometry.size.width * CGFloat(min(max(endSoc, 0), 100) / 100))
                     }
                 }
@@ -228,11 +228,11 @@ struct UndoBar: View {
             Spacer()
             Button("Undo", action: onUndo)
                 .font(.subheadline.weight(.semibold))
-                .tint(Color.electricTeal)
+                .tint(Color.appAccent)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color.surfaceVariant, in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 12))
         .task {
             // Matches the system snackbar dwell time before the undo lapses.
             try? await Task.sleep(for: .seconds(5))

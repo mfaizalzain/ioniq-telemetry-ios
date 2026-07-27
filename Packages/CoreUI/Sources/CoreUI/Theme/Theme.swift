@@ -7,34 +7,18 @@ import UIKit
 /// Dark is the default — the phone is frequently mounted in the vehicle and a
 /// light theme is glaring at night (mirrors Android IoniqTheme).
 public enum IoniqTheme {
-    /// Sets global UINavigationBar / UITabBar appearances to the deep-navy theme.
-    /// Call once at app launch (e.g. in `App.init()` or `SceneDelegate`).
+    /// Deliberately does nothing.
+    ///
+    /// This used to install global `UINavigationBar`/`UITabBar` appearance proxies
+    /// with hardcoded dark-navy backgrounds. That had two bugs: it suppressed the
+    /// large navigation title entirely (leaving a tall empty bar on every screen),
+    /// and it pinned the chrome to dark so the light theme setting did nothing.
+    ///
+    /// SwiftUI styles both bars correctly on its own from the colour scheme. Kept
+    /// as a no-op so the call site stays obvious rather than silently disappearing.
+    @available(*, deprecated, message: "No longer needed; SwiftUI styles the bars.")
     @MainActor
-    public static func apply() {
-        // Navigation bar
-        let navAppearance = UINavigationBarAppearance()
-        navAppearance.configureWithOpaqueBackground()
-        navAppearance.backgroundColor = .deepNavy
-        navAppearance.titleTextAttributes = [
-            .foregroundColor: UIColor.onSurface
-        ]
-        navAppearance.largeTitleTextAttributes = [
-            .foregroundColor: UIColor.onSurface
-        ]
-        UINavigationBar.appearance().standardAppearance = navAppearance
-        UINavigationBar.appearance().scrollEdgeAppearance = navAppearance
-        UINavigationBar.appearance().compactAppearance = navAppearance
-        UINavigationBar.appearance().tintColor = .electricTeal
-
-        // Tab bar
-        let tabAppearance = UITabBarAppearance()
-        tabAppearance.configureWithOpaqueBackground()
-        tabAppearance.backgroundColor = .deepNavy
-        UITabBar.appearance().standardAppearance = tabAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabAppearance
-        UITabBar.appearance().tintColor = .electricTeal
-        UITabBar.appearance().unselectedItemTintColor = UIColor.onSurface.withAlphaComponent(0.6)
-    }
+    public static func apply() {}
 }
 
 // MARK: - SwiftUI convenience
@@ -50,10 +34,10 @@ public struct IoniqThemedBackground<Content: View>: View {
 
     public var body: some View {
         ZStack {
-            Color.deepNavy.ignoresSafeArea()
+            Color.appBackground.ignoresSafeArea()
             content
         }
         .preferredColorScheme(.dark)
-        .tint(Color.electricTeal)
+        .tint(Color.appAccent)
     }
 }

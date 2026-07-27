@@ -108,7 +108,7 @@ struct SignalBars: View {
         HStack(spacing: 2) {
             ForEach(1...3, id: \.self) { bar in
                 Capsule()
-                    .fill(bar <= filledBars ? Color.electricTeal : Color.outlineVariant)
+                    .fill(bar <= filledBars ? Color.appAccent : Color.appOutline)
                     .frame(width: 3, height: CGFloat(4 + bar * 3))
             }
         }

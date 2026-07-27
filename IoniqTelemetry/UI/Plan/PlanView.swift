@@ -30,7 +30,7 @@ struct PlanView: View {
                     ProgressView()
                 }
             }
-            .background(Color.deepNavy)
+            .background(Color.appBackground)
             .navigationTitle("Plan")
         }
         .task {
@@ -68,7 +68,7 @@ private struct RouteBuilderCard: View {
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
                     }
-                    .tint(Color.electricTeal)
+                    .tint(Color.appAccent)
                     .accessibilityLabel("Swap origin and destination")
                 }
 
@@ -78,7 +78,7 @@ private struct RouteBuilderCard: View {
                     Label("Use current location", systemImage: "location.fill")
                         .font(.caption)
                 }
-                .tint(Color.electricTeal)
+                .tint(Color.appAccent)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
                 if !viewModel.suggestions.isEmpty {
@@ -107,7 +107,7 @@ private struct RouteBuilderCard: View {
                 }
         }
         .padding(10)
-        .background(Color.surfaceVariant, in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
     }
 }
 
@@ -183,13 +183,13 @@ private struct BatteryParametersCard: View {
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color.electricTeal.opacity(0.18), in: Capsule())
-                    .foregroundStyle(Color.electricTeal)
+                    .background(Color.appAccent.opacity(0.18), in: Capsule())
+                    .foregroundStyle(Color.appAccent)
             }
             Slider(value: value, in: range, step: 5) { editing in
                 if editing { onEdit() }
             }
-            .tint(Color.electricTeal)
+            .tint(Color.appAccent)
             .accessibilityValue("\(Int(value.wrappedValue)) percent")
         }
     }
@@ -214,7 +214,7 @@ private struct PlanActionSection: View {
                 .padding(.vertical, 6)
             }
             .buttonStyle(.borderedProminent)
-            .tint(Color.electricTeal)
+            .tint(Color.appAccent)
             .disabled(!viewModel.canPlan)
 
             if let error = viewModel.errorMessage {
@@ -332,7 +332,7 @@ private struct TimelineRow: View {
                     .background(tint.opacity(0.15), in: Circle())
                 if !isLast {
                     Rectangle()
-                        .fill(Color.outlineVariant)
+                        .fill(Color.appOutline)
                         .frame(width: 2)
                         .frame(minHeight: 24)
                 }
@@ -381,7 +381,7 @@ private struct NearbyChargersSection: View {
                             if charger.maxPowerKw > 0 {
                                 Text(String(format: "%.0f kW", charger.maxPowerKw))
                                     .font(.caption.weight(.semibold))
-                                    .foregroundStyle(Color.electricTeal)
+                                    .foregroundStyle(Color.appAccent)
                             }
                         }
                         .accessibilityElement(children: .combine)

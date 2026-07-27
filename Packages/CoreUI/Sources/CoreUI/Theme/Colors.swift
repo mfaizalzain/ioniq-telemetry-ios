@@ -64,10 +64,12 @@ public extension Color {
         scheme == .dark ? .greenOk : .greenOkLight
     }
 
-    /// Cell voltage delta colour coding (Android spec §10.1): green <30 mV, amber 30–50, red >50.
-    static func cellDelta(_ deltaVolts: Float?, dark: Bool = true) -> Color {
-        guard let delta = deltaVolts else { return .gray }
-        if delta < 0.030 { return dark ? .greenOk : .greenOkLight }
+    /// Cell voltage delta colour coding (Android spec §10.1): green <30 mV, amber
+    /// 30–50, red >50. Green resolves per interface style so it stays legible on a
+    /// light background.
+    static func cellDelta(_ deltaVolts: Float?) -> Color {
+        guard let delta = deltaVolts else { return .secondary }
+        if delta < 0.030 { return .appGreen }
         if delta <= 0.050 { return .amberWarn }
         return .redAlert
     }
@@ -75,11 +77,78 @@ public extension Color {
     /// Battery pack temperature colour (Android spec §10.1).
     /// Green in the healthy window, amber when cold enough to throttle DC charging,
     /// red when hot enough to risk derating.
-    static func packTemp(_ tempC: Int?, dark: Bool = true) -> Color {
-        guard let temp = tempC else { return .gray }
-        if temp < 5 { return .amberWarn }                     // too cold: DC charging throttled
-        if temp <= 40 { return dark ? .greenOk : .greenOkLight } // healthy operating window
-        if temp <= 50 { return .amberWarn }                   // warm: approaching derate
-        return .redAlert                                      // hot: derating likely
+    static func packTemp(_ tempC: Int?) -> Color {
+        guard let temp = tempC else { return .secondary }
+        if temp < 5 { return .amberWarn }        // too cold: DC charging throttled
+        if temp <= 40 { return .appGreen }       // healthy operating window
+        if temp <= 50 { return .amberWarn }      // warm: approaching derate
+        return .redAlert                         // hot: derating likely
     }
+}
+
+
+// MARK: - Adaptive semantic palette
+
+// The brand colours above are fixed values — they are the dark-theme palette and
+// the literal Android match. These semantic colours resolve per interface style so
+// the light theme is a real theme rather than dark chrome on a white page.
+//
+// Views should use these, not the raw brand colours, for anything structural
+// (backgrounds, surfaces, body text, dividers). Reach for the raw values only when
+// a specific hue is the point, such as the SOC ring gradient.
+
+public extension UIColor {
+    /// Screen background.
+    static let appBackground = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .deepNavy : .systemGroupedBackground
+    }
+
+    /// Card and grouped-row background, one step off the screen background.
+    static let appSurface = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .surfaceNavy : .secondarySystemGroupedBackground
+    }
+
+    /// Secondary fill for stat pills and inset rows.
+    static let appSurfaceVariant = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0x1C / 255.0, green: 0x27 / 255.0, blue: 0x40 / 255.0, alpha: 1)
+            : .tertiarySystemFill
+    }
+
+    /// Primary body text.
+    static let appOnSurface = UIColor { traits in
+        traits.userInterfaceStyle == .dark ? .onSurface : .label
+    }
+
+    /// Hairlines and gauge tracks.
+    static let appOutline = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? UIColor(red: 0x2C / 255.0, green: 0x37 / 255.0, blue: 0x52 / 255.0, alpha: 1)
+            : .separator
+    }
+
+    /// Accent. The bright teal fails contrast on white, so light mode uses the
+    /// darker variant that was already defined for exactly this purpose.
+    static let appAccent = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .electricTeal
+            : UIColor(red: 0x00 / 255.0, green: 0x6B / 255.0, blue: 0x58 / 255.0, alpha: 1)
+    }
+
+    /// Healthy / connected, contrast-safe in both themes.
+    static let appGreen = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .greenOk
+            : UIColor(red: 0x00 / 255.0, green: 0x70 / 255.0, blue: 0x3C / 255.0, alpha: 1)
+    }
+}
+
+public extension Color {
+    static let appBackground = Color(uiColor: .appBackground)
+    static let appSurface = Color(uiColor: .appSurface)
+    static let appSurfaceVariant = Color(uiColor: .appSurfaceVariant)
+    static let appOnSurface = Color(uiColor: .appOnSurface)
+    static let appOutline = Color(uiColor: .appOutline)
+    static let appAccent = Color(uiColor: .appAccent)
+    static let appGreen = Color(uiColor: .appGreen)
 }

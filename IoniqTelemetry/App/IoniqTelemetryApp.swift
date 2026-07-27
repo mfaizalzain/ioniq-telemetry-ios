@@ -11,16 +11,11 @@ struct IoniqTelemetryApp: App {
     // Shared with the CarPlay scene so one adapter connection feeds both surfaces.
     private let appServices = AppServices.shared
 
-    init() {
-        IoniqTheme.apply()
-    }
-
     var body: some Scene {
         WindowGroup {
             AppRootView()
                 .environment(appServices)
                 .modelContainer(AppDatabase.shared.container)
-                .preferredColorScheme(.dark)
                 .task {
                     await appServices.initialize()
                 }

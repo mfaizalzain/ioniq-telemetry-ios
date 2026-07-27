@@ -19,7 +19,7 @@ struct SettingsView: View {
                     ProgressView()
                 }
             }
-            .background(Color.deepNavy)
+            .background(Color.appBackground)
             .navigationTitle("Settings")
             .sheet(isPresented: $showVehiclePicker) {
                 if let viewModel { VehiclePickerSheet(viewModel: viewModel) }
@@ -138,7 +138,7 @@ private struct ProSection: View {
                 } label: {
                     Label("Unlock Pro", systemImage: "sparkles")
                 }
-                .tint(Color.electricTeal)
+                .tint(Color.appAccent)
             }
         } footer: {
             Text(viewModel.isPro ? "Pro is active on this device." : "")

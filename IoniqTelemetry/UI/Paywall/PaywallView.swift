@@ -43,7 +43,7 @@ struct PaywallView: View {
                 }
                 .padding()
             }
-            .background(Color.deepNavy)
+            .background(Color.appBackground)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -63,7 +63,7 @@ struct PaywallView: View {
         VStack(spacing: 8) {
             Image(systemName: "bolt.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.electricTeal)
+                .foregroundStyle(Color.appAccent)
             Text("Unlock Pro")
                 .font(.largeTitle.bold())
             Text("Supports all E-GMP vehicles.")
@@ -90,7 +90,7 @@ private struct FeatureList: View {
             ForEach(Self.features, id: \.title) { feature in
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: feature.icon)
-                        .foregroundStyle(Color.electricTeal)
+                        .foregroundStyle(Color.appAccent)
                         .frame(width: 24)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(feature.title)
@@ -107,7 +107,7 @@ private struct FeatureList: View {
             }
         }
         .padding()
-        .background(Color.surfaceNavy, in: RoundedRectangle(cornerRadius: 14))
+        .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 14))
     }
 }
 
@@ -153,8 +153,8 @@ private struct ProductButton: View {
                                 .font(.caption2.weight(.bold))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 2)
-                                .background(Color.greenOk.opacity(0.2), in: Capsule())
-                                .foregroundStyle(Color.greenOk)
+                                .background(Color.appGreen.opacity(0.2), in: Capsule())
+                                .foregroundStyle(Color.appGreen)
                         }
                     }
                     Text(viewModel.subtitle(for: product))
@@ -170,7 +170,7 @@ private struct ProductButton: View {
                 }
             }
             .padding()
-            .background(Color.surfaceVariant, in: RoundedRectangle(cornerRadius: 12))
+            .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 12))
         }
         .tint(.primary)
         .disabled(viewModel.purchaseInProgress != nil)
@@ -183,7 +183,7 @@ private struct ActiveProCard: View {
         HStack(spacing: 12) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.title2)
-                .foregroundStyle(Color.greenOk)
+                .foregroundStyle(Color.appGreen)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Pro is active")
                     .font(.headline)
@@ -194,7 +194,7 @@ private struct ActiveProCard: View {
             Spacer()
         }
         .padding()
-        .background(Color.greenOk.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.appGreen.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .combine)
     }
 }

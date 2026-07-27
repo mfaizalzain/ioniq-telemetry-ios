@@ -50,7 +50,7 @@ struct TripDetailView: View {
             }
             .padding(.vertical)
         }
-        .background(Color.deepNavy)
+        .background(Color.appBackground)
         .navigationTitle(trip.startTime.formatted(date: .abbreviated, time: .shortened))
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -76,14 +76,14 @@ struct TripDetailView: View {
     private var routeMap: some View {
         Map {
             MapPolyline(coordinates: routePoints)
-                .stroke(Color.electricTeal, lineWidth: 4)
+                .stroke(Color.appAccent, lineWidth: 4)
             if let start = routePoints.first {
                 Marker("Start", systemImage: "flag", coordinate: start)
-                    .tint(Color.greenOk)
+                    .tint(Color.appGreen)
             }
             if let end = routePoints.last {
                 Marker("End", systemImage: "flag.checkered", coordinate: end)
-                    .tint(Color.electricTeal)
+                    .tint(Color.appAccent)
             }
         }
         .frame(height: 240)
@@ -111,7 +111,7 @@ struct TripDetailView: View {
                         isEditingNote = false
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color.electricTeal)
+                    .tint(Color.appAccent)
                 }
             }
             .padding(12)
@@ -167,7 +167,7 @@ private struct TraceChart: View {
                 } else {
                     Chart(points, id: \.date) { point in
                         LineMark(x: .value("Time", point.date), y: .value(title, point.value))
-                            .foregroundStyle(Color.electricTeal)
+                            .foregroundStyle(Color.appAccent)
                             .interpolationMethod(.monotone)
                     }
                     .chartYAxis { AxisMarks(position: .leading) }

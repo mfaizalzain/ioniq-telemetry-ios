@@ -31,10 +31,10 @@ struct VehiclePickerSheet: View {
                                         .font(.caption.weight(.medium))
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 3)
-                                        .background(Color.surfaceVariant, in: Capsule())
+                                        .background(Color.appSurfaceVariant, in: Capsule())
                                     if viewModel.activeVehicle?.id == vehicle.id {
                                         Image(systemName: "checkmark")
-                                            .foregroundStyle(Color.electricTeal)
+                                            .foregroundStyle(Color.appAccent)
                                     }
                                 }
                             }

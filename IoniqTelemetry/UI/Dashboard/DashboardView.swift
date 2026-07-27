@@ -32,7 +32,7 @@ struct DashboardView: View {
                     .padding(.vertical)
                 }
             }
-            .background(Color.deepNavy)
+            .background(Color.appBackground)
             .navigationTitle("Dashboard")
             .toolbar {
                 if viewModel?.canUseCopilot == true {
@@ -42,7 +42,7 @@ struct DashboardView: View {
                         } label: {
                             Image(systemName: "sparkles")
                         }
-                        .tint(Color.electricTeal)
+                        .tint(Color.appAccent)
                         .accessibilityLabel("AI Assistant")
                     }
                 }
@@ -78,7 +78,7 @@ struct BatteryHeroCard: View {
                     // puts the 140° gap centred at the bottom.
                     Circle()
                         .trim(from: 0, to: Self.sweepFraction)
-                        .stroke(Color.outlineVariant, style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                        .stroke(Color.appOutline, style: StrokeStyle(lineWidth: 12, lineCap: .round))
                         .rotationEffect(.degrees(Self.startAngle))
                         .frame(width: 120, height: 120)
 
@@ -86,7 +86,7 @@ struct BatteryHeroCard: View {
                         .trim(from: 0, to: Self.sweepFraction * CGFloat(fillFraction))
                         .stroke(
                             AngularGradient(
-                                colors: [.electricTeal.opacity(0.75), .electricTeal],
+                                colors: [.appAccent.opacity(0.75), .electricTeal],
                                 center: .center,
                                 startAngle: .degrees(Self.startAngle),
                                 endAngle: .degrees(Self.startAngle + 220)
@@ -104,7 +104,7 @@ struct BatteryHeroCard: View {
                         Text("%")
                             .font(.system(size: 16, weight: .medium))
                     }
-                    .foregroundStyle(Color.onSurface)
+                    .foregroundStyle(Color.appOnSurface)
                 }
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("State of charge")
@@ -148,7 +148,7 @@ struct BatteryHeroCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding(8)
-        .background(Color.surfaceVariant.opacity(0.6))
+        .background(Color.appSurfaceVariant.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .combine)
     }
@@ -167,10 +167,10 @@ private struct ChargingChip: View {
             }
         }
         .font(.caption)
-        .foregroundStyle(Color.greenOk)
+        .foregroundStyle(Color.appGreen)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
-        .background(Color.greenOk.opacity(0.15))
+        .background(Color.appGreen.opacity(0.15))
         .clipShape(Capsule())
         .accessibilityElement(children: .combine)
     }
@@ -189,7 +189,7 @@ struct MetricTilesGrid: View {
                 icon: "bolt.fill",
                 label: viewModel.isRegenerating ? "POWER · REGEN" : "POWER",
                 value: DashboardViewModel.format(telemetry.powerKw, unit: "kW", decimals: 1),
-                valueColor: viewModel.isRegenerating ? .greenOk : .onSurface
+                valueColor: viewModel.isRegenerating ? .appGreen : .appOnSurface
             )
             MetricTile(
                 icon: "chart.line.uptrend.xyaxis",
@@ -202,7 +202,7 @@ struct MetricTilesGrid: View {
                 icon: "battery.100percent.bolt",
                 label: "HV VOLTAGE",
                 value: DashboardViewModel.format(telemetry.packVoltage, unit: "V", decimals: 0),
-                valueColor: .electricTeal
+                valueColor: .appAccent
             )
             MetricTile(
                 icon: "battery.25percent",
@@ -270,7 +270,7 @@ struct TirePressureVisualizerCard: View {
                 .font(.ioniqCaption.weight(.bold))
             Text(viewModel.tirePressure(kpa))
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(isLow ? Color.redAlert : Color.onSurface)
+                .foregroundStyle(isLow ? Color.redAlert : Color.appOnSurface)
             Text(viewModel.tirePressureUnit)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
@@ -280,7 +280,7 @@ struct TirePressureVisualizerCard: View {
         }
         .frame(minWidth: 70)
         .padding(8)
-        .background(Color.surfaceVariant.opacity(0.6))
+        .background(Color.appSurfaceVariant.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label) tire")

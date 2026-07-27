@@ -14,7 +14,7 @@ public enum ConnectionState: String, Sendable {
 
     public var color: Color {
         switch self {
-        case .connected: return .greenOk
+        case .connected: return .appGreen
         case .scanning, .connecting, .initializing: return .amberWarn
         case .error, .offline: return .redAlert
         }
@@ -50,12 +50,12 @@ public struct ConnectionBadge: View {
                 .frame(width: 8, height: 8)
             Text(state.rawValue)
                 .font(.ioniqCaption.weight(.medium))
-                .foregroundStyle(Color.onSurface)
+                .foregroundStyle(Color.appOnSurface)
                 .lineLimit(1)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 5)
-        .background(Color.surfaceNavy)
+        .background(Color.appSurface)
         .clipShape(Capsule())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Connection: \(state.rawValue)")
@@ -70,6 +70,6 @@ public struct ConnectionBadge: View {
         ConnectionBadge(state: .offline)
     }
     .padding()
-    .background(Color.deepNavy)
+    .background(Color.appBackground)
     .preferredColorScheme(.dark)
 }

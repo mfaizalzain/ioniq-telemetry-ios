@@ -23,7 +23,7 @@ public struct MetricTile: View {
         icon: String,
         label: String,
         value: String,
-        valueColor: Color = .onSurface,
+        valueColor: Color = .appOnSurface,
         badge: String? = nil
     ) {
         self.icon = icon
@@ -38,15 +38,15 @@ public struct MetricTile: View {
             HStack(spacing: 6) {
                 Image(systemName: icon)
                     .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(Color.electricTeal)
+                    .foregroundStyle(Color.appAccent)
                 Text(label)
                     .ioniqStatLabel()
-                    .foregroundStyle(Color.onSurfaceVariant)
+                    .foregroundStyle(Color.secondary)
                     .lineLimit(1)
                 if let badge {
                     Text(badge)
                         .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(Color.deepNavy)
+                        .foregroundStyle(Color.appBackground)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
                         .background(Color.amberWarn)
@@ -62,7 +62,7 @@ public struct MetricTile: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.surfaceNavy)
+        .background(Color.appSurface)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label): \(value)")
@@ -72,11 +72,11 @@ public struct MetricTile: View {
 #Preview {
     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
         MetricTile(icon: "bolt.fill", label: "Power", value: "-12.4 kW", badge: "REGEN")
-        MetricTile(icon: "chart.line.uptrend.xyaxis", label: "Cell Δ", value: "28 mV", valueColor: .greenOk)
+        MetricTile(icon: "chart.line.uptrend.xyaxis", label: "Cell Δ", value: "28 mV", valueColor: .appGreen)
         MetricTile(icon: "battery.100.bolt", label: "HV Voltage", value: "402 V")
         MetricTile(icon: "battery.100", label: "Aux Battery", value: "12.6 V")
     }
     .padding()
-    .background(Color.deepNavy)
+    .background(Color.appBackground)
     .preferredColorScheme(.dark)
 }

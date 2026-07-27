@@ -18,7 +18,7 @@ struct CopilotView: View {
                         .frame(maxHeight: .infinity)
                 }
             }
-            .background(Color.deepNavy)
+            .background(Color.appBackground)
             .navigationTitle("AI Assistant")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -78,11 +78,11 @@ private struct ChatBubble: View {
             if isUser { Spacer(minLength: 40) }
             Text(message.text)
                 .font(.body)
-                .foregroundStyle(isUser ? Color.deepNavy : Color.onSurface)
+                .foregroundStyle(isUser ? Color.appBackground : Color.appOnSurface)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
                 .background(
-                    isUser ? Color.electricTeal : Color.surfaceVariant,
+                    isUser ? Color.appAccent : Color.appSurfaceVariant,
                     in: RoundedRectangle(cornerRadius: 16)
                 )
                 .textSelection(.enabled)
@@ -101,14 +101,14 @@ private struct TypingIndicator: View {
         HStack(spacing: 4) {
             ForEach(0..<3, id: \.self) { index in
                 Circle()
-                    .fill(Color.onSurfaceVariant)
+                    .fill(Color.secondary)
                     .frame(width: 6, height: 6)
                     .opacity(phase == Double(index) ? 1 : 0.35)
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
-        .background(Color.surfaceVariant, in: RoundedRectangle(cornerRadius: 16))
+        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 16))
         .task {
             // Plain timer rather than repeatForever: the view is torn down when the
             // reply lands, and a detached animation would outlive it.
@@ -151,7 +151,7 @@ private struct SuggestionsView: View {
                             .foregroundStyle(.tertiary)
                     }
                     .padding(12)
-                    .background(Color.surfaceNavy, in: RoundedRectangle(cornerRadius: 10))
+                    .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 10))
                 }
                 .tint(.primary)
             }
@@ -174,7 +174,7 @@ private struct Composer: View {
             .textFieldStyle(.plain)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
-            .background(Color.surfaceVariant, in: Capsule())
+            .background(Color.appSurfaceVariant, in: Capsule())
             .onSubmit { Task { await viewModel.send() } }
 
             Button {
@@ -183,11 +183,11 @@ private struct Composer: View {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 30))
             }
-            .tint(Color.electricTeal)
+            .tint(Color.appAccent)
             .disabled(!viewModel.canSend)
             .accessibilityLabel("Send")
         }
         .padding()
-        .background(Color.deepNavy)
+        .background(Color.appBackground)
     }
 }

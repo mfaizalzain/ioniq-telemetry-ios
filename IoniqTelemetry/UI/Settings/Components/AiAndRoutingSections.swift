@@ -17,7 +17,7 @@ struct AiSection: View {
                 } label: {
                     Label("Unlock AI Features with Pro", systemImage: "lock.fill")
                 }
-                .tint(Color.electricTeal)
+                .tint(Color.appAccent)
             }
 
             SecretField(
@@ -51,8 +51,8 @@ private struct AiSectionHeader: View {
                     .font(.caption2.weight(.bold))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
-                    .background(Color.electricTeal.opacity(0.2), in: Capsule())
-                    .foregroundStyle(Color.electricTeal)
+                    .background(Color.appAccent.opacity(0.2), in: Capsule())
+                    .foregroundStyle(Color.appAccent)
             }
         }
     }
