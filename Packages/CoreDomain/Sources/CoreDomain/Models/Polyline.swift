@@ -1,4 +1,3 @@
-import CoreDomain
 import Foundation
 
 /// Google-style encoded polyline decoder.
