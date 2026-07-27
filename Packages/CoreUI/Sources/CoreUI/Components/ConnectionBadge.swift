@@ -64,8 +64,8 @@ public struct ConnectionBadge: View {
                 .foregroundStyle(Color.appOnSurface)
                 .lineLimit(1)
         }
-        .padding(.horizontal, style == .pill ? 10 : 0)
-        .padding(.vertical, style == .pill ? 5 : 0)
+        .padding(.horizontal, style == .pill ? 10 : 8)
+        .padding(.vertical, style == .pill ? 5 : 2)
         .background {
             if style == .pill {
                 Capsule().fill(Color.appSurface)
