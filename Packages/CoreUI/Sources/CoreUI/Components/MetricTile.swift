@@ -49,7 +49,7 @@ public struct MetricTile: View {
                         .foregroundStyle(Color.appBackground)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 2)
-                        .background(Color.amberWarn)
+                        .background(Color.appAmber)
                         .clipShape(Capsule())
                 }
             }

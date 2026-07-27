@@ -59,7 +59,7 @@ public final class OccupancyRepository: Sendable {
     private let session: URLSession
     private static let endpoint = URL(string: "https://places.googleapis.com/v1/places:searchNearby")!
 
-    public init(session: URLSession = .shared) {
+    public init(session: URLSession = NetworkSession.shared) {
         self.session = session
     }
 
@@ -87,8 +87,12 @@ public final class OccupancyRepository: Sendable {
             ))
         ))
 
+        let (data, response) = try await session.dataWithRetry(for: request)
+        // Recorded on a response, not before the call: this counter exists to mirror
+        // what Google bills, and a request that never reached them — no signal, DNS
+        // failure — is not a billed call. A non-2xx that did reach them still is.
         PlacesUsageCounter.shared.record()
-        let (data, response) = try await session.data(for: request)
+
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             throw OccupancyError.requestFailed(
                 (response as? HTTPURLResponse)?.statusCode ?? -1

@@ -1,3 +1,5 @@
+import Combine
+import CoreData
 import CoreDomain
 import Foundation
 import StoreKit
@@ -5,16 +7,16 @@ import StoreKit
 /// StoreKit 2 purchase flow for Pro.
 ///
 /// One non-consumable, matching the Android build's single `ioniq_telemetry_pro`
-/// product — buy once, keep it. Entitlement is derived from
-/// `Transaction.currentEntitlements` rather than from the purchase result alone,
-/// so a refund is reflected on the next refresh, and a purchase made on another
-/// device is picked up without an explicit restore.
+/// product — buy once, keep it. This screen owns the purchase flow only; the rule
+/// for what counts as entitled lives in `EntitlementRepositoryImpl`, which the app
+/// also re-runs at every launch. Deriving it in both places meant a refund was
+/// honoured only if you happened to open the paywall.
 @Observable
 @MainActor
 final class PaywallViewModel {
 
     /// The App Store Connect product ID. Same string as the Play Console one.
-    static let productID = "ioniq_telemetry_pro"
+    static let productID = EntitlementRepositoryImpl.productID
 
     private(set) var product: Product?
     private(set) var isLoading = false
@@ -23,11 +25,18 @@ final class PaywallViewModel {
     private(set) var isPro = false
 
     private let entitlement: EntitlementRepository
+    private var cancellables = Set<AnyCancellable>()
     /// nonisolated so `deinit` can cancel it without hopping to the main actor.
     private nonisolated(unsafe) var updateListener: Task<Void, Never>?
 
     init(entitlement: EntitlementRepository) {
         self.entitlement = entitlement
+
+        entitlement.isPro
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.isPro = $0 }
+            .store(in: &cancellables)
+
         // Catches renewals, refunds, and purchases completed outside the app.
         updateListener = Task { [weak self] in
             for await update in Transaction.updates {
@@ -92,23 +101,17 @@ final class PaywallViewModel {
         defer { isLoading = false }
         do {
             try await AppStore.sync()
-            await refreshEntitlement()
-            if !isPro { errorMessage = "No previous purchase found for this Apple Account." }
+            let entitled = await refreshEntitlement()
+            if !entitled { errorMessage = "No previous purchase found for this Apple Account." }
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    /// Recomputes Pro from what StoreKit currently considers active.
-    private func refreshEntitlement() async {
-        var entitled = false
-        for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result else { continue }
-            if transaction.productID == Self.productID, transaction.revocationDate == nil {
-                entitled = true
-            }
-        }
-        isPro = entitled
-        await entitlement.setPro(entitled, token: nil)
+    /// Recomputes Pro from what StoreKit currently considers active. `isPro` here
+    /// follows from the repository's publisher rather than being assigned twice.
+    @discardableResult
+    private func refreshEntitlement() async -> Bool {
+        await entitlement.refreshEntitlements()
     }
 }

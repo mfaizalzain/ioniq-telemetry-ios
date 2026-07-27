@@ -356,9 +356,13 @@ struct UndoBar: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 12))
-        .task {
+        // Keyed on the message so a second delete restarts the countdown. A bare
+        // `.task` is tied to view identity, and SwiftUI reuses this slot — the
+        // replacement bar inherited the finished task and never dismissed itself.
+        .task(id: message) {
             // Matches the system snackbar dwell time before the undo lapses.
             try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
             onDismiss()
         }
     }

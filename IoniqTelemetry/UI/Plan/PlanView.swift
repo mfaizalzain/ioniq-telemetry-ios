@@ -69,7 +69,7 @@ private struct RoutingNoticeBar: View {
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "info.circle.fill")
-                .foregroundStyle(Color.amberWarn)
+                .foregroundStyle(Color.appAmber)
             Text(message)
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
@@ -187,7 +187,7 @@ private struct AiPlanCard: View {
                 if let error = viewModel.aiError {
                     HStack(alignment: .top, spacing: 8) {
                         Image(systemName: "exclamationmark.circle.fill")
-                            .foregroundStyle(Color.amberWarn)
+                            .foregroundStyle(Color.appAmber)
                         Text(error).font(.caption)
                         Spacer()
                         Button {
@@ -316,7 +316,7 @@ private struct EndpointField: View {
                         Image(systemName: "minus.circle")
                     }
                     .buttonStyle(.plain)
-                    .tint(Color.redAlert)
+                    .tint(Color.appRed)
                     .accessibilityLabel("Remove stopover")
                 }
             }
@@ -521,11 +521,36 @@ private struct PlanActionSection: View {
             .buttonStyle(.plain)
             .disabled(!viewModel.canPlan)
 
+            // Up front, not after a 20 s timeout: routing needs the network, and a
+            // driver in a car park should be told that before they wait.
+            if viewModel.isOffline {
+                Label(
+                    "You're offline. Route planning needs a connection — this will work again once you have signal.",
+                    systemImage: "wifi.slash"
+                )
+                .font(.caption)
+                .foregroundStyle(Color.appAmber)
+                .multilineTextAlignment(.center)
+            }
+
             if let error = viewModel.errorMessage {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(Color.amberWarn)
+                    .foregroundStyle(Color.appAmber)
                     .multilineTextAlignment(.center)
+            }
+
+            // Distinct from `errorMessage`: the plan is usable, the charger data
+            // behind it just couldn't be refreshed. Saying nothing would let a
+            // driver route to a station that closed since the cache was written.
+            if viewModel.chargersAreCached {
+                Label(
+                    "Charger data couldn't be refreshed — showing saved results, which may be out of date.",
+                    systemImage: "wifi.exclamationmark"
+                )
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
             }
         }
         .padding(.horizontal)
@@ -865,13 +890,13 @@ private struct AvailabilityBadge: View {
     var body: some View {
         HStack(spacing: 4) {
             Circle()
-                .fill(status.isFull ? Color.redAlert : Color.appGreen)
+                .fill(status.isFull ? Color.appRed : Color.appGreen)
                 .frame(width: 6, height: 6)
             Text(status.isFull
                  ? "All \(status.total) in use"
                  : "\(status.available) of \(status.total) free")
                 .font(.caption2.weight(.medium))
-                .foregroundStyle(status.isFull ? Color.redAlert : Color.appGreen)
+                .foregroundStyle(status.isFull ? Color.appRed : Color.appGreen)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(status.isFull
@@ -999,7 +1024,7 @@ private struct ChargerAlongRouteCard: View {
                         .font(.caption).foregroundStyle(.secondary)
                     if rc.detourKm > 1 {
                         Text(String(format: "+%.1f km detour", rc.detourKm))
-                            .font(.caption).foregroundStyle(Color.amberWarn)
+                            .font(.caption).foregroundStyle(Color.appAmber)
                     }
                 }
                 if ChargerPriceText(charger: rc.charger).isEmpty == false {

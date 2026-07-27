@@ -4,23 +4,25 @@ import SwiftUI
 
 struct DashboardView: View {
     @Environment(AppServices.self) private var services
+    @Binding var selectedTab: AppTab
     @State private var viewModel: DashboardViewModel?
     @State private var showCopilot = false
 
     var body: some View {
         NavigationStack {
-            ScrollView {
+            Group {
                 if let viewModel {
-                    LazyVStack(spacing: 16) {
-                        BatteryHeroCard(viewModel: viewModel)
-                        MetricTilesGrid(viewModel: viewModel)
-                        TirePressureVisualizerCard(viewModel: viewModel)
-
-                        if let tip = viewModel.thermalTip {
-                            ThermalTipCard(tip: tip)
-                        }
+                    // Nothing has ever arrived from an adapter, so every tile would
+                    // be an em dash with no hint as to why. The Trips tab already
+                    // explains itself when empty; this one should too.
+                    if !viewModel.hasData && !viewModel.hasEverReceivedData {
+                        NotConnectedView { selectedTab = .settings }
+                    } else {
+                        content(viewModel)
                     }
-                    .padding(.vertical)
+                } else {
+                    ProgressView()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
             }
             .background(Color.appBackground)
@@ -52,6 +54,80 @@ struct DashboardView: View {
         .task {
             if viewModel == nil { viewModel = DashboardViewModel(services: services) }
         }
+    }
+
+    private func content(_ viewModel: DashboardViewModel) -> some View {
+        ScrollView {
+            LazyVStack(spacing: 16) {
+                // Readings survive the adapter dropping, which is useful — but only
+                // if it is clear they are a snapshot rather than live.
+                if !viewModel.hasData {
+                    StaleDataBanner(lastUpdated: viewModel.lastUpdatedText)
+                }
+
+                BatteryHeroCard(viewModel: viewModel)
+                MetricTilesGrid(viewModel: viewModel)
+                TirePressureVisualizerCard(viewModel: viewModel)
+
+                if let tip = viewModel.thermalTip {
+                    ThermalTipCard(tip: tip)
+                }
+            }
+            .padding(.vertical)
+        }
+    }
+}
+
+// MARK: - Disconnected states
+
+private struct NotConnectedView: View {
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Image(systemName: "cable.connector.slash")
+                .font(.system(size: 56))
+                .foregroundStyle(.tertiary)
+            Text("No Adapter Connected")
+                .font(.title2.weight(.medium))
+                .foregroundStyle(.secondary)
+            Text("Plug an OBD-II adapter into your car's port and pair it to see live battery, power and tyre data here.")
+                .font(.body)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+            Button("Set Up Adapter", action: onOpenSettings)
+                .buttonStyle(.borderedProminent)
+                .tint(Color.appAccent)
+                .foregroundStyle(Color.appOnAccent)
+                .padding(.top, 4)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+private struct StaleDataBanner: View {
+    let lastUpdated: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.circle.fill")
+            VStack(alignment: .leading, spacing: 1) {
+                Text("Adapter disconnected")
+                    .font(.subheadline.weight(.medium))
+                Text("Showing the last reading, \(lastUpdated).")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .foregroundStyle(Color.appAmber)
+        .padding(12)
+        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -134,7 +210,7 @@ struct BatteryHeroCard: View {
         .backgroundStyle(.ultraThinMaterial)
     }
 
-    private func statBadge(label: String, value: String, color: Color = .onSurface) -> some View {
+    private func statBadge(label: String, value: String, color: Color = .appOnSurface) -> some View {
         VStack(spacing: 4) {
             Text(label)
                 .font(.ioniqCaption)
@@ -208,7 +284,7 @@ struct MetricTilesGrid: View {
                 value: DashboardViewModel.format(telemetry.auxVoltage, unit: "V", decimals: 1),
                 // Below ~12.0 V the 12 V battery is draining faster than the DC-DC
                 // replaces it — the classic E-GMP no-start warning.
-                valueColor: (telemetry.auxVoltage ?? 12.6) < 12.0 ? .amberWarn : .greenOk
+                valueColor: (telemetry.auxVoltage ?? 12.6) < 12.0 ? .appAmber : .appGreen
             )
         }
         .padding(.horizontal, 12)
@@ -268,7 +344,7 @@ struct TirePressureVisualizerCard: View {
                 .font(.ioniqCaption.weight(.bold))
             Text(viewModel.tirePressure(kpa))
                 .font(.system(size: 18, weight: .bold))
-                .foregroundStyle(isLow ? Color.redAlert : Color.appOnSurface)
+                .foregroundStyle(isLow ? Color.appRed : Color.appOnSurface)
             Text(viewModel.tirePressureUnit)
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
@@ -300,7 +376,7 @@ struct ThermalTipCard: View {
             HStack(spacing: 12) {
                 Image(systemName: "thermometer.medium")
                     .font(.title2)
-                    .foregroundStyle(Color.amberWarn)
+                    .foregroundStyle(Color.appAmber)
                 Text(tip)
                     .font(.ioniqBody)
                     .foregroundStyle(.secondary)

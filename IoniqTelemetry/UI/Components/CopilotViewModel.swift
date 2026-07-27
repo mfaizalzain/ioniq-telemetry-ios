@@ -76,7 +76,9 @@ final class CopilotViewModel {
         case .success(let answer):
             messages.append(Message(role: .assistant, text: answer))
         case .failure(let error):
-            errorMessage = error.localizedDescription
+            // A URLError reaches here unmapped from the non-`testApiKey` paths, so
+            // "offline" reads as advice rather than a hostname-resolution message.
+            errorMessage = error.userMessage(subject: "The assistant")
         }
     }
 

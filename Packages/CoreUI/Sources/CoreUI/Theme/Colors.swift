@@ -70,8 +70,8 @@ public extension Color {
     static func cellDelta(_ deltaVolts: Float?) -> Color {
         guard let delta = deltaVolts else { return .secondary }
         if delta < 0.030 { return .appGreen }
-        if delta <= 0.050 { return .amberWarn }
-        return .redAlert
+        if delta <= 0.050 { return .appAmber }
+        return .appRed
     }
 
     /// Battery pack temperature colour (Android spec §10.1).
@@ -79,10 +79,10 @@ public extension Color {
     /// red when hot enough to risk derating.
     static func packTemp(_ tempC: Int?) -> Color {
         guard let temp = tempC else { return .secondary }
-        if temp < 5 { return .amberWarn }        // too cold: DC charging throttled
+        if temp < 5 { return .appAmber }        // too cold: DC charging throttled
         if temp <= 40 { return .appGreen }       // healthy operating window
-        if temp <= 50 { return .amberWarn }      // warm: approaching derate
-        return .redAlert                         // hot: derating likely
+        if temp <= 50 { return .appAmber }      // warm: approaching derate
+        return .appRed                         // hot: derating likely
     }
 }
 
@@ -150,6 +150,28 @@ public extension UIColor {
             ? .greenOk
             : UIColor(red: 0x00 / 255.0, green: 0x70 / 255.0, blue: 0x3C / 255.0, alpha: 1)
     }
+
+    /// Caution, contrast-safe in both themes.
+    ///
+    /// The brand amber is a light tint built for a near-black background; as
+    /// foreground text on a light one it lands near 1.8:1, which is decorative
+    /// rather than readable. The light variant is the same hue taken down to a
+    /// shade that clears AA (~5.4:1) — it is the colour of every settings warning,
+    /// so it has to be legible before it is on-brand.
+    static let appAmber = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .amberWarn
+            : UIColor(red: 0x9A / 255.0, green: 0x5B / 255.0, blue: 0x00 / 255.0, alpha: 1)
+    }
+
+    /// Error / alert, contrast-safe in both themes. The brand red is ~3.3:1 on a
+    /// light background, short of the 4.5:1 needed for body text; the light variant
+    /// is ~5.6:1.
+    static let appRed = UIColor { traits in
+        traits.userInterfaceStyle == .dark
+            ? .redAlert
+            : UIColor(red: 0xC6 / 255.0, green: 0x28 / 255.0, blue: 0x28 / 255.0, alpha: 1)
+    }
 }
 
 public extension Color {
@@ -161,4 +183,6 @@ public extension Color {
     static let appAccent = Color(uiColor: .appAccent)
     static let appOnAccent = Color(uiColor: .appOnAccent)
     static let appGreen = Color(uiColor: .appGreen)
+    static let appAmber = Color(uiColor: .appAmber)
+    static let appRed = Color(uiColor: .appRed)
 }

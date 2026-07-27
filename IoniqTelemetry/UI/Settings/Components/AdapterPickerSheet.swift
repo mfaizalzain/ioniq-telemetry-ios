@@ -63,7 +63,7 @@ struct AdapterPickerSheet: View {
                 if let error = viewModel.adapterError {
                     Section {
                         Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .foregroundStyle(Color.redAlert)
+                            .foregroundStyle(Color.appRed)
                     }
                 }
             }

@@ -53,7 +53,7 @@ struct CopilotView: View {
                     if let error = viewModel.errorMessage {
                         Label(error, systemImage: "exclamationmark.triangle.fill")
                             .font(.caption)
-                            .foregroundStyle(Color.redAlert)
+                            .foregroundStyle(Color.appRed)
                             .padding(.horizontal)
                     }
                 }
@@ -163,6 +163,14 @@ private struct SuggestionsView: View {
 
 private struct Composer: View {
     let viewModel: CopilotViewModel
+    /// Without this the keyboard stays up after sending and covers the reply the
+    /// user just asked for.
+    @FocusState private var isFocused: Bool
+
+    private func send() {
+        isFocused = false
+        Task { await viewModel.send() }
+    }
 
     var body: some View {
         HStack(spacing: 10) {
@@ -172,13 +180,15 @@ private struct Composer: View {
             ), axis: .vertical)
             .lineLimit(1...4)
             .textFieldStyle(.plain)
+            .focused($isFocused)
+            .submitLabel(.send)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(Color.appSurfaceVariant, in: Capsule())
-            .onSubmit { Task { await viewModel.send() } }
+            .onSubmit(send)
 
             Button {
-                Task { await viewModel.send() }
+                send()
             } label: {
                 Image(systemName: "arrow.up.circle.fill")
                     .font(.system(size: 30))

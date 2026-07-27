@@ -109,13 +109,18 @@ final class AppServices {
         bindEntitlement()
         bindObdStream()
 
-        await entitlement.refreshEntitlements()
+        // Re-derived from StoreKit, not read back from the cached flag — a refund or
+        // a purchase made on another device lands here rather than waiting for the
+        // user to open the paywall.
+        let entitled = await entitlement.refreshEntitlements()
 
         connectedCar.start()
 
-        // Retention purge is cheap and only needs to run once per launch.
+        // Retention purge is cheap and only needs to run once per launch. It uses the
+        // value just returned rather than `isPro`, which the publisher has not
+        // necessarily delivered to the main queue yet.
         do {
-            try tripLog.purge(isPro: isPro)
+            try tripLog.purge(isPro: entitled)
         } catch {
             print("[AppServices] trip purge failed: \(error.localizedDescription)")
         }

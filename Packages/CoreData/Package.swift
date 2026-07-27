@@ -15,6 +15,10 @@ let package = Package(
             name: "CoreData",
             dependencies: ["CoreDomain"],
             linkerSettings: [.linkedFramework("MapKit")]
+        ),
+        .testTarget(
+            name: "CoreDataTests",
+            dependencies: ["CoreData"]
         )
     ]
 )

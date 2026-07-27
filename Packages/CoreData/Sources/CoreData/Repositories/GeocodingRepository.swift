@@ -26,7 +26,7 @@ public final class GeocodingRepository: Sendable {
     private let session: URLSession
     private let preferences: PreferencesRepositoryImpl
 
-    public init(preferences: PreferencesRepositoryImpl, session: URLSession = .shared) {
+    public init(preferences: PreferencesRepositoryImpl, session: URLSession = NetworkSession.shared) {
         self.preferences = preferences
         self.session = session
     }
@@ -106,7 +106,7 @@ public final class GeocodingRepository: Sendable {
         }
         components.queryItems = items
 
-        let (data, _) = try await session.data(from: components.url!)
+        let (data, _) = try await session.dataWithRetry(from: components.url!)
         let response = try JSONDecoder().decode(PeliasResponse.self, from: data)
 
         return response.features.compactMap { feature in
@@ -146,7 +146,7 @@ public final class GeocodingRepository: Sendable {
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         PlacesUsageCounter.shared.record()
-        let (data, response) = try await session.data(for: request)
+        let (data, response) = try await session.dataWithRetry(for: request)
         if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
             throw RoutingError.provider(
                 "Google Places rejected the request (HTTP \(http.statusCode)). Enable \"Places API (New)\" on the key."

@@ -3,7 +3,24 @@ import CoreDomain
 import Foundation
 
 /// UserDefaults-backed implementation of PreferencesRepository.
+///
+/// The four API keys are the exception: they live in the Keychain (see
+/// `KeychainStore`) rather than the plist, and are migrated out of UserDefaults on
+/// first load. They remain ordinary fields on `UserPreferences`, so every reader —
+/// including the backup export — is unaffected by where they are stored.
 public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked Sendable {
+
+    /// Keychain account names for the credentials held outside the plist. The
+    /// strings double as the legacy UserDefaults keys they are migrated from.
+    private enum SecretKey {
+        static let googleMaps = "googleMapsApiKey"
+        static let ors = "orsApiKey"
+        static let openChargeMap = "openChargeMapApiKey"
+        static let gemini = "geminiApiKey"
+
+        static let all = [googleMaps, ors, openChargeMap, gemini]
+    }
+
     private let defaults = UserDefaults.standard
     private let _preferences: CurrentValueSubject<UserPreferences, Never>
 
@@ -15,7 +32,23 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
     public var currentPreferences: UserPreferences { _preferences.value }
 
     public init() {
+        Self.migrateSecretsToKeychain(from: defaults)
         _preferences = CurrentValueSubject(Self.load(from: defaults))
+    }
+
+    /// Moves any key still sitting in the plist into the Keychain, once, then
+    /// removes the plaintext copy. Safe to run on every launch: after the first
+    /// pass there is nothing left in UserDefaults to find.
+    private static func migrateSecretsToKeychain(from defaults: UserDefaults) {
+        for account in SecretKey.all {
+            guard let legacy = defaults.string(forKey: account), !legacy.isEmpty else { continue }
+            // Don't clobber a Keychain value that is already there — if both exist,
+            // the Keychain one is the newer write.
+            if KeychainStore.read(account) == nil {
+                KeychainStore.write(legacy, account: account)
+            }
+            defaults.removeObject(forKey: account)
+        }
     }
 
     public func update(_ transform: @Sendable (UserPreferences) -> UserPreferences) async {
@@ -53,14 +86,14 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         prefs.dynamicColor = defaults.bool(forKey: "dynamicColor", default: true)
         prefs.estimatedSohPercent = defaults.floatOrNil(forKey: "estimatedSohPercent")
         prefs.estimatedSohTimestamp = Int64(defaults.integer(forKey: "estimatedSohTimestamp"))
-        prefs.googleMapsApiKey = defaults.string(forKey: "googleMapsApiKey")
-        prefs.orsApiKey = defaults.string(forKey: "orsApiKey")
-        prefs.openChargeMapApiKey = defaults.string(forKey: "openChargeMapApiKey")
+        prefs.googleMapsApiKey = KeychainStore.read(SecretKey.googleMaps)
+        prefs.orsApiKey = KeychainStore.read(SecretKey.ors)
+        prefs.openChargeMapApiKey = KeychainStore.read(SecretKey.openChargeMap)
 
         if let raw = defaults.string(forKey: "routingProvider"),
            let val = RoutingProvider(rawValue: raw) { prefs.routingProvider = val }
 
-        prefs.geminiApiKey = defaults.string(forKey: "geminiApiKey")
+        prefs.geminiApiKey = KeychainStore.read(SecretKey.gemini)
         prefs.aiCoachingEnabled = defaults.bool(forKey: "aiCoachingEnabled", default: true)
         prefs.chargerOccupancyAlerts = defaults.bool(forKey: "chargerOccupancyAlerts", default: false)
         prefs.googlePoiSearch = defaults.bool(forKey: "googlePoiSearch", default: false)
@@ -88,11 +121,11 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(prefs.dynamicColor, forKey: "dynamicColor")
         setFloatOrNil(prefs.estimatedSohPercent, forKey: "estimatedSohPercent", in: defaults)
         defaults.set(Int(prefs.estimatedSohTimestamp), forKey: "estimatedSohTimestamp")
-        defaults.set(prefs.googleMapsApiKey, forKey: "googleMapsApiKey")
-        defaults.set(prefs.orsApiKey, forKey: "orsApiKey")
-        defaults.set(prefs.openChargeMapApiKey, forKey: "openChargeMapApiKey")
+        KeychainStore.write(prefs.googleMapsApiKey, account: SecretKey.googleMaps)
+        KeychainStore.write(prefs.orsApiKey, account: SecretKey.ors)
+        KeychainStore.write(prefs.openChargeMapApiKey, account: SecretKey.openChargeMap)
         defaults.set(prefs.routingProvider.rawValue, forKey: "routingProvider")
-        defaults.set(prefs.geminiApiKey, forKey: "geminiApiKey")
+        KeychainStore.write(prefs.geminiApiKey, account: SecretKey.gemini)
         defaults.set(prefs.aiCoachingEnabled, forKey: "aiCoachingEnabled")
         defaults.set(prefs.chargerOccupancyAlerts, forKey: "chargerOccupancyAlerts")
         defaults.set(prefs.googlePoiSearch, forKey: "googlePoiSearch")
@@ -109,17 +142,21 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
 }
 
 private extension UserDefaults {
+    /// `object(forKey:)` rather than `dictionaryRepresentation()[key]`: the latter
+    /// materialises every default in every domain — including the global ones — on
+    /// each call, and these helpers are called once per preference.
+    func hasValue(forKey key: String) -> Bool { object(forKey: key) != nil }
+
     func float(forKey key: String, default defaultValue: Float) -> Float {
-        let value = self.float(forKey: key)
-        // UserDefaults returns 0 for unset float keys — use dictionaryRepresentation to detect
-        return dictionaryRepresentation()[key] != nil ? value : defaultValue
+        // UserDefaults returns 0 for unset float keys, so presence has to be checked.
+        hasValue(forKey: key) ? float(forKey: key) : defaultValue
     }
 
     func bool(forKey key: String, default defaultValue: Bool) -> Bool {
-        dictionaryRepresentation()[key] != nil ? bool(forKey: key) : defaultValue
+        hasValue(forKey: key) ? bool(forKey: key) : defaultValue
     }
 
     func floatOrNil(forKey key: String) -> Float? {
-        dictionaryRepresentation()[key] != nil ? float(forKey: key) : nil
+        hasValue(forKey: key) ? float(forKey: key) : nil
     }
 }

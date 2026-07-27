@@ -7,7 +7,7 @@ public final class GeminiRepositoryImpl: GeminiRepository, Sendable {
     private let candidateModels = ["gemini-flash-lite-latest"]
 
     public init() {
-        self.session = URLSession.shared
+        self.session = NetworkSession.shared
     }
 
     // MARK: - Public API
@@ -165,13 +165,22 @@ public final class GeminiRepositoryImpl: GeminiRepository, Sendable {
         var lastError: Error?
         for model in candidateModels {
             do {
-                let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent?key=\(apiKey)")!
+                guard let url = URL(
+                    string: "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent"
+                ) else {
+                    throw GeminiError.apiError("Could not build a request URL for model \(model).")
+                }
                 var urlRequest = URLRequest(url: url)
                 urlRequest.httpMethod = "POST"
                 urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                // Header rather than a `?key=` query parameter: URLs reach system
+                // diagnostics, crash reports and any proxy on the path, and this is a
+                // credential billed to the user. Matches how the Places calls in
+                // GeocodingRepository and OccupancyRepository already authenticate.
+                urlRequest.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
                 urlRequest.httpBody = try JSONEncoder().encode(request)
 
-                let (data, response) = try await session.data(for: urlRequest)
+                let (data, response) = try await session.dataWithRetry(for: urlRequest)
                 let httpResponse = response as? HTTPURLResponse
 
                 if httpResponse?.statusCode == 404 {

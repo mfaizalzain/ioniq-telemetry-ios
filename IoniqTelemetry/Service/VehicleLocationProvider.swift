@@ -16,6 +16,12 @@ final class VehicleLocationProvider: NSObject {
     /// `DriveMonitor` relies on to tell parked from tunnel.
     private static let distanceFilterM: CLLocationDistance = 25
 
+    /// `BestForNavigation` is the turn-by-turn tier — it holds the GPS chip and the
+    /// sensor-fusion pipeline at full power for the whole drive. With a 25 m
+    /// displacement filter that precision is discarded before anyone reads it, so
+    /// the cheaper tier produces identical trip logs for a fraction of the draw.
+    private static let accuracy: CLLocationAccuracy = kCLLocationAccuracyNearestTenMeters
+
     private let manager = CLLocationManager()
     // Constructing a CMMotionActivityManager is itself enough to raise the Motion
     // & Fitness prompt, so it is built on first use — once an adapter is connected
@@ -44,7 +50,7 @@ final class VehicleLocationProvider: NSObject {
     override init() {
         super.init()
         manager.delegate = self
-        manager.desiredAccuracy = kCLLocationAccuracyBestForNavigation
+        manager.desiredAccuracy = Self.accuracy
         manager.distanceFilter = Self.distanceFilterM
         // `activityType` and `pausesLocationUpdatesAutomatically` both lean on the
         // motion coprocessor, and merely setting them raises the Motion & Fitness
@@ -60,8 +66,13 @@ final class VehicleLocationProvider: NSObject {
         isTracking = true
 
         manager.activityType = .automotiveNavigation
-        // Lets iOS suspend and relaunch us around a drive instead of keeping GPS hot.
-        manager.pausesLocationUpdatesAutomatically = true
+        // Deliberately off. When iOS pauses updates it suspends the app and never
+        // resumes without significant-change or region monitoring to wake it — so a
+        // twenty-minute stop at a charger ends trip logging for the rest of the
+        // drive. Leaving the session up costs little: the 25 m displacement filter
+        // already suppresses fixes from a stationary car, which is the same silence
+        // `DriveMonitor` reads as parked.
+        manager.pausesLocationUpdatesAutomatically = false
 
         switch manager.authorizationStatus {
         case .notDetermined:
@@ -76,10 +87,18 @@ final class VehicleLocationProvider: NSObject {
 
         guard hasLocationPermission else { return }
         manager.startUpdatingLocation()
-        if manager.authorizationStatus == .authorizedAlways {
-            manager.allowsBackgroundLocationUpdates = true
-        }
+        enableBackgroundUpdatesIfAllowed()
         startActivityUpdates()
+    }
+
+    /// Requires `location` in `UIBackgroundModes` — without it, assigning
+    /// `allowsBackgroundLocationUpdates` raises `NSInvalidArgumentException`.
+    private func enableBackgroundUpdatesIfAllowed() {
+        guard manager.authorizationStatus == .authorizedAlways else { return }
+        manager.allowsBackgroundLocationUpdates = true
+        // The blue pill. An always-on automotive session is expected to show it,
+        // and hiding a background GPS session is a review rejection.
+        manager.showsBackgroundLocationIndicator = true
     }
 
     func stop() {
@@ -94,9 +113,7 @@ final class VehicleLocationProvider: NSObject {
     private func authorizationChanged() {
         guard isTracking, hasLocationPermission else { return }
         manager.startUpdatingLocation()
-        if manager.authorizationStatus == .authorizedAlways {
-            manager.allowsBackgroundLocationUpdates = true
-        }
+        enableBackgroundUpdatesIfAllowed()
         startActivityUpdates()
     }
 

@@ -43,7 +43,7 @@ struct BackupSection: View {
             if let message {
                 Label(message, systemImage: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                     .font(.caption)
-                    .foregroundStyle(isError ? Color.redAlert : Color.appGreen)
+                    .foregroundStyle(isError ? Color.appRed : Color.appGreen)
             }
         } header: {
             Text("Data")

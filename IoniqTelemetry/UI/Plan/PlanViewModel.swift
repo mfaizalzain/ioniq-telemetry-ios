@@ -75,6 +75,15 @@ final class PlanViewModel {
     private(set) var errorMessage: String?
     private(set) var routingNotice: String?
 
+    /// The charger refresh failed and these rows came from the local cache. The
+    /// repository has always published this; nothing displayed it, so a driver
+    /// planning against week-old data had no way to know.
+    private(set) var chargersAreCached = false
+
+    /// Said up front rather than after a request times out — planning a route is
+    /// the one thing on this screen that cannot work offline.
+    private(set) var isOffline = false
+
     // MARK: - Natural-language planning
 
     var aiInput = ""
@@ -83,6 +92,10 @@ final class PlanViewModel {
     /// got the trip right before trusting the plan.
     private(set) var aiInterpretation: String?
     private(set) var aiError: String?
+
+    /// Why the last `geocodeFirst` returned nil, when it was a failure rather than
+    /// an empty result.
+    private var lastGeocodeError: String?
     private(set) var isPro = false
 
     /// The card only appears behind the same gate as the rest of the AI features.
@@ -126,6 +139,17 @@ final class PlanViewModel {
         services.entitlement.isPro
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.isPro = $0 }
+            .store(in: &cancellables)
+
+        services.chargers.servingCachedData
+            .receive(on: DispatchQueue.main)
+            .removeDuplicates()
+            .sink { [weak self] in self?.chargersAreCached = $0 }
+            .store(in: &cancellables)
+
+        NetworkMonitor.shared.online
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.isOffline = !$0 }
             .store(in: &cancellables)
 
         preferences = services.userPreferences
@@ -312,7 +336,9 @@ final class PlanViewModel {
             statusMessage = "Planning stops…"
             solve()
         } catch {
-            errorMessage = error.localizedDescription
+            // "Route planning" leads the sentence, and a URLError becomes advice
+            // rather than "A server with the specified hostname could not be found."
+            errorMessage = error.userMessage(subject: "Route planning")
             statusMessage = nil
         }
     }
@@ -495,7 +521,10 @@ final class PlanViewModel {
         guard let destinationName = parsed.destination?.trimmingCharacters(in: .whitespaces),
               !destinationName.isEmpty,
               let destinationPlace = await geocodeFirst(destinationName, near: searchCenter) else {
-            aiError = "I couldn't tell where you want to go — name a destination."
+            // "Name a destination" is wrong advice when the search never ran —
+            // rephrasing cannot fix a Places outage or a rejected key.
+            aiError = lastGeocodeError
+                ?? "I couldn't tell where you want to go — name a destination."
             return
         }
 
@@ -559,15 +588,33 @@ final class PlanViewModel {
             aiError = "Location is required to find nearby chargers."
             return
         }
-        let found = (try? await services.chargers.chargersNear(center: center, radiusKm: 10)) ?? []
+        // A lookup failure is not an empty result. `ChargerRepository` throws only
+        // when the cache is empty too, so reporting "no chargers found" here would
+        // tell the driver the road is bare when the request was actually refused.
+        let found: [Charger]
+        do {
+            found = try await services.chargers.chargersNear(center: center, radiusKm: 10)
+        } catch {
+            aiError = error.userMessage(subject: "Charger search")
+            return
+        }
         nearbyChargers = found
         aiInterpretation = found.isEmpty
             ? "No chargers found within 10 km of you."
             : "Found \(found.count) charger\(found.count == 1 ? "" : "s") within 10 km — see Nearby Chargers below."
     }
 
+    /// Nil covers two very different outcomes — "the search returned nothing" and
+    /// "the search itself failed" — so the failure is recorded here for callers that
+    /// need to tell the driver which one happened.
     private func geocodeFirst(_ query: String, near: LatLon?) async -> PlaceResult? {
-        try? await services.geocoding.search(query, near: near).first
+        do {
+            lastGeocodeError = nil
+            return try await services.geocoding.search(query, near: near).first
+        } catch {
+            lastGeocodeError = error.userMessage(subject: "Place search")
+            return nil
+        }
     }
 
     /// Echoes the parse back in one line, including anything that failed to resolve.

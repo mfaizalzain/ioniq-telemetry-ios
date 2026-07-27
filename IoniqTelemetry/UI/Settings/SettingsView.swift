@@ -86,7 +86,7 @@ private struct VehicleSection: View {
             if let profileError = viewModel.profileError {
                 Label(profileError, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(Color.amberWarn)
+                    .foregroundStyle(Color.appAmber)
             }
         }
     }
@@ -231,7 +231,7 @@ private struct AdapterSection: View {
             if let error = viewModel.adapterError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
-                    .foregroundStyle(Color.redAlert)
+                    .foregroundStyle(Color.appRed)
             }
         }
     }

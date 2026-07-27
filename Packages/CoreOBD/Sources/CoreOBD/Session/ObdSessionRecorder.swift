@@ -24,8 +24,26 @@ public final class ObdSessionRecorder: @unchecked Sendable {
         let stamp = formatter.string(from: Date())
         let f = directory.appendingPathComponent("obd-session-\(stamp).txt")
         try? "# Ioniq 5 OBD session capture \(stamp)\n".write(to: f, atomically: true, encoding: .utf8)
+        protect(f)
         fileLock.withLock { _file = f }
         return f
+    }
+
+    /// A capture is a raw dump of everything the car reported — VIN included — and
+    /// it is a debugging artefact, not user data worth restoring. Encrypt it at rest
+    /// and keep it out of backups.
+    ///
+    /// `completeUnlessOpen` rather than `complete`: a capture started before the
+    /// phone locks has to keep being appended to for the rest of the drive.
+    private func protect(_ url: URL) {
+        try? FileManager.default.setAttributes(
+            [.protectionKey: FileProtectionType.completeUnlessOpen],
+            ofItemAtPath: url.path
+        )
+        var url = url
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try? url.setResourceValues(values)
     }
 
     public func record(command: String, rawResponse: String) {

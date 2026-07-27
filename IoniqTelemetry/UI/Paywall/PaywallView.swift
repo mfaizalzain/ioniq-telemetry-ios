@@ -27,7 +27,7 @@ struct PaywallView: View {
                         if let error = viewModel.errorMessage {
                             Label(error, systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption)
-                                .foregroundStyle(Color.amberWarn)
+                                .foregroundStyle(Color.appAmber)
                                 .multilineTextAlignment(.center)
                         }
 

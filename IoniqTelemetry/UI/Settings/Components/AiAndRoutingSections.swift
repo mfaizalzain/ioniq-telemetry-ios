@@ -148,7 +148,7 @@ struct GoogleKeyField: View {
                     systemImage: "exclamationmark.triangle.fill"
                 )
                 .font(.caption)
-                .foregroundStyle(Color.amberWarn)
+                .foregroundStyle(Color.appAmber)
             }
         }
     }
@@ -185,10 +185,12 @@ private struct RoutingFooter: View {
 
     var body: some View {
         if let missingKey {
-            Text("Route planning needs a \(missingKey) key. Both providers have a free tier.")
-                .foregroundStyle(Color.amberWarn)
+            // "your … key" rather than "a/an": the provider name is injected, and
+            // "a OpenRouteService key" was wrong for one of the two providers.
+            Text("Route planning needs your \(missingKey) key. Both providers have a free tier.")
+                .foregroundStyle(Color.appAmber)
         } else {
-            Text("Apple Maps is the default — no key, no billing. Switch to OpenRouteService or Google Maps for elevation data or broader POI search.\\n\\nOpenRouteService is free with a quick signup. Google Maps needs a Cloud project with billing set up. Either way the key is yours, so requests count against your own quota.")
+            Text("Apple Maps is the default — no key, no billing. Switch to OpenRouteService or Google Maps for elevation data or broader POI search.\n\nOpenRouteService is free with a quick signup. Google Maps needs a Cloud project with billing set up. Either way the key is yours, so requests count against your own quota.")
         }
     }
 }
@@ -424,7 +426,7 @@ private struct ChargerAvailabilityFooter: View {
     var body: some View {
         if let reason {
             Text(reason)
-                .foregroundStyle(Color.amberWarn)
+                .foregroundStyle(Color.appAmber)
         } else {
             Text("Warns you when every charger with live status near your next stop is occupied.\n\nNeeds a Google Cloud key with the \u{201C}Places API (New)\u{201D} enabled — enter it once under Routing, where it also covers Google routing and POI search. Calls are billed to your account, so this stays off until you switch it on.")
         }

@@ -62,7 +62,7 @@ public final class RouteRepository: Sendable {
     private let session: URLSession
     private let preferences: PreferencesRepositoryImpl
 
-    public init(preferences: PreferencesRepositoryImpl, session: URLSession = .shared) {
+    public init(preferences: PreferencesRepositoryImpl, session: URLSession = NetworkSession.shared) {
         self.preferences = preferences
         self.session = session
     }
@@ -108,7 +108,7 @@ public final class RouteRepository: Sendable {
             "instructions": false
         ])
 
-        let (data, _) = try await session.data(for: request)
+        let (data, _) = try await session.dataWithRetry(for: request)
         let response = try JSONDecoder().decode(OrsDirectionsResponse.self, from: data)
 
         if let error = response.error {
@@ -144,7 +144,7 @@ public final class RouteRepository: Sendable {
         }
         components.queryItems = items
 
-        let (data, _) = try await session.data(from: components.url!)
+        let (data, _) = try await session.dataWithRetry(from: components.url!)
         let response = try JSONDecoder().decode(GoogleDirectionsResponse.self, from: data)
 
         guard response.status == "OK" else {

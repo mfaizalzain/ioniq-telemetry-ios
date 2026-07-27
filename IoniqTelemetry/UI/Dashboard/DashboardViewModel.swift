@@ -73,6 +73,18 @@ final class DashboardViewModel {
     }
 
     var hasData: Bool { connectionState == .connected }
+
+    /// True once any real sample has landed. Separates "never connected, every tile
+    /// is an em dash" from "connected earlier, these are the last readings" — the
+    /// two deserve very different screens.
+    var hasEverReceivedData: Bool { socPercent != nil || telemetry.packVoltage != nil }
+
+    /// How stale the readings are, for the banner shown after the adapter drops.
+    var lastUpdatedText: String {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: telemetry.timestamp, relativeTo: Date())
+    }
 }
 
 // MARK: - Formatting

@@ -15,8 +15,8 @@ public enum ConnectionState: String, Sendable {
     public var color: Color {
         switch self {
         case .connected: return .appGreen
-        case .scanning, .connecting, .initializing: return .amberWarn
-        case .error, .offline: return .redAlert
+        case .scanning, .connecting, .initializing: return .appAmber
+        case .error, .offline: return .appRed
         }
     }
 

@@ -113,16 +113,19 @@ public final class ObdManager {
 
         updateConnectionState(.connected)
 
+        // Driven by the transport's own state stream rather than a polling loop: a
+        // half-second wake every half second for the whole connection kept the CPU
+        // out of idle for the entire drive, and pushed the drop notice up to 500 ms
+        // late. The stream replays the current state on subscription, so a transport
+        // that dropped between `connect` returning and this task starting is still
+        // caught.
+        let states = t.stateStream
         stateWatchTask = Task { [weak self] in
-            guard let self else { return }
-            while !Task.isCancelled {
-                guard let t = self.transport else { break }
-                let st = t.state
-                if st == .disconnected || st == .error {
-                    await self.handleTransportDrop(isError: st == .error)
-                    break
-                }
-                try? await Task.sleep(nanoseconds: 500_000_000)
+            for await st in states {
+                guard !Task.isCancelled else { return }
+                guard st == .disconnected || st == .error else { continue }
+                await self?.handleTransportDrop(isError: st == .error)
+                return
             }
         }
 

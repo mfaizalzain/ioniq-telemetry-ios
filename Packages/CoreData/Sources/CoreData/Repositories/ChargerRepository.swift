@@ -63,7 +63,7 @@ public final class ChargerRepository: @unchecked Sendable {
         self.apiKey = apiKey
         self.source = source
         self.googleApiKey = googleApiKey
-        self.session = URLSession.shared
+        self.session = NetworkSession.shared
     }
 
     // MARK: - Public API
@@ -201,7 +201,7 @@ public final class ChargerRepository: @unchecked Sendable {
         guard let url = components.url else { throw ChargerError.badRequest }
 
         do {
-            let (data, response) = try await session.data(from: url)
+            let (data, response) = try await session.dataWithRetry(from: url)
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 _servingCachedData.value = true
                 throw ChargerError.httpStatus(http.statusCode)
@@ -301,7 +301,7 @@ public final class ChargerRepository: @unchecked Sendable {
 
         do {
             PlacesUsageCounter.shared.record()
-            let (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.dataWithRetry(for: request)
             if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
                 throw ChargerError.googleHttpStatus(http.statusCode)
             }
@@ -388,7 +388,9 @@ public enum ChargerError: LocalizedError {
         case .httpStatus(let code):
             return "Charger database returned an error (HTTP \(code))."
         case .transport(let error):
-            return "Could not reach the charger database: \(error.localizedDescription)"
+            // The underlying URLError becomes advice ("you appear to be offline")
+            // rather than Foundation's hostname-resolution wording.
+            return error.userMessage(subject: "Charger search")
         }
     }
 }
