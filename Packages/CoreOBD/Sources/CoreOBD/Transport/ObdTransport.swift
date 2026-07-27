@@ -1,20 +1,27 @@
 import Foundation
+import CoreDomain
 
-/// Protocol for ELM327 adapter communication (Bluetooth SPP / BLE / replay).
-@available(macOS 10.15, iOS 13.0, *)
+/// Protocol for OBD transport implementations (BLE, WiFi, replay).
 public protocol ObdTransport: AnyObject, Sendable {
-    /// Sends a command and returns everything received up to the ELM327 '>' prompt.
-    func send(_ command: String, timeoutMs: Int64) async throws -> String
+    /// Current connection state stream.
+    var stateStream: AsyncStream<ObdConnectionState> { get }
+
+    /// Connect to a device. Returns success or throws on failure.
+    func connect(device: ObdDevice) async throws
+
+    /// Send a command and return the raw response string.
+    func send(command: String, timeoutMs: Int64) async throws -> String
+
+    /// Disconnect from the device.
+    func disconnect() async
 }
 
-public let elmPrompt: Character = ">"
+/// Character that marks the end of an ELM327 response.
+public let ELM_PROMPT: Character = ">"
 
 /// Strips echoes, prompt, and blank lines from a raw adapter response.
-public func cleanResponse(_ raw: String, sentCommand: String? = nil) -> [String] {
-    raw.split(separator: "\r")
-        .flatMap { $0.split(separator: "\n") }
-        .map { $0.trimmingCharacters(in: .whitespaces)
-                      .trimmingCharacters(in: CharacterSet(charactersIn: String(elmPrompt)))
-                      .trimmingCharacters(in: .whitespaces) }
+public func cleanResponse(raw: String, sentCommand: String? = nil) -> [String] {
+    return raw.components(separatedBy: CharacterSet(charactersIn: "\r\n"))
+        .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: String(ELM_PROMPT), with: "").trimmingCharacters(in: .whitespacesAndNewlines) }
         .filter { !$0.isEmpty && $0 != sentCommand }
 }
