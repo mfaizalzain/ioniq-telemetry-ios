@@ -98,6 +98,7 @@
 		C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		CEE9272FAB694E0E7A2E71E6 /* CarPlayCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayCoordinator.swift; sourceTree = "<group>"; };
+		D0B90C783C3ACAF0CB846BA4 /* IoniqTelemetry-CarPlay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "IoniqTelemetry-CarPlay.entitlements"; sourceTree = "<group>"; };
 		D0F20D65CD1E45F443D1A915 /* ConnectedCarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectedCarService.swift; sourceTree = "<group>"; };
 		D76ACB924B36FF8C171B52B1 /* AlertNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertNotifier.swift; sourceTree = "<group>"; };
 		DB74CB948B1F7C8C5CAC6D43 /* IoniqTelemetry.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IoniqTelemetry.entitlements; sourceTree = "<group>"; };
@@ -330,6 +331,7 @@
 			children = (
 				71E75764760802E4E8D492C3 /* Assets.xcassets */,
 				FEA80BC3B62D16E7B2F8DA9B /* Info.plist */,
+				D0B90C783C3ACAF0CB846BA4 /* IoniqTelemetry-CarPlay.entitlements */,
 				DB74CB948B1F7C8C5CAC6D43 /* IoniqTelemetry.entitlements */,
 			);
 			path = Resources;

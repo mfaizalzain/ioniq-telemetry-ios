@@ -3,16 +3,12 @@
 <plist version="1.0">
 <dict>
 	<!--
-	  CarPlay apps must be granted an entitlement by Apple for one defined app
-	  category; there is no general-purpose "vehicle dashboard" category. EV
-	  charging is the category this app fits, and it is what gates
-	  CPPointOfInterestTemplate for the charger map.
+	  Default entitlements: no CarPlay key, so builds install on a device today.
 
-	  This must be requested from Apple and enabled on the App ID before a build
-	  carrying it will install on a device. Until then, remove this key locally or
-	  code signing will fail.
+	  The CarPlay entitlement lives in IoniqTelemetry-CarPlay.entitlements and is
+	  opted into per build (see scripts/run_device.sh). Signing a device build with
+	  a CarPlay entitlement Apple has not granted fails with a provisioning error,
+	  so it must not be the default.
 	-->
-	<key>com.apple.developer.carplay-charging</key>
-	<true/>
 </dict>
 </plist>

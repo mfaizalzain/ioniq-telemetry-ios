@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  CarPlay apps need an Apple-granted entitlement for one defined app category;
+	  there is no general "vehicle dashboard" category. EV charging is the one this
+	  app fits, and it is what gates CPPointOfInterestTemplate for the charger map.
+
+	  Request it at:
+	    https://developer.apple.com/contact/carplay/
+
+	  Simulator builds do not validate entitlements against a provisioning profile,
+	  so the CarPlay Simulator works with this file before Apple approves. A device
+	  build only signs once the entitlement is granted AND enabled on the App ID.
+	-->
+	<key>com.apple.developer.carplay-charging</key>
+	<true/>
+</dict>
+</plist>
