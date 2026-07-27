@@ -98,6 +98,16 @@ private struct GooglePoiSearchToggle: View {
                 get: { viewModel.preferences.googlePoiSearch },
                 set: { viewModel.setGooglePoiSearch($0) }
             ))
+            .onChange(of: viewModel.preferences.googlePoiSearch) { _, _ in }
+            .overlay(alignment: .bottom) {
+                if viewModel.preferences.googlePoiSearch {
+                    Text("For the best result")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .padding(.bottom, -6)
+                }
+            }
         }
     }
 }
@@ -353,7 +363,7 @@ struct ChargerSourceSection: View {
             if usesGoogle {
                 Text("Google Places covers areas where Open Charge Map is thin, and reports connector types and power. It has no price, network operator or access information, and it cannot search a bounding box — a route is covered by up to 12 circle queries, each one billed to your key.")
             } else {
-                Text("Charger locations come from Open Charge Map, using a key that ships with the app. Free, and it carries price, operator and access data.")
+                Text("Charger locations come from Open Charge Map. Free, and it carries price, operator and access data.")
             }
         }
     }
