@@ -49,6 +49,9 @@ public final class BackupRepository: @unchecked Sendable {
 
     // MARK: - Import
 
+    /// Counts are what the file carried, not what happened to be new: restoring
+    /// onto the device the backup came from is the common case, and reporting the
+    /// zero rows it inserted reads as "nothing was restored".
     public struct ImportSummary: Sendable, Equatable {
         public let trips: Int
         public let samples: Int
@@ -58,8 +61,8 @@ public final class BackupRepository: @unchecked Sendable {
         public let settingsRestored: Bool
     }
 
-    /// Restores a backup, skipping anything already present by id so re-importing
-    /// the same file is harmless rather than producing duplicates.
+    /// Restores a backup, overwriting rows that share an id so re-importing the
+    /// same file is idempotent rather than producing duplicates.
     @discardableResult
     public func restore(from data: Data) async throws -> ImportSummary {
         let decoder = JSONDecoder()
@@ -75,47 +78,35 @@ public final class BackupRepository: @unchecked Sendable {
             throw BackupError.tooNew(backup.version)
         }
 
-        let existingTrips = Set(try modelContext.fetch(FetchDescriptor<TripEntity>()).map(\.id))
-        var insertedTrips = 0
-        for trip in backup.trips where !existingTrips.contains(trip.id) {
+        // `id` is a unique attribute on each of these, so inserting a row that is
+        // already there replaces it instead of duplicating it.
+        for trip in backup.trips {
             modelContext.insert(trip.entity)
-            insertedTrips += 1
         }
-
-        // Samples carry no id of their own; dedupe on (tripId, timestamp), which is
-        // unique because the logger writes at most one sample per second per trip.
-        let existingSamples = Set(
-            try modelContext.fetch(FetchDescriptor<SampleEntity>())
-                .map { SampleKey(tripId: $0.tripId, timestamp: $0.timestamp) }
-        )
-        var insertedSamples = 0
-        for sample in backup.samples
-        where !existingSamples.contains(SampleKey(tripId: sample.tripId, timestamp: sample.timestamp)) {
-            modelContext.insert(sample.entity)
-            insertedSamples += 1
-        }
-
-        let existingSessions = Set(
-            try modelContext.fetch(FetchDescriptor<ChargeSessionEntity>()).map(\.id)
-        )
-        var insertedSessions = 0
-        for session in backup.chargeSessions where !existingSessions.contains(session.id) {
+        for session in backup.chargeSessions {
             modelContext.insert(session.entity)
-            insertedSessions += 1
         }
-
-        let existingSavedTrips = Set(try modelContext.fetch(FetchDescriptor<SavedTripEntity>()).map(\.id))
-        var insertedSavedTrips = 0
-        for saved in backup.savedTrips where !existingSavedTrips.contains(saved.id) {
+        for saved in backup.savedTrips {
             modelContext.insert(saved.entity)
-            insertedSavedTrips += 1
+        }
+        for place in backup.savedPlaces {
+            modelContext.insert(place.entity)
         }
 
-        let existingPlaces = Set(try modelContext.fetch(FetchDescriptor<SavedPlaceEntity>()).map(\.id))
-        var insertedPlaces = 0
-        for place in backup.savedPlaces where !existingPlaces.contains(place.id) {
-            modelContext.insert(place.entity)
-            insertedPlaces += 1
+        // Samples carry no id of their own, so they can't upsert. Replace the whole
+        // sample run of every trip the backup mentions: the file is the authority
+        // for those trips, and anything else double-imports the run.
+        let restoredTripIds = Set(backup.samples.map(\.tripId))
+        for tripId in restoredTripIds {
+            let existing = try modelContext.fetch(
+                FetchDescriptor<SampleEntity>(predicate: #Predicate { $0.tripId == tripId })
+            )
+            for sample in existing {
+                modelContext.delete(sample)
+            }
+        }
+        for sample in backup.samples {
+            modelContext.insert(sample.entity)
         }
 
         try modelContext.save()
@@ -127,18 +118,13 @@ public final class BackupRepository: @unchecked Sendable {
         }
 
         return ImportSummary(
-            trips: insertedTrips,
-            samples: insertedSamples,
-            chargeSessions: insertedSessions,
-            savedTrips: insertedSavedTrips,
-            savedPlaces: insertedPlaces,
+            trips: backup.trips.count,
+            samples: backup.samples.count,
+            chargeSessions: backup.chargeSessions.count,
+            savedTrips: backup.savedTrips.count,
+            savedPlaces: backup.savedPlaces.count,
             settingsRestored: settingsRestored
         )
-    }
-
-    private struct SampleKey: Hashable {
-        let tripId: String
-        let timestamp: Date
     }
 }
 

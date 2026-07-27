@@ -26,6 +26,7 @@
 		58FF896F28601DACFC7E543E /* VehicleLocationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27EDF8359710AED96EF1DC16 /* VehicleLocationProvider.swift */; };
 		5E4FEF21B4719E29D022AD31 /* CopilotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1CB89F2E357CB529065A64 /* CopilotView.swift */; };
 		602315C0596033975E43E07F /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E895DF443FCEEE5C5E060871 /* CoreBluetooth.framework */; };
+		64437CD9A71B3719571633A9 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 67165E3C3B428C078A95ED99 /* LaunchScreen.storyboard */; };
 		65E8F435BBCCED2E88B9C46C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F6099A4448EEBE22D1F18A1 /* StoreKit.framework */; };
 		679881A44DC2201BC2416EB3 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */; };
 		69F5F70B3E2F96A762AA0C92 /* CarPlayPointOfInterest.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9A602CFDC8597B98B79771BF /* CarPlayPointOfInterest.swift */; };
@@ -81,6 +82,7 @@
 		5CD51D249AA7A6761D98B76D /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };
 		5DEEE118E6C9CB6769158C33 /* BackupSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackupSection.swift; sourceTree = "<group>"; };
 		6343C9F5E46B88A76EC642D4 /* CopilotViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotViewModel.swift; sourceTree = "<group>"; };
+		67165E3C3B428C078A95ED99 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		6F4CB406BD5FDC8C8BFD3789 /* CoreData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreData; path = Packages/CoreData; sourceTree = SOURCE_ROOT; };
 		71E75764760802E4E8D492C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		734AFC3926EFA5634B2080D6 /* IoniqTelemetryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IoniqTelemetryApp.swift; sourceTree = "<group>"; };
@@ -347,6 +349,7 @@
 				D0B90C783C3ACAF0CB846BA4 /* IoniqTelemetry-CarPlay.entitlements */,
 				DB74CB948B1F7C8C5CAC6D43 /* IoniqTelemetry.entitlements */,
 				336E2B060531D9ECD0333359 /* IoniqTelemetry.storekit */,
+				67165E3C3B428C078A95ED99 /* LaunchScreen.storyboard */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -447,6 +450,7 @@
 			files = (
 				4D000C0C958F411F7D6A3FF4 /* Assets.xcassets in Resources */,
 				08F4CC8EC521314DA21CDD44 /* IoniqTelemetry.storekit in Resources */,
+				64437CD9A71B3719571633A9 /* LaunchScreen.storyboard in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

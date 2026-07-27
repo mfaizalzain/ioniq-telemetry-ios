@@ -12,8 +12,7 @@ import UniformTypeIdentifiers
 struct BackupSection: View {
     let viewModel: SettingsViewModel
 
-    @State private var exportedFileURL: URL?
-    @State private var isExporting = false
+    @State private var exportedFile: ExportedFile?
     @State private var isImporting = false
     @State private var message: String?
     @State private var isError = false
@@ -22,16 +21,18 @@ struct BackupSection: View {
     var body: some View {
         Section {
             Button {
-                Task {
-                    await exportBackup()
-                    if exportedFileURL != nil {
-                        isExporting = true
-                    }
-                }
+                Task { await exportBackup() }
             } label: {
                 Label("Export Backup", systemImage: "square.and.arrow.up")
             }
             .disabled(isWorking)
+            // Presentation modifiers go on the button rows, not on the Section:
+            // a modifier on a Section is applied to every row inside it, so the
+            // sheet ended up with one presenter per row all bound to the same
+            // state, and the first tap was swallowed by the collision.
+            .sheet(item: $exportedFile, onDismiss: { exportedFile = nil }) { file in
+                ShareSheet(items: [file.url])
+            }
 
             Button {
                 isImporting = true
@@ -39,6 +40,13 @@ struct BackupSection: View {
                 Label("Restore from Backup", systemImage: "square.and.arrow.down")
             }
             .disabled(isWorking)
+            .fileImporter(
+                isPresented: $isImporting,
+                allowedContentTypes: [.json],
+                allowsMultipleSelection: false
+            ) { result in
+                Task { await importBackup(result) }
+            }
 
             if let message {
                 Label(message, systemImage: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
@@ -50,18 +58,6 @@ struct BackupSection: View {
         } footer: {
             Text("Includes trips, charge sessions, saved routes and settings. Your API keys are in the file, so keep it somewhere private.")
         }
-        .sheet(isPresented: $isExporting, onDismiss: { exportedFileURL = nil }) {
-            if let url = exportedFileURL {
-                ShareSheet(items: [url])
-            }
-        }
-        .fileImporter(
-            isPresented: $isImporting,
-            allowedContentTypes: [.json],
-            allowsMultipleSelection: false
-        ) { result in
-            Task { await importBackup(result) }
-        }
     }
 
     private func exportBackup() async {
@@ -69,8 +65,8 @@ struct BackupSection: View {
         defer { isWorking = false }
         do {
             let url = try await viewModel.exportBackup()
-            exportedFileURL = url
             message = nil
+            exportedFile = ExportedFile(url: url)
         } catch {
             isError = true
             message = error.localizedDescription
@@ -90,12 +86,28 @@ struct BackupSection: View {
 
             let summary = try await viewModel.restoreBackup(from: url)
             isError = false
-            message = "Restored \(summary.trips) trips, \(summary.chargeSessions) charge sessions, \(summary.savedTrips) saved routes."
+            message = "Restored "
+                + [
+                    count(summary.trips, "trip"),
+                    count(summary.chargeSessions, "charge session"),
+                    count(summary.savedTrips, "saved route"),
+                    count(summary.savedPlaces, "saved place"),
+                ].joined(separator: ", ") + "."
         } catch {
             isError = true
             message = error.localizedDescription
         }
     }
+}
+
+private func count(_ value: Int, _ noun: String) -> String {
+    "\(value) \(noun)\(value == 1 ? "" : "s")"
+}
+
+/// Identity is the URL, so a re-export of the same path still re-presents.
+private struct ExportedFile: Identifiable {
+    let url: URL
+    var id: String { url.absoluteString }
 }
 
 private enum BackupUIError: LocalizedError {

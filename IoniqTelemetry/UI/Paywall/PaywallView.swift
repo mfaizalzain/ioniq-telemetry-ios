@@ -82,9 +82,8 @@ private struct FeatureList: View {
     private static let features: [(icon: String, title: String, detail: String)] = [
         ("sparkles", "AI Assistant", "Plain-language diagnostics and energy insights"),
         ("bell.badge", "Charger Occupancy Alerts", "Know before you arrive at a full charger"),
-        ("map", "Live Charger Availability", "Real-time status along your route"),
-        ("calendar", "365-Day Trip History", "Up from 90 days on the free tier"),
-        ("square.and.arrow.down", "Backup & Restore", "Export your trips, routes and settings")
+        ("map", "Live Charger Availability", "Connector status on nearby chargers, with your Google key"),
+        ("calendar", "365-Day Trip History", "Up from 90 days on the free tier")
     ]
 
     var body: some View {
