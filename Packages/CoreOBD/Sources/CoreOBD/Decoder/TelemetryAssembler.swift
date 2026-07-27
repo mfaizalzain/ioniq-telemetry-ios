@@ -50,12 +50,21 @@ public final class TelemetryAssembler: Sendable {
             )
         }
 
+        // Charging vs regen detection.
+        // Both push positive current into the pack — the difference is whether
+        // the car is stationary. Regen happens while moving; charging while parked.
+        // Without GPS (speed may be nil), fall back to pack current alone:
+        // charging always has steady positive current; regen oscillates between
+        // negative (accelerating) and positive (coasting/regen).
         if let current = t.packCurrent {
-            let charging = current > 1.0
+            let isStationary = (t.speedKph ?? 0) < 1.0
+            // Charging: stationary + positive current.
+            let charging = isStationary && current > 1.0
             t.isCharging = charging
+
             if !charging {
-                t.chargeType = ChargeType.none
-            } else if current > 60.0 {
+                t.chargeType = .none
+            } else if abs(current) > 60.0 {
                 t.chargeType = .dc
             } else {
                 t.chargeType = .ac
