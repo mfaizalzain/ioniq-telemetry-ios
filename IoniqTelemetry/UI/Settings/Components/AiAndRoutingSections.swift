@@ -94,16 +94,17 @@ private struct GooglePoiSearchToggle: View {
 
     var body: some View {
         if viewModel.preferences.routingProvider == .openRouteService {
-            VStack(alignment: .leading, spacing: 2) {
-                Toggle("Google POI search", isOn: Binding(
-                    get: { viewModel.preferences.googlePoiSearch },
-                    set: { viewModel.setGooglePoiSearch($0) }
-                ))
-                if viewModel.preferences.googlePoiSearch {
-                    Text("For the best result")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 44)
+            Toggle(isOn: Binding(
+                get: { viewModel.preferences.googlePoiSearch },
+                set: { viewModel.setGooglePoiSearch($0) }
+            )) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Google POI search")
+                    if viewModel.preferences.googlePoiSearch {
+                        Text("For the best result")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
