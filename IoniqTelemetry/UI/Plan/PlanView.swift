@@ -54,7 +54,6 @@ struct PlanView: View {
         .task {
             if viewModel == nil { viewModel = PlanViewModel(services: services) }
             viewModel?.reloadSaved()
-            await viewModel?.loadNearbyChargers()
         }
     }
 }
@@ -884,10 +883,18 @@ private struct NearbyChargersSection: View {
 
     var body: some View {
         if !viewModel.nearbyChargers.isEmpty {
+            // Show charger list when results exist
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("NEARBY CHARGERS")
-                        .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                    HStack {
+                        Text("NEARBY CHARGERS")
+                            .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                        Spacer()
+                        Button("Clear") {
+                            viewModel.clearNearbyChargers()
+                        }
+                        .font(.caption)
+                    }
 
                     ForEach(viewModel.nearbyChargers.prefix(6)) { charger in
                         HStack {
@@ -908,38 +915,28 @@ private struct NearbyChargersSection: View {
                                 }
                             }
                             Spacer()
-                            if charger.maxPowerKw > 0 {
-                                Text(String(format: "%.0f kW", charger.maxPowerKw))
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(Color.appAccent)
-                            }
-                            Menu {
-                                Button {
-                                    viewModel.setDestination(charger: charger)
-                                } label: {
-                                    Label("Set as destination", systemImage: "mappin.circle")
-                                }
-                                Button {
-                                    MapsNavigation.navigate(
-                                        to: LatLon(lat: charger.lat, lon: charger.lon),
-                                        name: charger.name
-                                    )
-                                } label: {
-                                    Label("Navigate here", systemImage: "arrow.triangle.turn.up.right.circle")
-                                }
+                            Button {
+                                viewModel.setDestination(charger: charger)
                             } label: {
-                                Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
+                                Image(systemName: "arrow.triangle.turn.up.right.diamond")
+                                    .font(.title3)
+                                    .foregroundStyle(Color.appAccent)
+                                    .padding(.leading, 8)
                             }
-                            .accessibilityLabel("Options for \(charger.name)")
+                            .buttonStyle(.plain)
                         }
-                        .accessibilityElement(children: .contain)
-                        Divider()
+                        .padding(.vertical, 3)
                     }
                 }
-                .padding(14)
             }
-            .padding(.horizontal)
-            .backgroundStyle(.ultraThinMaterial)
+        } else {
+            // Show a button to trigger the lookup
+            Button {
+                Task { await viewModel.loadNearbyChargers() }
+            } label: {
+                Label("Find Nearby Chargers", systemImage: "bolt.car")
+            }
         }
     }
 }
+

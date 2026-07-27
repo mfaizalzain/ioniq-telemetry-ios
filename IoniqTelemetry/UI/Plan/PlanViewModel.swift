@@ -732,6 +732,11 @@ final class PlanViewModel {
         await loadNearbyAvailability(center: center)
     }
 
+    func clearNearbyChargers() {
+        nearbyChargers = []
+        chargerAvailability = [:]
+    }
+
     /// Live connector availability for the nearby list.
     ///
     /// One Places request for the whole radius, not one per charger — it bills the
