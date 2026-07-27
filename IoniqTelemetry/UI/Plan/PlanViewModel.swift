@@ -99,7 +99,7 @@ final class PlanViewModel {
     private var cancellables = Set<AnyCancellable>()
     /// Cached so a re-route doesn't re-request the route and burn another API call.
     private var lastRoute: BaseRoute?
-    private var lastRouteChargers: [RouteCharger] = []
+    private(set) var lastRouteChargers: [RouteCharger] = []
 
     init(services: AppServices) {
         self.services = services

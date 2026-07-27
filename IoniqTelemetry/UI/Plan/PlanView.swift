@@ -1,5 +1,6 @@
 import CoreData
 import CoreDomain
+import CoreRouting
 import CoreUI
 import SwiftUI
 
@@ -29,6 +30,7 @@ struct PlanView: View {
                         if let plan = viewModel.plan {
                             ItineraryTimeline(plan: plan, viewModel: viewModel)
                             PlanActionsRow(viewModel: viewModel, showSaveTrip: $showSaveTrip)
+                            ChargersAlongRouteSection(viewModel: viewModel)
                         }
 
                         SavedTripsSection(viewModel: viewModel)
@@ -938,5 +940,102 @@ private struct NearbyChargersSection: View {
             }
         }
     }
+}
+
+/// Lists all chargers found along the planned route corridor, matching Android's
+/// behaviour. The user can browse, exclude, and set a charger as destination.
+private struct ChargersAlongRouteSection: View {
+    let viewModel: PlanViewModel
+
+    var body: some View {
+        if !viewModel.lastRouteChargers.isEmpty {
+            GroupBox {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("CHARGERS ALONG ROUTE")
+                            .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                        Spacer()
+                        Text("\(viewModel.lastRouteChargers.count) found")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+
+                    ForEach(Array(zip(viewModel.lastRouteChargers.indices, viewModel.lastRouteChargers)), id: \.0) { i, rc in
+                        ChargerAlongRouteCard(rc: rc, viewModel: viewModel)
+                        if i < viewModel.lastRouteChargers.count - 1 {
+                            Divider()
+                        }
+                    }
+
+                    if !viewModel.excludedChargerIds.isEmpty {
+                        Button("Reset excluded chargers") {
+                            viewModel.restoreExcludedChargers()
+                        }
+                        .font(.caption)
+                    }
+                }
+                .padding(14)
+            }
+            .padding(.horizontal)
+            .backgroundStyle(.ultraThinMaterial)
+        }
+    }
+}
+
+private struct ChargerAlongRouteCard: View {
+    let rc: RouteCharger
+    let viewModel: PlanViewModel
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(rc.charger.name)
+                    .font(.subheadline.weight(.medium)).lineLimit(1)
+                HStack(spacing: 6) {
+                    if rc.charger.maxPowerKw > 0 {
+                        Text(String(format: "%.0f kW", rc.charger.maxPowerKw))
+                            .font(.caption.weight(.semibold))
+                    }
+                    Text(String(format: "%.1f km", rc.distanceAlongRouteKm))
+                        .font(.caption).foregroundStyle(.secondary)
+                    if rc.detourKm > 1 {
+                        Text(String(format: "+%.1f km detour", rc.detourKm))
+                            .font(.caption).foregroundStyle(Color.amberWarn)
+                    }
+                }
+                if ChargerPriceText(charger: rc.charger).isEmpty == false {
+                    Text(ChargerPriceText(charger: rc.charger))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+            Menu {
+                Button {
+                    viewModel.setDestination(charger: rc.charger)
+                } label: {
+                    Label("Set as destination", systemImage: "mappin.circle")
+                }
+                Button {
+                    viewModel.excludeChargerAndReplan(rc.charger.id)
+                } label: {
+                    Label("Exclude from plan", systemImage: "xmark.circle")
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 3)
+    }
+}
+
+/// Returns a formatted price string for a charger, or empty string if unavailable.
+private func ChargerPriceText(charger: Charger) -> String {
+    if let price = charger.pricePerKwh, price > 0 {
+        return String(format: "$%.2f/kWh", price)
+    }
+    if !(charger.usageCost ?? "").isEmpty {
+        return charger.usageCost!
+    }
+    return ""
 }
 
