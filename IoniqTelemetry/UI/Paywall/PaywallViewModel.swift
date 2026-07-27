@@ -1,17 +1,24 @@
 import CoreDomain
 import Foundation
-@preconcurrency import StoreKit
+import StoreKit
 
-/// Supplies the Paywall screen with product info and purchase state.
+/// StoreKit 2 purchase flow for Pro.
+///
+/// One non-consumable, matching the Android build's single `ioniq_telemetry_pro`
+/// product — buy once, keep it. Entitlement is derived from
+/// `Transaction.currentEntitlements` rather than from the purchase result alone,
+/// so a refund is reflected on the next refresh, and a purchase made on another
+/// device is picked up without an explicit restore.
 @Observable
 @MainActor
 final class PaywallViewModel {
 
+    /// The App Store Connect product ID. Same string as the Play Console one.
     static let productID = "ioniq_telemetry_pro"
 
     private(set) var product: Product?
     private(set) var isLoading = false
-    private(set) var isPurchasing = false
+    private(set) var purchaseInProgress: Product.ID?
     private(set) var errorMessage: String?
     private(set) var isPro = false
 
@@ -53,22 +60,25 @@ final class PaywallViewModel {
 
     // MARK: - Purchase
 
-    func purchase() async {
-        guard let product else { return }
-        isPurchasing = true
-        defer { isPurchasing = false }
+    func purchase(_ product: Product) async {
+        purchaseInProgress = product.id
+        errorMessage = nil
+        defer { purchaseInProgress = nil }
+
         do {
-            let result = try await product.purchase()
-            switch result {
+            switch try await product.purchase() {
             case .success(let verification):
-                if case .verified(let transaction) = verification {
-                    await transaction.finish()
+                guard case .verified(let transaction) = verification else {
+                    // Unverified means the signature failed — never grant on that.
+                    errorMessage = "This purchase could not be verified."
+                    return
                 }
+                await transaction.finish()
                 await refreshEntitlement()
             case .userCancelled:
-                errorMessage = nil
+                break
             case .pending:
-                errorMessage = "Waiting for approval…"
+                errorMessage = "Purchase is pending approval."
             @unknown default:
                 break
             }
@@ -78,15 +88,27 @@ final class PaywallViewModel {
     }
 
     func restore() async {
-        // Transaction.updates (listened to in init) catches everything.
-        // Just refresh from the local receipt.
-        await refreshEntitlement()
+        isLoading = true
+        defer { isLoading = false }
+        do {
+            try await AppStore.sync()
+            await refreshEntitlement()
+            if !isPro { errorMessage = "No previous purchase found for this Apple Account." }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
-    // MARK: - Helpers
-
+    /// Recomputes Pro from what StoreKit currently considers active.
     private func refreshEntitlement() async {
-        let isPro = await entitlement.isPurchased(productID: Self.productID)
-        self.isPro = isPro
+        var entitled = false
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let transaction) = result else { continue }
+            if transaction.productID == Self.productID, transaction.revocationDate == nil {
+                entitled = true
+            }
+        }
+        isPro = entitled
+        await entitlement.setPro(entitled, token: nil)
     }
 }
