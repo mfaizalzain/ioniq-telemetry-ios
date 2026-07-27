@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.fmz.IoniqTelemetry.retention</string>
+	</array>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
@@ -20,8 +24,26 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Ioniq Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Ioniq Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Ioniq Telemetry needs location access for trip logging and route planning.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Ioniq Telemetry needs location access for trip logging and route planning.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>Ioniq Telemetry uses motion data to detect driving for automatic trip logging.</string>
+	<key>OpenChargeMapAPIKey</key>
+	<string>$(OPEN_CHARGE_MAP_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -43,16 +65,12 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-		<key>UIBackgroundModes</key>
-		<array>
-			<string>bluetooth-central</string>
-			<string>processing</string>
-		</array>
-		<key>BGTaskSchedulerPermittedIdentifiers</key>
-		<array>
-			<string>com.fmz.IoniqTelemetry.retention</string>
-		</array>
-		<key>UILaunchScreen</key>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-central</string>
+		<string>processing</string>
+	</array>
+	<key>UILaunchScreen</key>
 	<dict>
 		<key>UIColorName</key>
 		<string>LaunchBackground</string>
@@ -67,21 +85,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>LSApplicationQueriesSchemes</key>
-	<array>
-		<string>comgooglemaps</string>
-	</array>
-	<key>OpenChargeMapAPIKey</key>
-	<string>$(OPEN_CHARGE_MAP_API_KEY)</string>
-	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Ioniq Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
-	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Ioniq Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Ioniq Telemetry needs location access for trip logging and route planning.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Ioniq Telemetry needs location access for trip logging and route planning.</string>
-	<key>NSMotionUsageDescription</key>
-	<string>Ioniq Telemetry uses motion data to detect driving for automatic trip logging.</string>
 </dict>
 </plist>
