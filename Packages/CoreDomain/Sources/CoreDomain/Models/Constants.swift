@@ -62,8 +62,9 @@ public enum Ioniq5Constants {
             ?? "E-GMP"
     }
 
-    public static func usableKwhForProfile(_ profileId: String) -> Float {
-        allVehicles.first { $0.id == profileId }?.usableKwh
+    public static func usableKwhForProfile(_ profileId: String, customKwh: Float? = nil) -> Float {
+        if let customKwh, customKwh > 0 { return customKwh }
+        return allVehicles.first { $0.id == profileId }?.usableKwh
             ?? 77.4 // default
     }
 }

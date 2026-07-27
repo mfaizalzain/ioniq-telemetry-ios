@@ -1,0 +1,755 @@
+{
+  "builtTestProducts" : [
+
+  ],
+  "copyCommands" : {
+
+  },
+  "explicitTargetDependencyImportCheckingMode" : {
+    "none" : {
+
+    }
+  },
+  "generatedSourceTargetSet" : [
+
+  ],
+  "pluginDescriptions" : [
+
+  ],
+  "swiftCommands" : {
+    "C.CoreDomain-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/sources",
+      "importPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/CoreDomain.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CellAnomalyDetector.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Charger.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Constants.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CopilotContext.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ObdDevice.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ParkedState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ThermalAdvisor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripPlan.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripRequest.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/VehicleTelemetry.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ActivePlanHolder.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ConsentProvider.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/EntitlementRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/GeminiRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/PreferencesRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/TelemetryRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/VehicleMotionHolder.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "CoreDomain",
+      "moduleOutputPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules/CoreDomain.swiftmodule",
+      "objects" : [
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/CoreDomain.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/CellAnomalyDetector.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/Charger.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/Constants.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/CopilotContext.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ObdDevice.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ParkedState.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ThermalAdvisor.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/TripPlan.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/TripRequest.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/VehicleTelemetry.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ActivePlanHolder.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ConsentProvider.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/EntitlementRepository.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/GeminiRepository.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/PreferencesRepository.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/TelemetryRepository.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/VehicleMotionHolder.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/include/CoreDomain-Swift.h",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "coredomain"
+      ],
+      "outputFileMapPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/CoreDomain.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/CellAnomalyDetector.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/Charger.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/Constants.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/CopilotContext.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ObdDevice.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ParkedState.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ThermalAdvisor.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/TripPlan.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/TripRequest.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/VehicleTelemetry.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ActivePlanHolder.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/ConsentProvider.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/EntitlementRepository.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/GeminiRepository.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/PreferencesRepository.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/TelemetryRepository.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/VehicleMotionHolder.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules/CoreDomain.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/CoreDomain.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CellAnomalyDetector.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Charger.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Constants.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CopilotContext.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ObdDevice.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ParkedState.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ThermalAdvisor.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripPlan.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripRequest.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/VehicleTelemetry.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ActivePlanHolder.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ConsentProvider.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/EntitlementRepository.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/GeminiRepository.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/PreferencesRepository.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/TelemetryRepository.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/VehicleMotionHolder.swift"
+      ],
+      "tempsPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build",
+      "wholeModuleOptimization" : false
+    },
+    "C.CoreRouting-arm64-apple-macosx-debug.module" : {
+      "executable" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "fileList" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/sources",
+      "importPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules",
+      "inputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ChargeCurve.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ConsumptionModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/CoreRouting.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Geohash.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Ioniq5Constants.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Replanner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/RouteReplanner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/TripSolver.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules/CoreDomain.swiftmodule"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/sources"
+        }
+      ],
+      "isLibrary" : true,
+      "moduleName" : "CoreRouting",
+      "moduleOutputPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules/CoreRouting.swiftmodule",
+      "objects" : [
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ChargeCurve.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ConsumptionModel.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/CoreRouting.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Geohash.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Ioniq5Constants.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Replanner.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/RouteReplanner.swift.o",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/TripSolver.swift.o"
+      ],
+      "otherArguments" : [
+        "-target",
+        "arm64-apple-macosx14.0",
+        "-incremental",
+        "-enable-batch-mode",
+        "-serialize-diagnostics",
+        "-index-store-path",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/index/store",
+        "-Onone",
+        "-enable-testing",
+        "-j10",
+        "-DSWIFT_PACKAGE",
+        "-DDEBUG",
+        "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+        "-module-cache-path",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/ModuleCache",
+        "-parseable-output",
+        "-parse-as-library",
+        "-emit-objc-header",
+        "-emit-objc-header-path",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/include/CoreRouting-Swift.h",
+        "-swift-version",
+        "6",
+        "-plugin-path",
+        "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+        "-sdk",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-F",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-I",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-L",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+        "-g",
+        "-Xcc",
+        "-isysroot",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+        "-Xcc",
+        "-F",
+        "-Xcc",
+        "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+        "-Xcc",
+        "-fPIC",
+        "-Xcc",
+        "-g",
+        "-package-name",
+        "corerouting"
+      ],
+      "outputFileMapPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/output-file-map.json",
+      "outputs" : [
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ChargeCurve.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ConsumptionModel.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/CoreRouting.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Geohash.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Ioniq5Constants.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Replanner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/RouteReplanner.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/TripSolver.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules/CoreRouting.swiftmodule"
+        }
+      ],
+      "prepareForIndexing" : false,
+      "sources" : [
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ChargeCurve.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ConsumptionModel.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/CoreRouting.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Geohash.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Ioniq5Constants.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Replanner.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/RouteReplanner.swift",
+        "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/TripSolver.swift"
+      ],
+      "tempsPath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build",
+      "wholeModuleOptimization" : false
+    }
+  },
+  "swiftFrontendCommands" : {
+
+  },
+  "swiftTargetScanArgs" : {
+    "CoreDomain" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "CoreDomain",
+      "-package-name",
+      "coredomain",
+      "-c",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/CoreDomain.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CellAnomalyDetector.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Charger.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Constants.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CopilotContext.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ObdDevice.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ParkedState.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ThermalAdvisor.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripPlan.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripRequest.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/VehicleTelemetry.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ActivePlanHolder.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ConsentProvider.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/EntitlementRepository.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/GeminiRepository.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/PreferencesRepository.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/TelemetryRepository.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/VehicleMotionHolder.swift",
+      "-I",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/include/CoreDomain-Swift.h",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "coredomain",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ],
+    "CoreRouting" : [
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc",
+      "-module-name",
+      "CoreRouting",
+      "-package-name",
+      "corerouting",
+      "-c",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ChargeCurve.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ConsumptionModel.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/CoreRouting.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Geohash.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Ioniq5Constants.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Replanner.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/RouteReplanner.swift",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/TripSolver.swift",
+      "-I",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/Modules",
+      "-target",
+      "arm64-apple-macosx14.0",
+      "-incremental",
+      "-enable-batch-mode",
+      "-serialize-diagnostics",
+      "-index-store-path",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/index/store",
+      "-Onone",
+      "-enable-testing",
+      "-j10",
+      "-DSWIFT_PACKAGE",
+      "-DDEBUG",
+      "-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE",
+      "-module-cache-path",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/ModuleCache",
+      "-parseable-output",
+      "-parse-as-library",
+      "-emit-objc-header",
+      "-emit-objc-header-path",
+      "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/include/CoreRouting-Swift.h",
+      "-swift-version",
+      "6",
+      "-plugin-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing",
+      "-sdk",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-F",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-I",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-L",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib",
+      "-g",
+      "-Xcc",
+      "-isysroot",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.5.sdk",
+      "-Xcc",
+      "-F",
+      "-Xcc",
+      "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks",
+      "-Xcc",
+      "-fPIC",
+      "-Xcc",
+      "-g",
+      "-package-name",
+      "corerouting",
+      "-driver-use-frontend-path",
+      "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+    ]
+  },
+  "targetDependencyMap" : {
+    "CoreDomain" : [
+
+    ],
+    "CoreRouting" : [
+      "CoreDomain"
+    ]
+  },
+  "testDiscoveryCommands" : {
+
+  },
+  "testEntryPointCommands" : {
+
+  },
+  "traitConfiguration" : {
+    "default" : {
+
+    }
+  },
+  "writeCommands" : {
+    "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/CoreDomain.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CellAnomalyDetector.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Charger.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/Constants.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/CopilotContext.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ObdDevice.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ParkedState.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/ThermalAdvisor.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripPlan.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/TripRequest.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Models/VehicleTelemetry.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ActivePlanHolder.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/ConsentProvider.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/EntitlementRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/GeminiRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/PreferencesRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/TelemetryRepository.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain/Sources/CoreDomain/Repository/VehicleMotionHolder.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreDomain.build/sources"
+    },
+    "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/sources" : {
+      "alwaysOutOfDate" : false,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<sources-file-list>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ChargeCurve.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ConsumptionModel.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/CoreRouting.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Geohash.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Ioniq5Constants.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Replanner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/RouteReplanner.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/TripSolver.swift"
+        }
+      ],
+      "outputFilePath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/sources"
+    },
+    "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt" : {
+      "alwaysOutOfDate" : true,
+      "inputs" : [
+        {
+          "kind" : "virtual",
+          "name" : "<swift-get-version>"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"
+        }
+      ],
+      "outputFilePath" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+    }
+  }
+}

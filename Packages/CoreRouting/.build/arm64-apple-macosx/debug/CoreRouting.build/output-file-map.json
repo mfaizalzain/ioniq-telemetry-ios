@@ -1,0 +1,61 @@
+{
+  "": {
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/primary.swiftdeps"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ChargeCurve.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ChargeCurve.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ChargeCurve.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ChargeCurve~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ChargeCurve.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ChargeCurve.dia"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/ConsumptionModel.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ConsumptionModel.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ConsumptionModel.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ConsumptionModel~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ConsumptionModel.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/ConsumptionModel.dia"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/CoreRouting.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/CoreRouting.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/CoreRouting.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/CoreRouting~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/CoreRouting.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/CoreRouting.dia"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Geohash.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Geohash.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Geohash.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Geohash~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Geohash.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Geohash.dia"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Ioniq5Constants.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Ioniq5Constants.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Ioniq5Constants.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Ioniq5Constants~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Ioniq5Constants.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Ioniq5Constants.dia"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/Replanner.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Replanner.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Replanner.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Replanner~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Replanner.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/Replanner.dia"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/RouteReplanner.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/RouteReplanner.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/RouteReplanner.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/RouteReplanner~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/RouteReplanner.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/RouteReplanner.dia"
+  },
+  "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/Sources/CoreRouting/TripSolver.swift": {
+    "dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/TripSolver.d",
+    "object": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/TripSolver.swift.o",
+    "swiftmodule": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/TripSolver~partial.swiftmodule",
+    "swift-dependencies": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/TripSolver.swiftdeps",
+    "diagnostics": "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreRouting/.build/arm64-apple-macosx/debug/CoreRouting.build/TripSolver.dia"
+  }
+}

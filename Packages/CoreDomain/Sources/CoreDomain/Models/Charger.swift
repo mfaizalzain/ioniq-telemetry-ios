@@ -59,7 +59,7 @@ public struct Charger: Sendable, Identifiable, Equatable {
 
 // MARK: - Connector
 
-public struct Connector: Sendable, Equatable {
+public struct Connector: Sendable, Equatable, Codable {
     public var type: ConnectorType
     public var powerKw: Float
     public var count: Int
@@ -71,7 +71,7 @@ public struct Connector: Sendable, Equatable {
     }
 }
 
-public enum ConnectorType: String, Sendable, CaseIterable {
+public enum ConnectorType: String, Sendable, CaseIterable, Codable {
     case ccs2 = "CCS2"
     case ccs1 = "CCS1"
     case chademo = "CHADEMO"

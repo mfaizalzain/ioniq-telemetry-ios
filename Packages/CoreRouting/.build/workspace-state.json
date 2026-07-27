@@ -1,0 +1,27 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "coredomain",
+          "kind" : "fileSystem",
+          "location" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain",
+          "name" : "CoreDomain"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/Users/faizalzain/Dev/ioniq-telemetry-ios/Packages/CoreDomain"
+        },
+        "subpath" : "coredomain"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}
