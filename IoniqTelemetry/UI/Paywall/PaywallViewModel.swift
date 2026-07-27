@@ -23,20 +23,18 @@ final class PaywallViewModel {
     private(set) var isPro = false
 
     private let entitlement: EntitlementRepository
-    private let updateListener: Task<Void, Never>?
+    private lazy var updateListener: Task<Void, Never>? = Task { [weak self] in
+        for await update in Transaction.updates {
+            guard let self else { return }
+            if case .verified(let transaction) = update {
+                await transaction.finish()
+            }
+            await self.refreshEntitlement()
+        }
+    }
 
     init(entitlement: EntitlementRepository) {
         self.entitlement = entitlement
-        // Catches renewals, refunds, and purchases completed outside the app.
-        updateListener = Task { [weak self] in
-            for await update in Transaction.updates {
-                guard let self else { return }
-                if case .verified(let transaction) = update {
-                    await transaction.finish()
-                }
-                await self.refreshEntitlement()
-            }
-        }
     }
 
     // MARK: - Loading
