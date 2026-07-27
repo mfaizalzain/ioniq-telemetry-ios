@@ -290,6 +290,16 @@ private struct EndpointField: View {
                 if endpoint.isSearching {
                     ProgressView().controlSize(.small)
                 }
+                if !endpoint.query.isEmpty {
+                    Button {
+                        viewModel.clearEndpoint(slot)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.tertiary)
+                    .accessibilityLabel("Clear \(placeholder)")
+                }
                 if let selected = endpoint.selected {
                     Button {
                         viewModel.toggleFavorite(selected)

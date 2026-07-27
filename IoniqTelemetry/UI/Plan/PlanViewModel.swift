@@ -166,6 +166,21 @@ final class PlanViewModel {
         search(text, slot: slot)
     }
 
+    /// Empties a slot completely — text, the resolved place, and any suggestions.
+    /// Clearing only the text would leave `selected` behind, so the field would look
+    /// empty while the plan still routed to the old place.
+    func clearEndpoint(_ slot: Slot) {
+        searchTask?.cancel()
+        update(slot) {
+            $0.query = ""
+            $0.selected = nil
+            $0.suggestions = []
+            $0.isSearching = false
+        }
+        activeSlot = nil
+        invalidatePlan()
+    }
+
     func addWaypoint() {
         waypoints.append(Endpoint())
     }
