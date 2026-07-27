@@ -97,25 +97,68 @@ def draw_background(size: int) -> Image.Image:
                 color = lerp_color(BG_MID, BG_BOT, tt)
             small.putpixel((x, y), color)
     img = small.resize((size, size), Image.BILINEAR).convert("RGBA")
-    draw = ImageDraw.Draw(img)
 
-    # Speed lines (scaled)
+    # Speed lines on a separate overlay so alpha blends properly
+    overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    overlay_draw = ImageDraw.Draw(overlay)
     scale = size / VIEWPORT
     # Line 1: M-10,84 L60,14  stroke 10
-    x1, y1 = -10 * scale, 84 * scale
-    x2, y2 = 60 * scale, 14 * scale
-    draw.line([(x1, y1), (x2, y2)], fill=SPEED_LINE_1, width=int(10 * scale))
-
+    overlay_draw.line(
+        [(-10 * scale, 84 * scale), (60 * scale, 14 * scale)],
+        fill=SPEED_LINE_1,
+        width=max(1, int(10 * scale)),
+    )
     # Line 2: M20,110 L104,26  stroke 14
-    x1, y1 = 20 * scale, 110 * scale
-    x2, y2 = 104 * scale, 26 * scale
-    draw.line([(x1, y1), (x2, y2)], fill=SPEED_LINE_2, width=int(14 * scale))
-
+    overlay_draw.line(
+        [(20 * scale, 110 * scale), (104 * scale, 26 * scale)],
+        fill=SPEED_LINE_2,
+        width=max(1, int(14 * scale)),
+    )
+    img = Image.alpha_composite(img, overlay)
     return img
 
 
+def _arc_mask(size: int, center, radius, start_deg, end_deg, width) -> Image.Image:
+    """Grayscale mask of an arc with round caps, built via donut + pieslice (no spikes)."""
+    mask = Image.new("L", (size, size), 0)
+    md = ImageDraw.Draw(mask)
+    cx, cy = center
+    r_outer = radius + width / 2.0
+    r_inner = radius - width / 2.0
+
+    # PIL pieslice/arc use 0 = 3 o'clock, increasing CLOCKWISE (y-axis down),
+    # matching Android's angle convention.
+    # PIL pieslice draws from start to end going clockwise.
+    # Our start=160, end=380 (i.e. 20 deg past full 360). PIL handles end > 360.
+    # Draw filled donut slice via two steps:
+    # 1) filled outer pieslice
+    md.pieslice(
+        [cx - r_outer, cy - r_outer, cx + r_outer, cy + r_outer],
+        start=start_deg,
+        end=end_deg,
+        fill=255,
+    )
+    # 2) cut out inner pieslice
+    md.pieslice(
+        [cx - r_inner, cy - r_inner, cx + r_inner, cy + r_inner],
+        start=start_deg,
+        end=end_deg,
+        fill=0,
+    )
+
+    # Round caps: filled circles at arc endpoints
+    s_rad = math.radians(start_deg)
+    e_rad = math.radians(end_deg)
+    sx, sy = cx + radius * math.cos(s_rad), cy + radius * math.sin(s_rad)
+    ex, ey = cx + radius * math.cos(e_rad), cy + radius * math.sin(e_rad)
+    r = width / 2.0
+    md.ellipse([sx - r, sy - r, sx + r, sy + r], fill=255)
+    md.ellipse([ex - r, ey - r, ex + r, ey + r], fill=255)
+    return mask
+
+
 def draw_arc_segment(
-    draw: ImageDraw.Draw,
+    img: Image.Image,
     center: Tuple[float, float],
     radius: float,
     start_deg: float,
@@ -123,14 +166,10 @@ def draw_arc_segment(
     width: int,
     color,
 ):
-    """Draw an arc segment with round caps (chord segments for clean AA)."""
-    segments = max(64, int(abs(end_deg - start_deg) * 2))
-    pts = _arc_points(center, radius, start_deg, end_deg, segments)
-    draw.line(pts, fill=color, width=width, joint="curve")
-    # round caps
-    r = width / 2.0
-    for p in (pts[0], pts[-1]):
-        draw.ellipse([p[0] - r, p[1] - r, p[0] + r, p[1] + r], fill=color)
+    """Paste a solid-color arc through a mask (clean anti-aliased edges)."""
+    mask = _arc_mask(img.size[0], center, radius, start_deg, end_deg, width)
+    layer = Image.new("RGBA", img.size, (*color[:3], color[3] if len(color) > 3 else 255))
+    img.paste(layer, (0, 0), mask)
 
 
 def _arc_points(center, radius, start_deg, end_deg, segments):
@@ -154,40 +193,56 @@ def draw_arc_gradient(
     start_color,
     end_color,
 ):
-    """Draw an arc with a linear gradient along its length (chord segments)."""
-    segments = max(64, int(sweep_deg * 2))
-    pts = _arc_points(center, radius, start_deg, start_deg + sweep_deg, segments)
-    draw = ImageDraw.Draw(img)
-    for i in range(segments):
-        t = i / (segments - 1)
-        color = lerp_color(start_color, end_color, t)
-        draw.line([pts[i], pts[i + 1]], fill=(*color, 255), width=width)
-    # round caps: draw filled circles at each end
-    r = width / 2.0
-    for p, col_t in ((pts[0], 0.0), (pts[-1], 1.0)):
-        color = lerp_color(start_color, end_color, col_t)
-        draw.ellipse(
-            [p[0] - r, p[1] - r, p[0] + r, p[1] + r],
-            fill=(*color, 255),
-        )
+    """Draw an arc with a linear gradient along its length via mask + gradient layer."""
+    # Build gradient layer along the arc direction (start -> end point)
+    end_deg = start_deg + sweep_deg
+    # Use the chord from arc start to arc end as the gradient axis
+    s_rad = math.radians(start_deg)
+    e_rad = math.radians(end_deg)
+    cx, cy = center
+    sx, sy = cx + radius * math.cos(s_rad), cy + radius * math.sin(s_rad)
+    ex, ey = cx + radius * math.cos(e_rad), cy + radius * math.sin(e_rad)
+
+    # Project each pixel onto the gradient axis to find t (computed at low res, upscaled)
+    SMALL = 256
+    small_grad = Image.new("RGB", (SMALL, SMALL))
+    sg = small_grad.load()
+    dx = ex - sx
+    dy = ey - sy
+    scale_f = SMALL / img.size[0]
+    sx_s, sy_s = sx * scale_f, sy * scale_f
+    dx_s, dy_s = dx * scale_f, dy * scale_f
+    len_sq_s = dx_s * dx_s + dy_s * dy_s or 1.0
+    for y in range(SMALL):
+        for x in range(SMALL):
+            t = ((x - sx_s) * dx_s + (y - sy_s) * dy_s) / len_sq_s
+            t = max(0.0, min(1.0, t))
+            sg[x, y] = lerp_color(start_color, end_color, t)
+    grad = small_grad.resize(img.size, Image.BILINEAR).convert("RGBA")
+
+    # Mask the gradient by the arc shape
+    mask = _arc_mask(img.size[0], center, radius, start_deg, end_deg, width)
+    img.paste(grad, (0, 0), mask)
 
 
 def draw_icon(size: int, transparent: bool = False) -> Image.Image:
-    """Compose full icon at given pixel size."""
-    scale = size / VIEWPORT
+    """Compose full icon at given pixel size (rendered at 2x then downsampled)."""
+    SS = 2  # supersample factor
+    big = size * SS
+    scale = big / VIEWPORT
     center = (CENTER[0] * scale, CENTER[1] * scale)
     radius = RADIUS * scale
     stroke = max(1, int(STROKE_WIDTH * scale))
 
     if transparent:
-        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
     else:
-        img = draw_background(size)
+        img = draw_background(big)
 
     draw = ImageDraw.Draw(img)
 
     # SOC gauge track (dim full arc)
-    draw_arc_segment(draw, center, radius, ARC_START_DEG, ARC_START_DEG + ARC_SWEEP_DEG, stroke, (*TRACK_COLOR, 255))
+    draw_arc_segment(img, center, radius, ARC_START_DEG, ARC_START_DEG + ARC_SWEEP_DEG, stroke, (*TRACK_COLOR, 255))
 
     # SOC ring (trimmed 78%) with gradient
     trim_sweep = ARC_SWEEP_DEG * TRIM_END
@@ -203,6 +258,8 @@ def draw_icon(size: int, transparent: bool = False) -> Image.Image:
     overlay_draw.polygon(bolt_scaled, fill=BOLT_OVERLAY)
     img = Image.alpha_composite(img, overlay)
 
+    # Downsample to target size with high-quality filter
+    img = img.resize((size, size), Image.LANCZOS)
     return img
 
 
