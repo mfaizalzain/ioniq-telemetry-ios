@@ -23,7 +23,7 @@ final class PaywallViewModel {
     private(set) var isPro = false
 
     private let entitlement: EntitlementRepository
-    private var updateListener: Task<Void, Never>?
+    private let updateListener: Task<Void, Never>?
 
     init(entitlement: EntitlementRepository) {
         self.entitlement = entitlement
@@ -37,14 +37,6 @@ final class PaywallViewModel {
                 await self.refreshEntitlement()
             }
         }
-    }
-
-    deinit {
-        // nonisolated(unsafe) required because deinit is nonisolated even on
-        // @MainActor classes, and @Observable makes stored properties isolated.
-        // Reference type + cancel is safe across actors — no data race.
-        nonisolated(unsafe) let t = updateListener
-        t?.cancel()
     }
 
     // MARK: - Loading
