@@ -39,9 +39,6 @@ final class ConnectedCarService {
     private var tirePressure: TirePressureMonitor!
     private var healthEstimator: BatteryHealthEstimator!
 
-    /// Trips created in the last 15 minutes, so a quick simulation test is visible.
-    private(set) var recentTripCount = 0
-
     private var cancellables = Set<AnyCancellable>()
     private var isRunning = false
     private var lastTelemetry = VehicleTelemetry()
@@ -265,22 +262,6 @@ final class ConnectedCarService {
                 next.estimatedSohTimestamp = timestamp
                 return next
             }
-        }
-    }
-
-    // MARK: - Debug Simulation
-
-    /// Feeds a simulated 10 km drive through the pipeline — trip starts, GPS
-    /// distance accumulates, and the trip saves with non-zero distance.
-    func simulateTrip() {
-        let simulator = DebugSimulator()
-        Task { [weak self] in
-            await simulator.start { [weak self] (telemetry: VehicleTelemetry, fix: Fix) in
-                guard let self else { return }
-                self.location.setFix(fix)
-                self.consume(telemetry)
-            }
-            self?.recentTripCount += 1
         }
     }
 

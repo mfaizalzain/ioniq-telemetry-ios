@@ -23,9 +23,6 @@ final class VehicleLocationProvider: NSObject {
     private var activityManager: CMMotionActivityManager?
 
     private(set) var latestFix: Fix?
-
-    /// For debug simulation: injects a synthetic GPS fix without CoreLocation.
-    func setFix(_ fix: Fix?) { latestFix = fix }
     private(set) var isInVehicle = false
     private(set) var isTracking = false
 
