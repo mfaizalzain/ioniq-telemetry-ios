@@ -18,7 +18,7 @@ settings:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: S232V5F699
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "7"
+    CURRENT_PROJECT_VERSION: "8"
     ITSAppUsesNonExemptEncryption: false
     # iPhone only. The layouts have never been designed or tested for iPad, and
     # shipping a stretched one invites a 2.4.1 rejection. Set here rather than in
