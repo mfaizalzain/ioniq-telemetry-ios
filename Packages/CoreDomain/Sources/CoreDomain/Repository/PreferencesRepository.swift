@@ -50,6 +50,9 @@ public struct UserPreferences: Sendable {
     public var googleMapsApiKey: String?
     /// BYOK: user-supplied OpenRouteService key, used for routing and geocoding.
     public var orsApiKey: String?
+    /// BYOK: Open Charge Map key. OCM rejects unauthenticated requests outright
+    /// (HTTP 403), so charger lookup does nothing at all without this.
+    public var openChargeMapApiKey: String?
     /// Which engine plans the base route. The key for the selected provider must also
     /// be set — [routingKeyFor] resolves both together, and route planning is
     /// unavailable until one pair is complete.
@@ -84,6 +87,7 @@ public struct UserPreferences: Sendable {
         estimatedSohTimestamp: Int64 = 0,
         googleMapsApiKey: String? = nil,
         orsApiKey: String? = nil,
+        openChargeMapApiKey: String? = nil,
         routingProvider: RoutingProvider = .openRouteService,
         geminiApiKey: String? = nil,
         aiCoachingEnabled: Bool = true,
@@ -108,6 +112,7 @@ public struct UserPreferences: Sendable {
         self.estimatedSohTimestamp = estimatedSohTimestamp
         self.googleMapsApiKey = googleMapsApiKey
         self.orsApiKey = orsApiKey
+        self.openChargeMapApiKey = openChargeMapApiKey
         self.routingProvider = routingProvider
         self.geminiApiKey = geminiApiKey
         self.aiCoachingEnabled = aiCoachingEnabled

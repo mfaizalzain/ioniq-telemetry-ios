@@ -64,7 +64,13 @@ final class AppServices {
             entitlement: entitlement,
             preferencesRepository: preferences
         )
-        chargers = ChargerRepository(modelContext: modelContext, apiKey: Secrets.openChargeMapKey)
+        // Captured weakly through a box so the repository always sees the current
+        // preference rather than whatever was set at launch.
+        let preferencesRef = preferences
+        chargers = ChargerRepository(modelContext: modelContext) {
+            let userKey = preferencesRef.currentPreferences.openChargeMapApiKey ?? ""
+            return userKey.isEmpty ? Secrets.openChargeMapKey : userKey
+        }
         savedTrips = SavedTripRepository(modelContext: modelContext)
         savedPlaces = SavedPlaceRepository(modelContext: modelContext)
         backup = BackupRepository(modelContext: modelContext, preferences: preferences)
@@ -205,8 +211,9 @@ final class AppServices {
 
 /// Build-time configuration read from Info.plist, so no key is committed in source.
 enum Secrets {
-    /// Open Charge Map API key. OCM serves keyless requests at a lower rate limit,
-    /// so an empty value degrades gracefully rather than failing outright.
+    /// Optional build-time Open Charge Map key, for a distribution build that ships
+    /// one. Empty in normal development, in which case the user's own key from
+    /// Settings is used — OCM rejects unauthenticated requests with HTTP 403.
     static var openChargeMapKey: String {
         Bundle.main.object(forInfoDictionaryKey: "OpenChargeMapAPIKey") as? String ?? ""
     }

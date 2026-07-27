@@ -17,6 +17,9 @@ targets:
     platform: iOS
     sources:
       - IoniqTelemetry
+    configFiles:
+      Debug: Secrets.xcconfig
+      Release: Secrets.xcconfig
     settings:
       base:
         INFOPLIST_FILE: IoniqTelemetry/Resources/Info.plist
@@ -62,3 +65,20 @@ packages:
     path: Packages/CoreRouting
   CoreUI:
     path: Packages/CoreUI
+schemes:
+  IoniqTelemetry:
+    build:
+      targets:
+        IoniqTelemetry: all
+        IoniqTelemetryTests: [test]
+    run:
+      config: Debug
+      # Local StoreKit testing: purchases resolve against this file, so the paywall
+      # is exercisable before the products exist in App Store Connect.
+      storeKitConfiguration: IoniqTelemetry/Resources/IoniqTelemetry.storekit
+    test:
+      config: Debug
+      targets:
+        - IoniqTelemetryTests
+    archive:
+      config: Release

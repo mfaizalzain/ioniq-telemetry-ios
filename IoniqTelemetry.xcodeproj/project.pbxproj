@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		08F4CC8EC521314DA21CDD44 /* IoniqTelemetry.storekit in Resources */ = {isa = PBXBuildFile; fileRef = 336E2B060531D9ECD0333359 /* IoniqTelemetry.storekit */; };
 		0B661B348BCFD37E44E4F40A /* MapsNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9FAD7209721D00BF6A517CFA /* MapsNavigation.swift */; };
 		0C6B1ADF300322C93745F9F3 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7989C5DE8BAB8D4052549AB7 /* PaywallView.swift */; };
 		13BAD2FF5C03019D0DDF41F3 /* PlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B92C9548673D78AA607E3859 /* PlanView.swift */; };
@@ -70,6 +71,7 @@
 		1B6ECC04918055FCDD1B2BFB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2778BB8F33F074543D1B90F2 /* PlanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanViewModel.swift; sourceTree = "<group>"; };
 		27EDF8359710AED96EF1DC16 /* VehicleLocationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleLocationProvider.swift; sourceTree = "<group>"; };
+		336E2B060531D9ECD0333359 /* IoniqTelemetry.storekit */ = {isa = PBXFileReference; path = IoniqTelemetry.storekit; sourceTree = "<group>"; };
 		39E4C656FFEE54E2D359DFD6 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		3BD0F36BBF1F0EC4A7BF4C1D /* CoreUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreUI; path = Packages/CoreUI; sourceTree = SOURCE_ROOT; };
 		3F6099A4448EEBE22D1F18A1 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
@@ -83,6 +85,7 @@
 		71E75764760802E4E8D492C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		734AFC3926EFA5634B2080D6 /* IoniqTelemetryApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IoniqTelemetryApp.swift; sourceTree = "<group>"; };
 		7989C5DE8BAB8D4052549AB7 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
+		7A7AC19356FAE862F3F3F8B1 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Secrets.xcconfig; sourceTree = "<group>"; };
 		7B3BD72A95E554A583F634A7 /* IoniqTelemetry.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = IoniqTelemetry.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		8172C23BE112C6BFD8D27007 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		88D3784E71C842EED4005A96 /* TripDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripDetailView.swift; sourceTree = "<group>"; };
@@ -260,6 +263,15 @@
 			path = Components;
 			sourceTree = "<group>";
 		};
+		B23FCFA5E1ABF2C7D88320D3 /* ioniq-telemetry-ios */ = {
+			isa = PBXGroup;
+			children = (
+				7A7AC19356FAE862F3F3F8B1 /* Secrets.xcconfig */,
+			);
+			name = "ioniq-telemetry-ios";
+			path = .;
+			sourceTree = "<group>";
+		};
 		C19C0657CF43D6ABD700DECE /* Paywall */ = {
 			isa = PBXGroup;
 			children = (
@@ -272,6 +284,7 @@
 		C8552EFF225ABAD148A49A9D = {
 			isa = PBXGroup;
 			children = (
+				B23FCFA5E1ABF2C7D88320D3 /* ioniq-telemetry-ios */,
 				4E4814EB891D889E5166DD78 /* IoniqTelemetry */,
 				E3B07F07FFBF7931162ED362 /* IoniqTelemetryTests */,
 				6C3D7B8736A4CAF3728E0DCA /* Packages */,
@@ -333,6 +346,7 @@
 				FEA80BC3B62D16E7B2F8DA9B /* Info.plist */,
 				D0B90C783C3ACAF0CB846BA4 /* IoniqTelemetry-CarPlay.entitlements */,
 				DB74CB948B1F7C8C5CAC6D43 /* IoniqTelemetry.entitlements */,
+				336E2B060531D9ECD0333359 /* IoniqTelemetry.storekit */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -432,6 +446,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D000C0C958F411F7D6A3FF4 /* Assets.xcassets in Resources */,
+				08F4CC8EC521314DA21CDD44 /* IoniqTelemetry.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -559,6 +574,7 @@
 		};
 		6A8B8CD868D85DDE81B435C2 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7A7AC19356FAE862F3F3F8B1 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = IoniqTelemetry/Resources/IoniqTelemetry.entitlements;
@@ -635,6 +651,7 @@
 		};
 		83E16173D5538EBA365892F3 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 7A7AC19356FAE862F3F3F8B1 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = IoniqTelemetry/Resources/IoniqTelemetry.entitlements;

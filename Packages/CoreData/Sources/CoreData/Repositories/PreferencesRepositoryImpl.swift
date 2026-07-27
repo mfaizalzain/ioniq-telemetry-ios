@@ -11,6 +11,9 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         _preferences.eraseToAnyPublisher()
     }
 
+    /// Latest value without subscribing, for callers that need a synchronous read.
+    public var currentPreferences: UserPreferences { _preferences.value }
+
     public init() {
         _preferences = CurrentValueSubject(Self.load(from: defaults))
     }
@@ -52,6 +55,7 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         prefs.estimatedSohTimestamp = Int64(defaults.integer(forKey: "estimatedSohTimestamp"))
         prefs.googleMapsApiKey = defaults.string(forKey: "googleMapsApiKey")
         prefs.orsApiKey = defaults.string(forKey: "orsApiKey")
+        prefs.openChargeMapApiKey = defaults.string(forKey: "openChargeMapApiKey")
 
         if let raw = defaults.string(forKey: "routingProvider"),
            let val = RoutingProvider(rawValue: raw) { prefs.routingProvider = val }
@@ -83,6 +87,7 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(Int(prefs.estimatedSohTimestamp), forKey: "estimatedSohTimestamp")
         defaults.set(prefs.googleMapsApiKey, forKey: "googleMapsApiKey")
         defaults.set(prefs.orsApiKey, forKey: "orsApiKey")
+        defaults.set(prefs.openChargeMapApiKey, forKey: "openChargeMapApiKey")
         defaults.set(prefs.routingProvider.rawValue, forKey: "routingProvider")
         defaults.set(prefs.geminiApiKey, forKey: "geminiApiKey")
         defaults.set(prefs.aiCoachingEnabled, forKey: "aiCoachingEnabled")

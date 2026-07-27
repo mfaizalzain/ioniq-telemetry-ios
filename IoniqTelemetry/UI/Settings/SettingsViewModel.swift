@@ -135,6 +135,7 @@ final class SettingsViewModel {
     func setAiCoaching(_ value: Bool) { update { $0.aiCoachingEnabled = value } }
     func setGoogleMapsKey(_ value: String) { update { $0.googleMapsApiKey = value.isEmpty ? nil : value } }
     func setOrsKey(_ value: String) { update { $0.orsApiKey = value.isEmpty ? nil : value } }
+    func setOpenChargeMapKey(_ value: String) { update { $0.openChargeMapApiKey = value.isEmpty ? nil : value } }
     func setRoutingProvider(_ value: RoutingProvider) { update { $0.routingProvider = value } }
     func setChargerOccupancyAlerts(_ value: Bool) { update { $0.chargerOccupancyAlerts = value } }
     func setGooglePoiSearch(_ value: Bool) { update { $0.googlePoiSearch = value } }

@@ -192,8 +192,38 @@ enum KeyHelp {
 
     static let googleTitle = "Create a key in Google Cloud Console"
     static let google = URL(string: "https://console.cloud.google.com/apis/credentials")!
+
+    static let ocmTitle = "Get a free key at openchargemap.org"
+    static let ocm = URL(string: "https://openchargemap.org/site/developerinfo")!
 }
 
+
+// MARK: - Charger data
+
+/// The Open Charge Map key behind charger lookup.
+///
+/// Its own section, and deliberately outside the Pro gate: finding chargers is a
+/// free feature, and OCM rejects unauthenticated requests outright, so without a
+/// key the Plan screen can only ever report "no chargers found".
+struct ChargerDataSection: View {
+    let viewModel: SettingsViewModel
+
+    var body: some View {
+        Section {
+            SecretField(
+                placeholder: "Open Charge Map key",
+                initialValue: viewModel.preferences.openChargeMapApiKey ?? "",
+                onCommit: { viewModel.setOpenChargeMapKey($0) },
+                helpTitle: KeyHelp.ocmTitle,
+                helpURL: KeyHelp.ocm
+            )
+        } header: {
+            Text("Charger Data")
+        } footer: {
+            Text("Charger locations come from Open Charge Map, which requires a key. The app ships with one; add your own here to use your own quota instead.")
+        }
+    }
+}
 
 // MARK: - Charger availability
 

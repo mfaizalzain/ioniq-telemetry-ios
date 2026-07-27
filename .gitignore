@@ -25,3 +25,6 @@ xcuserdata/
 # SwiftPM build artifacts
 Packages/*/.build/
 build/
+
+# Local secrets (mirrors Android local.properties)
+Secrets.xcconfig

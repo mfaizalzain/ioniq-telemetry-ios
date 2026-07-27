@@ -6,7 +6,9 @@ import SwiftData
 /// Repository for charger data — OCM API fetch + local cache with 7-day TTL.
 public final class ChargerRepository: @unchecked Sendable {
     private let modelContext: ModelContext
-    private let apiKey: String
+    /// Read per request, not captured at init: the user can paste a key into
+    /// Settings at any time and the next lookup must pick it up.
+    private let apiKey: @Sendable () -> String
     private let session: URLSession
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
@@ -28,7 +30,7 @@ public final class ChargerRepository: @unchecked Sendable {
         30: .nacs
     ]
 
-    public init(modelContext: ModelContext, apiKey: String) {
+    public init(modelContext: ModelContext, apiKey: @escaping @Sendable () -> String) {
         self.modelContext = modelContext
         self.apiKey = apiKey
         self.session = URLSession.shared
@@ -81,8 +83,15 @@ public final class ChargerRepository: @unchecked Sendable {
             return oldest == nil || now.timeIntervalSince(oldest!) > Self.cacheTTL
         }
 
+        var refreshError: (any Error)?
         if stale {
-            try? await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+            do {
+                try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+            } catch {
+                // Cached data is better than an error, so hold this and only throw
+                // if the cache turns out to be empty too.
+                refreshError = error
+            }
         }
 
         var seen = Set<String>()
@@ -96,6 +105,9 @@ public final class ChargerRepository: @unchecked Sendable {
                 results.append(entityToDomain(entity))
             }
         }
+        // Without this the UI reports "no chargers here" when the truth is "the
+        // charger database refused the request" — two very different problems.
+        if results.isEmpty, let refreshError { throw refreshError }
         return results
     }
 
@@ -115,13 +127,27 @@ public final class ChargerRepository: @unchecked Sendable {
     }
 
     private func refreshArea(minLat: Double, minLon: Double, maxLat: Double, maxLon: Double) async throws {
-        let boundingBox = "(\(minLat),\(minLon)),(\(maxLat),\(maxLon))"
-        guard let url = URL(string: "https://api.openchargemap.io/v3/poi/?output=json&maxresults=500&boundingbox=\(boundingBox)&key=\(apiKey)") else {
-            return
+        let key = apiKey().trimmingCharacters(in: .whitespaces)
+        guard !key.isEmpty else {
+            _servingCachedData.value = true
+            throw ChargerError.missingApiKey
         }
 
+        var components = URLComponents(string: "https://api.openchargemap.io/v3/poi/")!
+        components.queryItems = [
+            .init(name: "output", value: "json"),
+            .init(name: "maxresults", value: "500"),
+            .init(name: "boundingbox", value: "(\(minLat),\(minLon)),(\(maxLat),\(maxLon))"),
+            .init(name: "key", value: key)
+        ]
+        guard let url = components.url else { throw ChargerError.badRequest }
+
         do {
-            let (data, _) = try await session.data(from: url)
+            let (data, response) = try await session.data(from: url)
+            if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) {
+                _servingCachedData.value = true
+                throw ChargerError.httpStatus(http.statusCode)
+            }
             let pois = try decoder.decode([OCMPoi].self, from: data)
             let now = Date()
 
@@ -131,12 +157,39 @@ public final class ChargerRepository: @unchecked Sendable {
             }
             try modelContext.save()
             _servingCachedData.value = false
+        } catch let error as ChargerError {
+            throw error
         } catch {
             _servingCachedData.value = true
+            throw ChargerError.transport(error)
         }
     }
 
-    // MARK: - Mapping
+    // MARK: - Errors
+
+public enum ChargerError: LocalizedError {
+    case missingApiKey
+    case badRequest
+    case httpStatus(Int)
+    case transport(any Error)
+
+    public var errorDescription: String? {
+        switch self {
+        case .missingApiKey:
+            return "Add an Open Charge Map key in Settings to look up chargers."
+        case .badRequest:
+            return "Could not build the charger request."
+        case .httpStatus(let code) where code == 401 || code == 403:
+            return "Open Charge Map rejected the key. Check it in Settings."
+        case .httpStatus(let code):
+            return "Charger database returned an error (HTTP \(code))."
+        case .transport(let error):
+            return "Could not reach the charger database: \(error.localizedDescription)"
+        }
+    }
+}
+
+// MARK: - Mapping
 
     private func poiToEntity(_ poi: OCMPoi, now: Date) -> ChargerEntity? {
         guard let id = poi.ID,
