@@ -47,6 +47,7 @@
 		DDBA760A7159403F6F7ED913 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F928199730EF5D5C4706F89A /* MapKit.framework */; };
 		DE5B89219B64A8133FF439A2 /* CoreUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5D04FA331DABD94427A1A3F /* CoreUI */; };
 		F3B564D252CFF1EA0DF1F0D1 /* AiAndRoutingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133D14427B0062FE116986F1 /* AiAndRoutingSections.swift */; };
+		F3E6EF975311CC465BB8550B /* DebugSimulator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13ABC00155E52E67B0C8420C /* DebugSimulator.swift */; };
 		F5358B51092E6DF7F0F23662 /* TripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7CF9643A43B2EB650FBB1C /* TripsView.swift */; };
 		F8682992E3B4E8CF5CBAA411 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 39E4C656FFEE54E2D359DFD6 /* AVFoundation.framework */; };
 		F991904E691DCA5B7CA8D426 /* AdapterPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B42B4D82470CE7E0B542CE25 /* AdapterPickerSheet.swift */; };
@@ -67,6 +68,7 @@
 		02F27779AB748111ADD5A0EE /* CoreDomain */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreDomain; path = Packages/CoreDomain; sourceTree = SOURCE_ROOT; };
 		1025A4ECE56E6140DA4895E4 /* Speech.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Speech.framework; path = System/Library/Frameworks/Speech.framework; sourceTree = SDKROOT; };
 		133D14427B0062FE116986F1 /* AiAndRoutingSections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiAndRoutingSections.swift; sourceTree = "<group>"; };
+		13ABC00155E52E67B0C8420C /* DebugSimulator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugSimulator.swift; sourceTree = "<group>"; };
 		17DA8DC491CA28199554CE44 /* TripsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsViewModel.swift; sourceTree = "<group>"; };
 		1B6ECC04918055FCDD1B2BFB /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2778BB8F33F074543D1B90F2 /* PlanViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanViewModel.swift; sourceTree = "<group>"; };
@@ -147,6 +149,7 @@
 			children = (
 				D76ACB924B36FF8C171B52B1 /* AlertNotifier.swift */,
 				D0F20D65CD1E45F443D1A915 /* ConnectedCarService.swift */,
+				13ABC00155E52E67B0C8420C /* DebugSimulator.swift */,
 				27EDF8359710AED96EF1DC16 /* VehicleLocationProvider.swift */,
 			);
 			path = Service;
@@ -471,6 +474,7 @@
 				C70DACC2EE93D18555F72C60 /* CopilotViewModel.swift in Sources */,
 				679881A44DC2201BC2416EB3 /* DashboardView.swift in Sources */,
 				713585F39A0A3E6CD1C7C39A /* DashboardViewModel.swift in Sources */,
+				F3E6EF975311CC465BB8550B /* DebugSimulator.swift in Sources */,
 				B1A4DA9B674AAAF6B40425DD /* IoniqTelemetryApp.swift in Sources */,
 				0B661B348BCFD37E44E4F40A /* MapsNavigation.swift in Sources */,
 				0C6B1ADF300322C93745F9F3 /* PaywallView.swift in Sources */,

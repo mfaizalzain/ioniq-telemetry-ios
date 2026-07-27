@@ -33,6 +33,16 @@ struct DashboardView: View {
                         ConnectionBadge(state: ConnectionState(viewModel.connectionState), style: .plain)
                     }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        services.connectedCar.simulateTrip()
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .font(.caption)
+                    }
+                    .tint(Color.appAccent)
+                    .accessibilityLabel("Simulate trip")
+                }
                 if viewModel?.canUseCopilot == true {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
