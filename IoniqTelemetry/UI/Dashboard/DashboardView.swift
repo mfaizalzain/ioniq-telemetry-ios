@@ -12,15 +12,6 @@ struct DashboardView: View {
             ScrollView {
                 if let viewModel {
                     LazyVStack(spacing: 16) {
-                        HStack {
-                            Text(viewModel.vehicleName.uppercased())
-                                .font(.headline.weight(.medium))
-                                .foregroundStyle(.secondary)
-                            Spacer()
-                            ConnectionBadge(state: ConnectionState(viewModel.connectionState))
-                        }
-                        .padding(.horizontal)
-
                         BatteryHeroCard(viewModel: viewModel)
                         MetricTilesGrid(viewModel: viewModel)
                         TirePressureVisualizerCard(viewModel: viewModel)
@@ -33,8 +24,15 @@ struct DashboardView: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Dashboard")
+            // The vehicle is the title: the tab bar already says "Dashboard", and a
+            // separate in-content header repeated both.
+            .navigationTitle(viewModel?.vehicleName ?? "")
             .toolbar {
+                if let viewModel {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        ConnectionBadge(state: ConnectionState(viewModel.connectionState), style: .plain)
+                    }
+                }
                 if viewModel?.canUseCopilot == true {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {

@@ -37,10 +37,21 @@ public enum ConnectionState: String, Sendable {
 /// A compact pill badge showing the current connection state with a colored
 /// status dot. Used on the dashboard header.
 public struct ConnectionBadge: View {
-    private let state: ConnectionState
 
-    public init(state: ConnectionState) {
+    public enum Style {
+        /// Standalone pill with its own surface. For use inside content.
+        case pill
+        /// No background — for toolbars and other chrome that already supplies one,
+        /// where a pill would read as a capsule inside a capsule.
+        case plain
+    }
+
+    private let state: ConnectionState
+    private let style: Style
+
+    public init(state: ConnectionState, style: Style = .pill) {
         self.state = state
+        self.style = style
     }
 
     public var body: some View {
@@ -53,10 +64,13 @@ public struct ConnectionBadge: View {
                 .foregroundStyle(Color.appOnSurface)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Color.appSurface)
-        .clipShape(Capsule())
+        .padding(.horizontal, style == .pill ? 10 : 0)
+        .padding(.vertical, style == .pill ? 5 : 0)
+        .background {
+            if style == .pill {
+                Capsule().fill(Color.appSurface)
+            }
+        }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Connection: \(state.rawValue)")
     }
