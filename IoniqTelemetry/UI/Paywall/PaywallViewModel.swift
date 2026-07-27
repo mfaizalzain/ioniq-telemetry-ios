@@ -39,7 +39,7 @@ final class PaywallViewModel {
         }
     }
 
-    deinit { updateListener?.cancel() }
+    deinit { Task { @MainActor in self.updateListener?.cancel() } }
 
     // MARK: - Loading
 
