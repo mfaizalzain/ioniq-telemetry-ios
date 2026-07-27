@@ -24,7 +24,7 @@ final class PaywallViewModel {
 
     private let entitlement: EntitlementRepository
     /// nonisolated so `deinit` can cancel it without hopping to the main actor.
-    private nonisolated(unsafe) var updateListener: Task<Void, Never>?
+    private nonisolated var updateListener: Task<Void, Never>?
 
     init(entitlement: EntitlementRepository) {
         self.entitlement = entitlement
