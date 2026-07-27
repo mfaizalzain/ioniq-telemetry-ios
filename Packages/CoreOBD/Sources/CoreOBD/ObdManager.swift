@@ -4,7 +4,7 @@ import CoreDomain
 /// Owns the transport, initializer, scheduler, and decoder, exposing a single
 /// telemetry stream. Held by the connected-car service.
 @MainActor
-public final class ObdManager: @unchecked Sendable {
+public final class ObdManager {
 
     public typealias TransportFactory = @Sendable (String) async throws -> any ObdTransport
 
@@ -23,9 +23,12 @@ public final class ObdManager: @unchecked Sendable {
 
     // MARK: - Internal
 
-    private nonisolated(unsafe) var decoder = DecoderEngine()
-    private nonisolated(unsafe) var assembler = TelemetryAssembler()
-    private nonisolated(unsafe) var activeProfile: DecoderProfile
+    // Immutable and Sendable, so the off-actor polling callback can reach them
+    // without `nonisolated(unsafe)`. `activeProfile` stays main-actor isolated —
+    // the scheduler closure captures the profile it was built with instead.
+    private let decoder = DecoderEngine()
+    private let assembler = TelemetryAssembler()
+    private var activeProfile: DecoderProfile
 
     public let recorder: ObdSessionRecorder
 

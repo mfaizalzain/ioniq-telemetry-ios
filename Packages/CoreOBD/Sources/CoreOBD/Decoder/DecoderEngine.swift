@@ -3,7 +3,9 @@ import Foundation
 /// Evaluates declarative signal formulas against reassembled UDS payloads.
 /// In a formula, A is the byte at startByte, B at startByte+1, then C, D.
 /// Expressions are compiled once per signal and cached.
-public final class DecoderEngine {
+/// Sendable by way of the lock guarding the only mutable state (the formula
+/// cache); the polling scheduler decodes off the main actor.
+public final class DecoderEngine: @unchecked Sendable {
 
     private let varNames = ["A", "B", "C", "D"]
     private let formulaCache = NSLock()

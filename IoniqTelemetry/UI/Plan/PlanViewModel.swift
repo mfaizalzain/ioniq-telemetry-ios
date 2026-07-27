@@ -154,6 +154,12 @@ final class PlanViewModel {
         originQuery = "Current Location"
     }
 
+    /// Drops the active plan, so the replan and occupancy monitors stop watching.
+    func clearPlan() {
+        plan = nil
+        services.activePlan.clearPlan()
+    }
+
     func swapEndpoints() {
         swap(&originPlace, &destinationPlace)
         swap(&originQuery, &destinationQuery)
@@ -195,6 +201,10 @@ final class PlanViewModel {
 
             if let solved {
                 plan = solved
+                // Publish so the drive service can watch progress against it and
+                // CarPlay can show the same itinerary.
+                services.activePlan.setPlan(solved)
+                services.activePlan.setRoute(route.sampledPoints)
                 statusMessage = nil
             } else {
                 errorMessage = "Couldn't find a workable charging plan. Try a higher departure charge or a lower arrival reserve."

@@ -8,6 +8,7 @@ let package = Package(
         .library(name: "CoreDomain", targets: ["CoreDomain"])
     ],
     targets: [
-        .target(name: "CoreDomain")
+        .target(name: "CoreDomain"),
+        .testTarget(name: "CoreDomainTests", dependencies: ["CoreDomain"])
     ]
 )

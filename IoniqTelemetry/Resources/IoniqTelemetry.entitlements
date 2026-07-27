@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  CarPlay apps must be granted an entitlement by Apple for one defined app
+	  category; there is no general-purpose "vehicle dashboard" category. EV
+	  charging is the category this app fits, and it is what gates
+	  CPPointOfInterestTemplate for the charger map.
+
+	  This must be requested from Apple and enabled on the App ID before a build
+	  carrying it will install on a device. Until then, remove this key locally or
+	  code signing will fail.
+	-->
+	<key>com.apple.developer.carplay-charging</key>
+	<true/>
+</dict>
+</plist>

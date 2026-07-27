@@ -17,6 +17,10 @@ struct PlanView: View {
 
                         if let plan = viewModel.plan {
                             ItineraryTimeline(plan: plan)
+                            Button("Clear Plan", role: .destructive) {
+                                viewModel.clearPlan()
+                            }
+                            .font(.footnote)
                         }
 
                         NearbyChargersSection(viewModel: viewModel)

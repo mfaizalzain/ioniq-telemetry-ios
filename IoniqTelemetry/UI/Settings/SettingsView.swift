@@ -43,6 +43,7 @@ struct SettingsView: View {
             AdapterSection(viewModel: viewModel, showAdapterPicker: $showAdapterPicker)
             AiSection(viewModel: viewModel, showPaywall: $showPaywall)
             RoutingSection(viewModel: viewModel)
+            BackupSection(viewModel: viewModel)
             UnitsSection(viewModel: viewModel)
             AppearanceSection(viewModel: viewModel)
             ProSection(viewModel: viewModel, showPaywall: $showPaywall)

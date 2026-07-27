@@ -1,4 +1,5 @@
 import Combine
+import CoreData
 import CoreDomain
 import CoreOBD
 import CoreRouting
@@ -148,6 +149,21 @@ final class SettingsViewModel {
         case .googleMaps:
             return (preferences.googleMapsApiKey ?? "").isEmpty ? "Google Maps" : nil
         }
+    }
+
+    // MARK: - Backup
+
+    /// Writes the backup to a temporary file and returns its URL for sharing.
+    func exportBackup() async throws -> URL {
+        let data = try services.backup.export(preferences: preferences)
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent(BackupRepository.suggestedFilename())
+        try data.write(to: url, options: .atomic)
+        return url
+    }
+
+    func restoreBackup(from url: URL) async throws -> BackupRepository.ImportSummary {
+        try await services.backup.restore(from: Data(contentsOf: url))
     }
 
     private func update(_ mutate: @escaping @Sendable (inout UserPreferences) -> Void) {

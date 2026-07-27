@@ -30,11 +30,18 @@ final class AppServices {
     let chargers: ChargerRepository
     let savedTrips: SavedTripRepository
     let savedPlaces: SavedPlaceRepository
+    let backup: BackupRepository
+    let occupancy = OccupancyRepository()
+    let activePlan = ActivePlanHolderImpl()
 
     // MARK: - OBD
 
     let obdManager: ObdManager
     let bleScanner = BleScanner()
+
+    /// Owns the drive pipeline. Not observable — it needs `self`, and @Observable
+    /// cannot back a lazy property.
+    @ObservationIgnored private(set) var connectedCar: ConnectedCarService!
 
     // MARK: - Observable state
 
@@ -60,6 +67,7 @@ final class AppServices {
         chargers = ChargerRepository(modelContext: modelContext, apiKey: Secrets.openChargeMapKey)
         savedTrips = SavedTripRepository(modelContext: modelContext)
         savedPlaces = SavedPlaceRepository(modelContext: modelContext)
+        backup = BackupRepository(modelContext: modelContext, preferences: preferences)
 
         obdManager = ObdManager(
             transportFactory: { address in
@@ -72,6 +80,8 @@ final class AppServices {
             },
             sessionDirectory: Self.sessionDirectory()
         )
+
+        connectedCar = ConnectedCarService(services: self)
     }
 
     // MARK: - Startup
@@ -85,6 +95,8 @@ final class AppServices {
         bindObdStream()
 
         await entitlement.refreshEntitlements()
+
+        connectedCar.start()
 
         // Retention purge is cheap and only needs to run once per launch.
         do {
@@ -116,21 +128,14 @@ final class AppServices {
             .store(in: &cancellables)
     }
 
-    /// Fans OBD output out to the telemetry repository (phone UI + CarPlay) and
-    /// the trip log (persistence). This is the join that makes the packages live.
+    /// Publishes OBD output to the telemetry repository, which every other
+    /// consumer reads. Trip logging deliberately does *not* happen here:
+    /// `ConnectedCarService` is the single consumer that corrects the frame
+    /// (regen vs charging, GPS-derived speed) before anything is persisted.
     private func bindObdStream() {
         obdManager.onTelemetryUpdated = { [weak self] sample in
             Task { @MainActor in
-                guard let self else { return }
-                self.telemetry.update(sample)
-                do {
-                    // No GPS fix yet — location comes from the drive-monitor
-                    // service (Phase 5), so trips currently derive distance from
-                    // the odometer rather than a GPS track.
-                    try self.tripLog.onTelemetry(telemetry: sample, lat: nil, lon: nil)
-                } catch {
-                    print("[AppServices] sample logging failed: \(error.localizedDescription)")
-                }
+                self?.telemetry.update(sample)
             }
         }
 

@@ -2,7 +2,7 @@ import Foundation
 import CoreDomain
 
 /// Folds decoded signal maps into the running VehicleTelemetry snapshot.
-public final class TelemetryAssembler {
+public final class TelemetryAssembler: Sendable {
 
     public func merge(current: VehicleTelemetry, signals: [String: Double], now: Date) -> VehicleTelemetry {
         var t = current
