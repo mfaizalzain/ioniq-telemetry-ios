@@ -144,12 +144,6 @@ final class ConnectedCarService {
         handleTransition(decision.transition, telemetry: telemetry)
         logSample(telemetry, fix: frame.fix, inVehicle: decision.tripActive)
 
-        if decision.transition == .start {
-            print("[ConnectedCar] trip started — fix=\(frame.fix != nil ? "YES" : "NO") odo=\(frame.odometerKm ?? -1)")
-        } else if decision.transition == .end {
-            print("[ConnectedCar] trip ended")
-        }
-
         chargeAlerts.onTelemetry(telemetry)
         tirePressure.onTelemetry(telemetry)
         updateHealthEstimate(telemetry)
