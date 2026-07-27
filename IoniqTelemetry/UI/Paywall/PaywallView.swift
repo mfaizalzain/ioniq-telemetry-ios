@@ -12,7 +12,7 @@ struct PaywallView: View {
                     VStack(spacing: 8) {
                         Image(systemName: "bolt.fill")
                             .font(.system(size: 48))
-                            .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                            .foregroundStyle(Color.electricTeal)
 
                         Text("Unlock Pro")
                             .font(.largeTitle.bold())
@@ -49,7 +49,7 @@ struct PaywallView: View {
                 }
                 .padding()
             }
-            .background(Color(red: 0.043, green: 0.071, blue: 0.125))
+            .background(Color.deepNavy)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -77,7 +77,7 @@ struct PaywallView: View {
                         .font(.caption.weight(.bold))
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color(red: 0.09, green: 0.91, blue: 0.76))
+                        .background(Color.electricTeal)
                         .foregroundStyle(.black)
                         .clipShape(Capsule())
                 }
@@ -98,7 +98,7 @@ struct FeatureRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .frame(width: 24)
-                .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                .foregroundStyle(Color.electricTeal)
             Text(text)
                 .font(.body)
             Spacer()

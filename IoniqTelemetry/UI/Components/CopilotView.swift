@@ -45,7 +45,7 @@ struct CopilotView: View {
                     } label: {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.title2)
-                            .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                            .foregroundStyle(Color.electricTeal)
                     }
                     .disabled(inputText.isEmpty)
 
@@ -54,12 +54,12 @@ struct CopilotView: View {
                     } label: {
                         Image(systemName: isListening ? "mic.fill" : "mic")
                             .font(.title2)
-                            .foregroundStyle(isListening ? Color(red: 0.94, green: 0.33, blue: 0.31) : .secondary)
+                            .foregroundStyle(isListening ? Color.redAlert : .secondary)
                     }
                 }
                 .padding()
             }
-            .background(Color(red: 0.043, green: 0.071, blue: 0.125))
+            .background(Color.deepNavy)
             .navigationTitle("AI Assistant")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -102,7 +102,7 @@ struct ChatBubble: View {
             if message.role == .assistant {
                 Image(systemName: "sparkles")
                     .font(.caption)
-                    .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                    .foregroundStyle(Color.electricTeal)
                     .padding(6)
                     .background(Color(white: 1).opacity(0.1), in: Circle())
             } else {
@@ -111,7 +111,7 @@ struct ChatBubble: View {
             Text(message.text)
                 .font(.body)
                 .padding(12)
-                .background(message.role == .user ? Color(red: 0.09, green: 0.91, blue: 0.76).opacity(0.2) : Color(white: 1).opacity(0.1))
+                .background(message.role == .user ? Color.electricTeal.opacity(0.2) : Color(white: 1).opacity(0.1))
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             if message.role == .user {
                 Spacer()

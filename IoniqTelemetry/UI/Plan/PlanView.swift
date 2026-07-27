@@ -23,7 +23,7 @@ struct PlanView: View {
                             // Trigger planning
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
+                        .tint(Color.electricTeal)
                     }
 
                     NearbyChargersSection()
@@ -32,7 +32,7 @@ struct PlanView: View {
                 }
                 .padding()
             }
-            .background(Color(red: 0.043, green: 0.071, blue: 0.125))
+            .background(Color.deepNavy)
             .navigationTitle("Plan")
         }
     }
@@ -42,7 +42,7 @@ struct PlanHeader: View {
     var body: some View {
         HStack {
             Image(systemName: "map.fill")
-                .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                .foregroundStyle(Color.electricTeal)
             Text("Trip Planner")
                 .font(.title3.weight(.semibold))
             Spacer()
@@ -59,9 +59,9 @@ struct RouteBuilderCard: View {
             VStack(spacing: 12) {
                 HStack {
                     VStack(spacing: 6) {
-                        Circle().fill(Color(red: 0.09, green: 0.91, blue: 0.76)).frame(width: 8, height: 8)
+                        Circle().fill(Color.electricTeal).frame(width: 8, height: 8)
                         Rectangle().fill(.quaternary).frame(width: 2, height: 24)
-                        Circle().fill(Color(red: 0.94, green: 0.33, blue: 0.31)).frame(width: 8, height: 8)
+                        Circle().fill(Color.redAlert).frame(width: 8, height: 8)
                     }
                     VStack(spacing: 8) {
                         TextField("Origin", text: $origin)
@@ -96,10 +96,10 @@ struct BatteryParametersCard: View {
                         Spacer()
                         Text("\(String(format: "%.0f", departureSoc))%")
                             .font(.headline)
-                            .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                            .foregroundStyle(Color.electricTeal)
                     }
                     Slider(value: $departureSoc, in: 10...100, step: 5)
-                        .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
+                        .tint(Color.electricTeal)
                 }
 
                 Text("Arrival Reserve Target")
@@ -131,7 +131,7 @@ struct ReserveChip: View {
                 .font(.caption.weight(.medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(selected == value ? Color(red: 0.09, green: 0.91, blue: 0.76) : Color(white: 1).opacity(0.1))
+                .background(selected == value ? Color.electricTeal : Color(white: 1).opacity(0.1))
                 .foregroundStyle(selected == value ? .black : .primary)
                 .clipShape(Capsule())
         }

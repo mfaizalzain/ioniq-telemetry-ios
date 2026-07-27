@@ -11,6 +11,10 @@ let package = Package(
         .package(path: "../CoreDomain")
     ],
     targets: [
-        .target(name: "CoreOBD", dependencies: ["CoreDomain"])
+        .target(
+            name: "CoreOBD",
+            dependencies: ["CoreDomain"],
+            resources: [.process("Resources")]
+        )
     ]
 )

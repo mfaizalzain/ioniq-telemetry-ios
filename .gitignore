@@ -21,3 +21,7 @@ xcuserdata/
 
 # Git
 .gitignore
+
+# SwiftPM build artifacts
+Packages/*/.build/
+build/

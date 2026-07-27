@@ -10,7 +10,7 @@ struct TripsView: View {
             VStack {
                 EmptyTripsView()
             }
-            .background(Color(red: 0.043, green: 0.071, blue: 0.125))
+            .background(Color.deepNavy)
             .navigationTitle("Trips")
         }
     }
@@ -73,7 +73,7 @@ struct TripCard: View {
             VStack(spacing: 10) {
                 HStack {
                     Circle()
-                        .fill(Color(red: 0.09, green: 0.91, blue: 0.76))
+                        .fill(Color.electricTeal)
                         .frame(width: 36, height: 36)
                         .overlay {
                             Image(systemName: "car.fill")
@@ -108,8 +108,8 @@ struct TripCard: View {
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(
                                     LinearGradient(colors: [
-                                        Color(red: 0.40, green: 0.73, blue: 0.42),
-                                        Color(red: 0.09, green: 0.91, blue: 0.76)
+                                        Color.greenOk,
+                                        Color.electricTeal
                                     ], startPoint: .leading, endPoint: .trailing)
                                 )
                                 .frame(width: geo.size.width * 0.85)

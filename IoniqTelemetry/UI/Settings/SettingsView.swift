@@ -49,7 +49,7 @@ struct SettingsView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Image(systemName: "sparkles")
-                                .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                                .foregroundStyle(Color.electricTeal)
                             Text("AI Assistant (BYOK)")
                                 .font(.headline)
                         }
@@ -64,7 +64,7 @@ struct SettingsView: View {
                             }
                         }
                         Toggle("Enable AI Coaching", isOn: $aiCoachingEnabled)
-                            .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
+                            .tint(Color.electricTeal)
                     }
                 } header: {
                     Text("AI Assistant")
@@ -74,9 +74,9 @@ struct SettingsView: View {
 
                 Section {
                     Toggle("Google Maps Routing", isOn: .constant(false))
-                        .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
+                        .tint(Color.electricTeal)
                     Toggle("Charger Occupancy Alerts", isOn: $chargerAlerts)
-                        .tint(Color(red: 0.09, green: 0.91, blue: 0.76))
+                        .tint(Color.electricTeal)
                     TextField("Google Maps API Key", text: $mapsKey)
                         .textFieldStyle(.roundedBorder)
                 } header: {
@@ -119,7 +119,7 @@ struct SettingsView: View {
                 }
             }
             .scrollContentBackground(.hidden)
-            .background(Color(red: 0.043, green: 0.071, blue: 0.125))
+            .background(Color.deepNavy)
             .navigationTitle("Settings")
         }
     }

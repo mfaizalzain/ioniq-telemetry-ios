@@ -24,7 +24,6 @@
 		7B55233B7E5EEAA127719D42 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = E478B08AFC2545C89E60B30C /* AppServices.swift */; };
 		7D8AD819E4D270C82B43EE9F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */; };
 		86FD1D0BE18C53A9F2D136FC /* CoreRouting in Frameworks */ = {isa = PBXBuildFile; productRef = 361EBE86862C04F207736117 /* CoreRouting */; };
-		874B3ED90BE25A72BAFE4830 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCA43C9AD86CFEBC26B1A55D /* SceneDelegate.swift */; };
 		95F25117F336829F31773888 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8172C23BE112C6BFD8D27007 /* AppRootView.swift */; };
 		B1A4DA9B674AAAF6B40425DD /* IoniqTelemetryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734AFC3926EFA5634B2080D6 /* IoniqTelemetryApp.swift */; };
 		C806C545266A393FF6046E31 /* CoreData in Frameworks */ = {isa = PBXBuildFile; productRef = CE94BDBFAE6356B793FDC1B5 /* CoreData */; };
@@ -60,7 +59,6 @@
 		9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		B92C9548673D78AA607E3859 /* PlanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanView.swift; sourceTree = "<group>"; };
 		BA7CF9643A43B2EB650FBB1C /* TripsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripsView.swift; sourceTree = "<group>"; };
-		BCA43C9AD86CFEBC26B1A55D /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		C099E3944C24DCE57842106B /* BackgroundTasks.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = BackgroundTasks.framework; path = System/Library/Frameworks/BackgroundTasks.framework; sourceTree = SDKROOT; };
 		C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
@@ -215,7 +213,6 @@
 				8172C23BE112C6BFD8D27007 /* AppRootView.swift */,
 				E478B08AFC2545C89E60B30C /* AppServices.swift */,
 				734AFC3926EFA5634B2080D6 /* IoniqTelemetryApp.swift */,
-				BCA43C9AD86CFEBC26B1A55D /* SceneDelegate.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -374,7 +371,6 @@
 				B1A4DA9B674AAAF6B40425DD /* IoniqTelemetryApp.swift in Sources */,
 				0C6B1ADF300322C93745F9F3 /* PaywallView.swift in Sources */,
 				13BAD2FF5C03019D0DDF41F3 /* PlanView.swift in Sources */,
-				874B3ED90BE25A72BAFE4830 /* SceneDelegate.swift in Sources */,
 				449483518D023F014ABE7E73 /* SettingsView.swift in Sources */,
 				F5358B51092E6DF7F0F23662 /* TripsView.swift in Sources */,
 			);

@@ -13,6 +13,10 @@ public final class ObdManager: @unchecked Sendable {
     public private(set) var telemetry: VehicleTelemetry = VehicleTelemetry()
     public private(set) var connectionState: ObdConnectionState = .disconnected
 
+    /// Why the last `loadProfile` call failed, if it did. Surfaced in Settings so
+    /// a bad profile id is visible instead of silently decoding nothing.
+    public private(set) var lastProfileError: String?
+
     public var onTelemetryUpdated: (@Sendable (VehicleTelemetry) -> Void)?
     public var onConnectionStateChanged: (@Sendable (ObdConnectionState) -> Void)?
     public var onRawLine: (@Sendable (String) -> Void)?
@@ -49,7 +53,11 @@ public final class ObdManager: @unchecked Sendable {
 
     // MARK: - Profile loading
 
-    public func loadProfile(profileId: String, from bundle: Bundle = .main) {
+    public func loadProfile(profileId: String) {
+        loadProfile(profileId: profileId, from: .module)
+    }
+
+    public func loadProfile(profileId: String, from bundle: Bundle) {
         let assetNames: [String: String] = [
             "ioniq5_2022_77kwh": "ioniq5_2022_77kwh",
             "ioniq5_84kwh": "ioniq5_84kwh",
@@ -68,14 +76,21 @@ public final class ObdManager: @unchecked Sendable {
             "gv60_77": "gv60_77kwh",
         ]
 
-        guard let assetName = assetNames[profileId] else { return }
-
-        guard let url = bundle.url(forResource: assetName, withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let profile = try? ProfileParser.parse(data: data) else {
+        guard let assetName = assetNames[profileId] else {
+            lastProfileError = "Unknown vehicle profile '\(profileId)' — keeping \(activeProfile.profileId)."
             return
         }
-        activeProfile = profile
+
+        guard let url = bundle.url(forResource: assetName, withExtension: "json") else {
+            lastProfileError = "Profile asset \(assetName).json is missing from the bundle."
+            return
+        }
+        do {
+            activeProfile = try ProfileParser.parse(data: Data(contentsOf: url))
+            lastProfileError = nil
+        } catch {
+            lastProfileError = "Profile \(assetName).json could not be parsed: \(error.localizedDescription)"
+        }
     }
 
     // MARK: - Connection lifecycle

@@ -25,7 +25,7 @@ struct DashboardView: View {
                 }
                 .padding(.vertical)
             }
-            .background(Color(red: 0.043, green: 0.071, blue: 0.125))
+            .background(Color.deepNavy)
             .navigationTitle("Dashboard")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -33,7 +33,7 @@ struct DashboardView: View {
                         // AI Copilot FAB placeholder
                     } label: {
                         Image(systemName: "sparkles")
-                            .foregroundStyle(Color(red: 0.09, green: 0.91, blue: 0.76))
+                            .foregroundStyle(Color.electricTeal)
                     }
                 }
             }
@@ -46,42 +46,54 @@ struct DashboardView: View {
 struct BatteryHeroCard: View {
     var socPercent: Float = 78
 
+    /// Gauge geometry, shared with the Android build: a 220° arc starting at 160°,
+    /// leaving a 140° gap centred at the bottom.
+    private static let startAngle: Double = 160
+    private static let sweepFraction: CGFloat = 220.0 / 360.0
+
+    private var fillFraction: Float { min(max(socPercent / 100, 0), 1) }
+
     var body: some View {
         GroupBox {
             VStack(spacing: 10) {
                 // SOC ring
                 ZStack {
-                    // Dim track
+                    // Dim track. SwiftUI trims clockwise from 3 o'clock, so the
+                    // 160° rotation puts the 140° gap centred at the bottom —
+                    // matching the Android gauge (start 160°, sweep 220°).
                     Circle()
-                        .trim(from: 0.56, to: 0.44) // 160° to 200° expressed as fractions
-                        .rotation(.degrees(90))
-                        .stroke(.secondary.opacity(0.3), style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                        .trim(from: 0, to: Self.sweepFraction)
+                        .stroke(Color.outlineVariant, style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                        .rotationEffect(.degrees(Self.startAngle))
                         .frame(width: 120, height: 120)
 
-                    // Active ring (78%)
                     Circle()
-                        .trim(from: 0.56, to: 0.56 + 0.61 * 0.78)
-                        .rotation(.degrees(90))
+                        .trim(from: 0, to: Self.sweepFraction * CGFloat(fillFraction))
                         .stroke(
-                            LinearGradient(
-                                colors: [
-                                    Color(red: 0.06, green: 0.75, blue: 0.63),
-                                    Color(red: 0.24, green: 0.96, blue: 0.85)
-                                ],
-                                startPoint: .bottomLeading,
-                                endPoint: .topTrailing
+                            AngularGradient(
+                                colors: [.electricTeal.opacity(0.75), .electricTeal],
+                                center: .center,
+                                startAngle: .degrees(Self.startAngle),
+                                endAngle: .degrees(Self.startAngle + 220)
                             ),
                             style: StrokeStyle(lineWidth: 12, lineCap: .round)
                         )
+                        .rotationEffect(.degrees(Self.startAngle))
                         .frame(width: 120, height: 120)
+                        .animation(.easeOut(duration: 0.4), value: socPercent)
 
-                    // Percentage text
-                    Text(String(format: "%.0f", socPercent))
-                        .font(.system(size: 32, weight: .bold))
-                        .tracking(-1.5)
-                        + Text("%")
-                        .font(.system(size: 16, weight: .medium))
+                    HStack(alignment: .firstTextBaseline, spacing: 1) {
+                        Text(String(format: "%.0f", socPercent))
+                            .font(.system(size: 32, weight: .bold))
+                            .tracking(-1.5)
+                        Text("%")
+                            .font(.system(size: 16, weight: .medium))
+                    }
+                    .foregroundStyle(Color.onSurface)
                 }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("State of charge")
+                .accessibilityValue("\(Int(socPercent.rounded())) percent")
 
                 // Stats row
                 HStack(spacing: 16) {
