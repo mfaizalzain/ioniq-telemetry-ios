@@ -96,7 +96,7 @@ public final class PollingScheduler: @unchecked Sendable {
             return
         }
 
-        await recorder?.record(command: framed, rawResponse: raw)
+        recorder?.record(command: framed, rawResponse: raw)
 
         let lines = cleanResponse(raw: raw, sentCommand: framed)
         for line in lines { onRawLine(line) }
