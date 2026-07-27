@@ -12,7 +12,8 @@ import UniformTypeIdentifiers
 struct BackupSection: View {
     let viewModel: SettingsViewModel
 
-    @State private var exportedFile: BackupFile?
+    @State private var exportedFileURL: URL?
+    @State private var isExporting = false
     @State private var isImporting = false
     @State private var message: String?
     @State private var isError = false
@@ -21,7 +22,12 @@ struct BackupSection: View {
     var body: some View {
         Section {
             Button {
-                Task { await exportBackup() }
+                Task {
+                    await exportBackup()
+                    if exportedFileURL != nil {
+                        isExporting = true
+                    }
+                }
             } label: {
                 Label("Export Backup", systemImage: "square.and.arrow.up")
             }
@@ -44,8 +50,10 @@ struct BackupSection: View {
         } footer: {
             Text("Includes trips, charge sessions, saved routes and settings. Your API keys are in the file, so keep it somewhere private.")
         }
-        .sheet(item: $exportedFile) { file in
-            ShareSheet(items: [file.url])
+        .sheet(isPresented: $isExporting, onDismiss: { exportedFileURL = nil }) {
+            if let url = exportedFileURL {
+                ShareSheet(items: [url])
+            }
         }
         .fileImporter(
             isPresented: $isImporting,
@@ -61,7 +69,7 @@ struct BackupSection: View {
         defer { isWorking = false }
         do {
             let url = try await viewModel.exportBackup()
-            exportedFile = BackupFile(url: url)
+            exportedFileURL = url
             message = nil
         } catch {
             isError = true
@@ -93,12 +101,6 @@ struct BackupSection: View {
 private enum BackupUIError: LocalizedError {
     case noAccess
     var errorDescription: String? { "Couldn't open that file." }
-}
-
-/// Identifiable wrapper so `.sheet(item:)` can drive presentation off the URL.
-private struct BackupFile: Identifiable {
-    let url: URL
-    var id: String { url.path }
 }
 
 private struct ShareSheet: UIViewControllerRepresentable {
