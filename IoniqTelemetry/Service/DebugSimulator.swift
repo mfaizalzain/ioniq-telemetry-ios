@@ -16,21 +16,20 @@ final class DebugSimulator {
     private var isRunning = false
 
     /// Called each tick with a telemetry frame and GPS fix that the caller feeds
-    /// into their consume() pipeline.
-    func start(onTick: @escaping @MainActor (VehicleTelemetry, Fix) -> Void) {
+    /// into their consume() pipeline. Returns when the simulation completes.
+    func start(onTick: @escaping @MainActor (VehicleTelemetry, Fix) -> Void) async {
         guard !isRunning else { return }
         isRunning = true
 
         let totalTicks = Int(Self.driveDistanceKm * 1000 / Self.speedMs / Self.tickInterval)
         let latPerTick = (Self.driveDistanceKm / 111_320.0) / Double(totalTicks) // degrees per metre
 
-        Task {
-            var tick = 0
-            var socBms: Float = 72.0
-            var socDisplay: Float = 72.0
-            let packVoltage: Float = 355.0
+        var tick = 0
+        var socBms: Float = 72.0
+        var socDisplay: Float = 72.0
+        let packVoltage: Float = 355.0
 
-            while tick < totalTicks && isRunning {
+        while tick < totalTicks && isRunning {
                 let lat = Self.startLat + latPerTick * Double(tick)
                 let lon = Self.startLon
 
@@ -82,7 +81,6 @@ final class DebugSimulator {
             }
 
             print("[DebugSimulator] finished — \(totalTicks) ticks, ~\(Self.driveDistanceKm) km")
-        }
     }
 
     func stop() {
