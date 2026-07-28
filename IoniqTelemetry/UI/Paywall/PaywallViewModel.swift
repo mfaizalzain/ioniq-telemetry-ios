@@ -62,6 +62,7 @@ final class PaywallViewModel {
                 ? "Pro is not available for purchase right now."
                 : nil
         } catch {
+            log("load", error)
             errorMessage = error.localizedDescription
         }
         await refreshEntitlement()
@@ -92,6 +93,7 @@ final class PaywallViewModel {
                 break
             }
         } catch {
+            log("purchase", error)
             errorMessage = error.localizedDescription
         }
     }
@@ -106,6 +108,54 @@ final class PaywallViewModel {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    // MARK: - Diagnostics
+
+    /// Names the concrete StoreKit case behind a failure.
+    ///
+    /// `localizedDescription` collapses every one of these into roughly "cannot
+    /// connect to iTunes Store", which cannot distinguish a product the store has
+    /// never published from a device that is offline. The cases worth recognising:
+    /// `productUnavailable` means the store knows the id but will not sell it —
+    /// typically an in-app purchase that has not been through review — while
+    /// `notAvailableInStorefront` points at the Apple Account's region instead.
+    private func log(_ stage: String, _ error: Error) {
+        var detail = "\(type(of: error)): \(error)"
+
+        if let purchaseError = error as? Product.PurchaseError {
+            switch purchaseError {
+            case .productUnavailable:
+                detail = "productUnavailable — the store will not sell this product yet"
+            case .purchaseNotAllowed:
+                detail = "purchaseNotAllowed — restrictions, or no Apple Account signed in"
+            case .ineligibleForOffer:
+                detail = "ineligibleForOffer"
+            case .invalidQuantity:
+                detail = "invalidQuantity"
+            default:
+                detail = "Product.PurchaseError: \(purchaseError)"
+            }
+        } else if let storeKitError = error as? StoreKitError {
+            switch storeKitError {
+            case .notAvailableInStorefront:
+                detail = "notAvailableInStorefront — not sold in this account's region"
+            case .networkError(let underlying):
+                detail = "networkError: \(underlying)"
+            case .systemError(let underlying):
+                detail = "systemError: \(underlying)"
+            case .notEntitled:
+                detail = "notEntitled"
+            case .unsupported:
+                detail = "unsupported"
+            case .userCancelled:
+                detail = "userCancelled"
+            default:
+                detail = "StoreKitError: \(storeKitError)"
+            }
+        }
+
+        print("[Paywall] \(stage) failed for \(Self.productID) — \(detail)")
     }
 
     /// Recomputes Pro from what StoreKit currently considers active. `isPro` here
