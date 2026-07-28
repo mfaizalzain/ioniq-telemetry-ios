@@ -18,7 +18,7 @@ settings:
     SWIFT_VERSION: "6.0"
     DEVELOPMENT_TEAM: S232V5F699
     MARKETING_VERSION: "1.0.0"
-    CURRENT_PROJECT_VERSION: "8"
+    CURRENT_PROJECT_VERSION: "9"
     ITSAppUsesNonExemptEncryption: false
     # iPhone only. The layouts have never been designed or tested for iPad, and
     # shipping a stretched one invites a 2.4.1 rejection. Set here rather than in
@@ -45,6 +45,8 @@ targets:
         LD_RUNPATH_SEARCH_PATHS: "@executable_path/Frameworks @loader_path/Frameworks"
       configs:
         Debug-CarPlay:
+          CODE_SIGN_ENTITLEMENTS: IoniqTelemetry/Resources/IoniqTelemetry-CarPlay.entitlements
+        Release:
           CODE_SIGN_ENTITLEMENTS: IoniqTelemetry/Resources/IoniqTelemetry-CarPlay.entitlements
     dependencies:
       - package: CoreOBD
