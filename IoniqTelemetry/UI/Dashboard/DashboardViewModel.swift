@@ -64,8 +64,9 @@ final class DashboardViewModel {
     /// Regen is power flowing back into the pack. With the formula
     /// `pack_current = -(A*256+B)/10`, discharge current reads negative;
     /// regen/charge current reads positive. So positive power = energy
-    /// flowing IN. The difference between regen and charging is whether
-    /// the car is stationary (`isCharging` gates on that in the assembler).
+    /// flowing IN. The difference between regen and charging is whether the car
+    /// is stationary, and for how long — `DriveMonitor` makes that call, and
+    /// `ConnectedCarService` publishes its verdict as `isCharging` here.
     /// Mutually exclusive: if charging, this is always false.
     var isRegenerating: Bool {
         guard !telemetry.isCharging, let power = telemetry.powerKw else { return false }

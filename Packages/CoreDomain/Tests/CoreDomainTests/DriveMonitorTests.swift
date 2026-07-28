@@ -128,4 +128,47 @@ struct DriveMonitorTests {
         #expect(decision.transition == .end)
         #expect(!monitor.tripActive)
     }
+
+    /// The contract `ConnectedCarService`'s supervisor depends on: park at home,
+    /// switch off with the dongle still in, and the bus stops answering. Nothing
+    /// advances this monitor until a frame arrives, so the supervisor synthesises
+    /// one on wall-clock time — and it must close the trip on arrival rather than
+    /// needing a fresh run of live frames.
+    @Test("a synthetic frame after a long silence still ends the trip")
+    func silentSessionEndsTripOnNextFrame() {
+        let monitor = DriveMonitor()
+        let anchor = Fix(lat: 3.1400, lon: 101.6800, at: start)
+        _ = monitor.onFrame(frame(fix: anchor))
+        let moved = Fix(lat: 3.1410, lon: 101.6800, at: start.addingTimeInterval(20))
+        #expect(monitor.onFrame(frame(fix: moved, at: 20)).transition == .start)
+
+        // Car asleep for two hours: no frames at all, then the supervisor ticks.
+        let decision = monitor.onFrame(frame(fix: moved, at: 20 + 2 * 60 * 60))
+        #expect(decision.transition == .end)
+        #expect(!monitor.tripActive)
+        #expect(!decision.isCharging)
+    }
+
+    /// The supervisor passes `rawIsCharging: false` on its synthetic frames, so a
+    /// charge that begins while the bus is quiet must be confirmed by real frames
+    /// once they resume — never by the ticks themselves.
+    @Test("charging still confirms from real frames after a silent spell")
+    func chargingConfirmsAfterSilence() {
+        let monitor = DriveMonitor()
+        let fix = Fix(lat: 3.1400, lon: 101.6800, at: start)
+        _ = monitor.onFrame(frame(fix: fix))
+
+        // Supervisor ticks while the car sleeps: never charging.
+        for minute in 1...30 {
+            let tick = monitor.onFrame(frame(charging: false, fix: fix, at: Double(minute) * 60))
+            #expect(!tick.isCharging)
+        }
+
+        // Plugged in: real frames resume, stationary with positive pack current.
+        let plugIn = start.addingTimeInterval(31 * 60)
+        #expect(!monitor.onFrame(frame(charging: true, fix: fix, from: plugIn)).isCharging)
+        let confirmed = monitor.onFrame(frame(charging: true, fix: fix, at: 31, from: plugIn))
+        #expect(confirmed.isCharging)
+        #expect(confirmed.chargeType == .dc)
+    }
 }

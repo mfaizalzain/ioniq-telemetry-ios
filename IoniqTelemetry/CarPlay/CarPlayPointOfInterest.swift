@@ -27,6 +27,8 @@ enum CarPlayPointOfInterest {
         )
         // Capture the coordinate rather than the MKMapItem: the button handler is
         // @Sendable and MKMapItem is not, so the item is rebuilt on the main actor.
+        // Apple Maps only here — the chargers are drawn on a MapKit template, and
+        // handing off to Google Maps sends the driver to the phone screen mid-drive.
         let destination = LatLon(lat: charger.lat, lon: charger.lon)
         let name = charger.name
         poi.primaryButton = CPTextButton(
@@ -34,7 +36,7 @@ enum CarPlayPointOfInterest {
             textStyle: .confirm
         ) { _ in
             Task { @MainActor in
-                MapsNavigation.navigate(to: destination, name: name)
+                MapsNavigation.navigate(to: destination, name: name, preferGoogleMaps: false)
             }
         }
         return poi

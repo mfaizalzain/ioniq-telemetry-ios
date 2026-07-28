@@ -43,6 +43,29 @@ final class ConnectedCarService {
     private var isRunning = false
     private var lastTelemetry = VehicleTelemetry()
 
+    // MARK: - Supervisor tuning
+
+    /// How often the supervisor looks at the session. Frequent enough that a
+    /// five-minute idle end lands close to its nominal time, rare enough to be
+    /// invisible on battery.
+    private static let supervisorTick: TimeInterval = 15
+    /// No decoded frame for this long means the car's bus has gone quiet — the
+    /// vehicle is asleep, or the link is up but no longer carrying anything.
+    private static let framesQuiet: TimeInterval = 30
+    /// Quiet this long while still nominally connected means the session is dead
+    /// rather than idle. The adapter answers nothing, but nothing declares a drop,
+    /// so without this the app waits for a manual disconnect that may never come.
+    private static let sessionDead: TimeInterval = 120
+    /// Reconnect backoff, mirroring Android's `RECONNECT_BACKOFF_MS`.
+    private static let reconnectBackoff: [TimeInterval] = [5, 10, 30, 60]
+
+    private var supervisor: Task<Void, Never>?
+    /// When the last real decoded frame arrived. Nil until the first one.
+    private var lastFrameAt: Date?
+    private var reconnectAttempt = 0
+    private var isReconnecting = false
+    private var connectionState: ObdConnectionState = .disconnected
+
     init(services: AppServices) {
         self.services = services
 
@@ -78,7 +101,7 @@ final class ConnectedCarService {
         guard !isRunning else { return }
         isRunning = true
 
-        services.telemetry.state
+        services.rawTelemetry
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in self?.consume($0) }
             .store(in: &cancellables)
@@ -91,7 +114,9 @@ final class ConnectedCarService {
             .removeDuplicates()
             .sink { [weak self] state in
                 guard let self else { return }
+                self.connectionState = state
                 if state == .connected {
+                    self.reconnectAttempt = 0
                     self.location.start()
                 } else if state == .disconnected || state == .error {
                     self.location.stop()
@@ -99,13 +124,18 @@ final class ConnectedCarService {
                     self.driveMonitor.reset()
                     self.parkedEvaluator.reset()
                     self.parkedState = .unknown
+                    self.lastFrameAt = nil
                 }
             }
             .store(in: &cancellables)
+
+        startSupervisor()
     }
 
     func stop() {
         isRunning = false
+        supervisor?.cancel()
+        supervisor = nil
         cancellables.removeAll()
         location.stop()
         finalizeActiveTrip()
@@ -115,6 +145,110 @@ final class ConnectedCarService {
         // every gated surface stays locked with nothing left running to unlock it.
         parkedState = .unknown
         isTripActive = false
+    }
+
+    // MARK: - Supervisor
+
+    /// Wall-clock supervision of a session that has gone quiet.
+    ///
+    /// Everything else here is frame-driven, which is correct while the car is
+    /// awake and wrong the moment it sleeps. Park at home, switch off and leave the
+    /// dongle in: the bus stops answering, no frames arrive, and `DriveMonitor`'s
+    /// five-minute idle end never fires because nothing advances its clock. The
+    /// trip stays "in progress", and when charging starts an hour later the app is
+    /// still holding a session that no longer carries anything — which is why a
+    /// manual disconnect/reconnect was the only way to get the charge logged.
+    ///
+    /// So: tick on the clock rather than on frames, and treat a long silence on a
+    /// nominally-connected link as a dead session worth rebuilding. The reconnect
+    /// loop mirrors Android's `connectWithBackoff`.
+    private func startSupervisor() {
+        supervisor?.cancel()
+        supervisor = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: UInt64(Self.supervisorTick * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                guard let self, self.isRunning else { return }
+                await self.superviseTick()
+            }
+        }
+    }
+
+    private func superviseTick() async {
+        let now = Date()
+        let quietFor = lastFrameAt.map { now.timeIntervalSince($0) } ?? .infinity
+
+        // Fresh data means the frame path is doing its job — stay out of its way.
+        // In particular the charge debounce must only ever see real frames.
+        guard quietFor >= Self.framesQuiet else { return }
+
+        tickDriveMonitor(now: now)
+
+        guard !isReconnecting,
+              services.hasSavedAdapter,
+              !services.autoReconnectSuppressed,
+              // CoreBluetooth is already holding an untimed connect for this
+              // adapter. Reconnecting here would cancel the one mechanism that
+              // survives the app being suspended.
+              !services.obdManager.isRecoveringLink else { return }
+
+        switch connectionState {
+        case .connected where quietFor >= Self.sessionDead:
+            // Connected but silent: tear the session down so the reconnect below
+            // rebuilds it. A dead BLE link reports no drop of its own.
+            await reconnect(afterTeardown: true)
+        case .disconnected, .error:
+            await reconnect(afterTeardown: false)
+        default:
+            break
+        }
+    }
+
+    /// Advances the trip state machine on wall-clock time while the bus is quiet.
+    ///
+    /// `rawIsCharging` is deliberately false: a synthetic frame carries no evidence
+    /// of current flowing, and feeding stale telemetry back in would let a regen
+    /// burst from the end of the drive ripen into a "charge" long after the fact.
+    /// Real charging keeps frames coming, so this path never runs during one.
+    private func tickDriveMonitor(now: Date) {
+        guard driveMonitor.tripActive else { return }
+
+        let frame = DriveFrame(
+            connected: connectionState == .connected,
+            rawIsCharging: false,
+            rawChargeType: nil,
+            odometerKm: lastTelemetry.odometerKm,
+            fix: location.latestFix,
+            inVehicle: location.isInVehicle,
+            hasLocationPermission: location.hasLocationPermission,
+            hasMotionPermission: location.hasMotionPermission,
+            now: now
+        )
+        let decision = driveMonitor.onFrame(frame)
+        updateParkedState(decision: decision, frame: frame)
+        handleTransition(decision.transition, telemetry: lastTelemetry)
+    }
+
+    private func reconnect(afterTeardown: Bool) async {
+        isReconnecting = true
+        defer { isReconnecting = false }
+
+        if afterTeardown {
+            await services.disconnect(userInitiated: false)
+        }
+
+        let delay = Self.reconnectBackoff[min(reconnectAttempt, Self.reconnectBackoff.count - 1)]
+        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+        guard !Task.isCancelled, isRunning else { return }
+
+        // Unlike Android there is no give-up: an iOS app with no session is not
+        // burning a foreground service, and the car waking up hours later is
+        // exactly the case this exists to catch.
+        if await services.autoConnectLastAdapter() {
+            reconnectAttempt = 0
+        } else {
+            reconnectAttempt += 1
+        }
     }
 
     /// Closes an in-progress trip when the adapter drops or the pipeline is torn down.
@@ -148,6 +282,7 @@ final class ConnectedCarService {
     // MARK: - Pipeline
 
     private func consume(_ raw: VehicleTelemetry) {
+        lastFrameAt = Date()
         let frame = DriveFrame(
             connected: raw.connectionState == .connected,
             rawIsCharging: raw.isCharging,
@@ -169,6 +304,11 @@ final class ConnectedCarService {
         telemetry.isCharging = decision.isCharging
         telemetry.chargeType = decision.chargeType
         lastTelemetry = telemetry
+
+        // Published before the monitors run so the dashboard and CarPlay never show
+        // the uncorrected frame — regen on the move used to read as "charging"
+        // because the raw stream went to the repository directly.
+        services.telemetry.update(telemetry)
 
         updateParkedState(decision: decision, frame: frame)
         handleTransition(decision.transition, telemetry: telemetry)

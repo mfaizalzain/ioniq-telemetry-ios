@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Ioniq Telemetry</string>
+	<string>IONIQ Telemetry</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,15 +29,15 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Ioniq Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
+	<string>IONIQ Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Ioniq Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
+	<string>IONIQ Telemetry needs Bluetooth access to connect to your OBD-II adapter.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Ioniq Telemetry needs location access for trip logging and route planning.</string>
+	<string>IONIQ Telemetry needs location access for trip logging and route planning.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Ioniq Telemetry needs location access for trip logging and route planning.</string>
+	<string>IONIQ Telemetry needs location access for trip logging and route planning.</string>
 	<key>NSMotionUsageDescription</key>
-	<string>Ioniq Telemetry uses motion data to detect driving for automatic trip logging.</string>
+	<string>IONIQ Telemetry uses motion data to detect driving for automatic trip logging.</string>
 	<key>OpenChargeMapAPIKey</key>
 	<string>$(OPEN_CHARGE_MAP_API_KEY)</string>
 	<key>UIApplicationSceneManifest</key>

@@ -212,15 +212,21 @@ struct BatteryHeroCard: View {
 
     private func statBadge(label: String, value: String, color: Color = .appOnSurface) -> some View {
         VStack(spacing: 4) {
+            // One line always: "HEALTH SOH" wraps at narrow widths, which made that
+            // badge taller than its neighbours and knocked the values out of line.
             Text(label)
                 .font(.ioniqCaption)
                 .foregroundStyle(.secondary)
                 .ioniqStatLabel()
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
             Text(value)
                 .font(.system(size: 14, weight: .medium))
                 .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(8)
         .background(Color.appSurfaceVariant.opacity(0.6))
         .clipShape(RoundedRectangle(cornerRadius: 8))

@@ -23,6 +23,19 @@ public protocol ObdTransport: AnyObject, Sendable {
     /// Close the connection and release resources.
     func disconnect() async
 
+    /// Ask the transport to keep trying to restore a dropped link on its own,
+    /// without a caller-driven retry loop.
+    ///
+    /// This exists for CoreBluetooth, where a `connect` on a known peripheral has
+    /// no timeout: iOS holds the request and completes it whenever the adapter
+    /// comes back, waking a suspended app to do it. That is the only mechanism
+    /// that survives the app being suspended in a parked car — an app-level retry
+    /// loop only runs while the app does.
+    ///
+    /// - Returns: true if a standing request is now armed, false when the
+    ///   transport has no such facility and the caller should retry itself.
+    func beginStandingReconnect() -> Bool
+
     /// Send a command and return everything received up to (and including) the
     /// ELM327 `>` prompt.
     ///
@@ -55,4 +68,7 @@ public func parseResponse(_ data: Data, sentCommand: String? = nil) -> [String] 
 
 extension ObdTransport {
     public var isConnected: Bool { state == .connected }
+
+    /// WiFi and replay transports have nothing equivalent — their callers retry.
+    public func beginStandingReconnect() -> Bool { false }
 }

@@ -81,6 +81,9 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
     private var pendingSend: CheckedContinuation<String, any Error>?
     private var pendingStage: CheckedContinuation<Void, any Error>?
     private var targetIdentifier: UUID?
+    /// The last adapter this transport connected to, so a standing reconnect can
+    /// find it again without a scan.
+    private var lastIdentifier: UUID?
 
     private var centralManager: CBCentralManager!
     private var peripheral: CBPeripheral?
@@ -88,6 +91,12 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
     private var notifyCharacteristic: CBCharacteristic?
     private var selectedServiceIsKnown = false
     private var pendingServiceCount = 0
+    /// True while an untimed `connect` is outstanding. Discovery then has no
+    /// continuation to resume — it has to finish the link on its own.
+    private var standingReconnect = false
+    /// The peripheral a standing reconnect is armed for, retained because
+    /// CoreBluetooth drops an untimed request the moment its object is released.
+    private var standingPeripheral: CBPeripheral?
 
     public var state: ObdConnectionState {
         lock.withLock { _state }
@@ -139,7 +148,10 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
 
             let target = try await resolvePeripheral(identifier: identifier)
             target.delegate = self
-            lock.withLock { peripheral = target }
+            lock.withLock {
+                peripheral = target
+                lastIdentifier = identifier
+            }
 
             try await withStageTimeout(Self.setupTimeout) {
                 self.centralManager.connect(target, options: nil)
@@ -162,7 +174,70 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
         }
     }
 
+    /// Arms an untimed CoreBluetooth connect for the adapter used last.
+    ///
+    /// `CBCentralManager.connect` never times out. Handing the request to iOS and
+    /// walking away is what makes a parked car recoverable: the app can be
+    /// suspended for hours, and the system still completes the connection — and
+    /// wakes the app to hand it over — the moment the adapter powers back up.
+    ///
+    /// The link alone is not a session: `ObdManager` still has to re-run the
+    /// ELM327 handshake once `.connected` comes back, which is why this only
+    /// restores the GATT layer and reports the state change.
+    public func beginStandingReconnect() -> Bool {
+        guard centralManager.state == .poweredOn else { return false }
+        guard let identifier = lock.withLock({ lastIdentifier }),
+              let target = centralManager.retrievePeripherals(withIdentifiers: [identifier]).first
+        else { return false }
+
+        target.delegate = self
+        lock.withLock {
+            standingReconnect = true
+            standingPeripheral = target
+            peripheral = target
+            writeCharacteristic = nil
+            notifyCharacteristic = nil
+            selectedServiceIsKnown = false
+            pendingServiceCount = 0
+            responseBuffer = ""
+        }
+        setState(.connecting)
+        centralManager.connect(target, options: nil)
+        return true
+    }
+
+    /// Re-issues the untimed connect after a link came back unusable. Cheap, and
+    /// it keeps the recovery path in iOS's hands rather than spinning here.
+    private func rearmStandingReconnect() {
+        let target = lock.withLock { () -> CBPeripheral? in
+            guard standingReconnect else { return nil }
+            writeCharacteristic = nil
+            notifyCharacteristic = nil
+            selectedServiceIsKnown = false
+            pendingServiceCount = 0
+            return standingPeripheral
+        }
+        guard let target else { return }
+        centralManager.cancelPeripheralConnection(target)
+        centralManager.connect(target, options: nil)
+    }
+
+    /// Drops a pending standing request. Called on explicit disconnect, and after
+    /// the link is back, so a stale request cannot resurrect a session the user
+    /// deliberately ended.
+    private func cancelStandingReconnect() {
+        let target = lock.withLock { () -> CBPeripheral? in
+            guard standingReconnect else { return nil }
+            standingReconnect = false
+            let p = standingPeripheral
+            standingPeripheral = nil
+            return p
+        }
+        if let target { centralManager.cancelPeripheralConnection(target) }
+    }
+
     public func disconnect() async {
+        cancelStandingReconnect()
         let (target, stage, send) = lock.withLock { () -> (CBPeripheral?, CheckedContinuation<Void, any Error>?, CheckedContinuation<String, any Error>?) in
             let p = peripheral
             let st = pendingStage
@@ -341,7 +416,14 @@ extension BleTransport: CBCentralManagerDelegate {
     }
 
     public func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
-        takePendingStage()?.resume()
+        // A standing reconnect has no `connect(device:)` call waiting on it — the
+        // link came back on iOS's schedule, possibly while the app was suspended,
+        // so discovery has to be driven from here.
+        guard lock.withLock({ standingReconnect }) else {
+            takePendingStage()?.resume()
+            return
+        }
+        peripheral.discoverServices(nil)
     }
 
     public func centralManager(
@@ -349,6 +431,10 @@ extension BleTransport: CBCentralManagerDelegate {
         didFailToConnect peripheral: CBPeripheral,
         error: Error?
     ) {
+        if lock.withLock({ standingReconnect }) {
+            rearmStandingReconnect()
+            return
+        }
         takePendingStage()?.resume(throwing: BleError.connectFailed(error?.localizedDescription ?? "unknown"))
     }
 
@@ -357,16 +443,21 @@ extension BleTransport: CBCentralManagerDelegate {
         didDisconnectPeripheral peripheral: CBPeripheral,
         error: Error?
     ) {
-        lock.withLock {
+        let standing = lock.withLock { () -> Bool in
             self.peripheral = nil
             writeCharacteristic = nil
             notifyCharacteristic = nil
             selectedServiceIsKnown = false
             pendingServiceCount = 0
             responseBuffer = ""
+            return standingReconnect
         }
         takePendingStage()?.resume(throwing: BleError.disconnected)
         takePendingSend()?.resume(throwing: BleError.disconnected)
+        // Mid-rearm: the state is already `.connecting` and the request is still
+        // outstanding, so reporting a drop here would have ObdManager tear down a
+        // recovery that is working.
+        guard !standing else { return }
         setState(error == nil ? .disconnected : .error)
     }
 }
@@ -376,13 +467,17 @@ extension BleTransport: CBCentralManagerDelegate {
 extension BleTransport: CBPeripheralDelegate {
 
     public func peripheral(_ peripheral: CBPeripheral, didDiscoverServices error: Error?) {
-        if let error {
-            takePendingStage()?.resume(throwing: BleError.connectFailed(error.localizedDescription))
-            return
-        }
-        let services = peripheral.services ?? []
+        let services = error == nil ? (peripheral.services ?? []) : []
         guard !services.isEmpty else {
-            takePendingStage()?.resume(throwing: BleError.noUsableCharacteristics)
+            if lock.withLock({ standingReconnect }) {
+                // Connected but useless. Drop the link and re-arm rather than
+                // sitting on a peripheral that will never yield a serial service.
+                rearmStandingReconnect()
+                return
+            }
+            let failure = error.map { BleError.connectFailed($0.localizedDescription) }
+                ?? BleError.noUsableCharacteristics
+            takePendingStage()?.resume(throwing: failure)
             return
         }
         // Probe every service and pick the best write/notify pair once they have
@@ -407,6 +502,8 @@ extension BleTransport: CBPeripheralDelegate {
 
         enum Outcome { case pending, ready, noneUsable }
         var outcome = Outcome.pending
+        var standing = false
+        var notifyTarget: CBCharacteristic?
 
         let stage = lock.withLock { () -> CheckedContinuation<Void, any Error>? in
             if let write, let notify, writeCharacteristic == nil || (isKnown && !selectedServiceIsKnown) {
@@ -415,10 +512,31 @@ extension BleTransport: CBPeripheralDelegate {
                 selectedServiceIsKnown = isKnown
             }
             pendingServiceCount = max(pendingServiceCount - 1, 0)
-            guard pendingServiceCount == 0, let c = pendingStage else { return nil }
+            guard pendingServiceCount == 0 else { return nil }
+
+            standing = standingReconnect
             outcome = writeCharacteristic == nil ? .noneUsable : .ready
+            notifyTarget = notifyCharacteristic
+            guard let c = pendingStage else { return nil }
             pendingStage = nil
             return c
+        }
+
+        // Standing reconnects finish the handshake here: there is no `connect`
+        // call to hand the result back to, so the transport declares itself
+        // connected and lets `ObdManager` redo the ELM327 init off the state.
+        if standing {
+            guard outcome == .ready, let notifyTarget else {
+                rearmStandingReconnect()
+                return
+            }
+            peripheral.setNotifyValue(true, for: notifyTarget)
+            lock.withLock {
+                standingReconnect = false
+                standingPeripheral = nil
+            }
+            setState(.connected)
+            return
         }
 
         switch outcome {

@@ -36,6 +36,15 @@ public final class ObdManager {
     private var scheduler: PollingScheduler?
     private var stateWatchTask: Task<Void, Never>?
     private let transportFactory: TransportFactory
+    /// Set while the transport is holding a standing reconnect, so a `.connected`
+    /// from the state stream is understood as "link restored, rebuild the session"
+    /// rather than the replay of a state this manager already handled.
+    private var awaitingStandingReconnect = false
+
+    /// True while the transport holds an untimed reconnect for a dropped link.
+    /// App-level retry loops should stand down: iOS will complete this one even if
+    /// the app is suspended, and reconnecting by hand would cancel it.
+    public var isRecoveringLink: Bool { awaitingStandingReconnect }
 
     // MARK: - Init
 
@@ -123,9 +132,17 @@ public final class ObdManager {
         stateWatchTask = Task { [weak self] in
             for await st in states {
                 guard !Task.isCancelled else { return }
-                guard st == .disconnected || st == .error else { continue }
-                await self?.handleTransportDrop(isError: st == .error)
-                return
+                guard let self else { return }
+                switch st {
+                case .disconnected, .error:
+                    // Keep watching only while the transport is recovering the
+                    // link itself; otherwise this session is over.
+                    guard await self.handleTransportDrop(isError: st == .error) else { return }
+                case .connected:
+                    await self.resumeStandingSession()
+                default:
+                    continue
+                }
             }
         }
 
@@ -163,10 +180,44 @@ public final class ObdManager {
         )
     }
 
-    private func handleTransportDrop(isError: Bool) async {
+    /// - Returns: true when the transport has armed its own reconnect, so this
+    ///   manager should stay subscribed and rebuild the session if the link
+    ///   returns. False means the session is finished and the caller reconnects.
+    private func handleTransportDrop(isError: Bool) async -> Bool {
         scheduler?.stop()
         scheduler = nil
+        // Reported either way: a dropped link is a dropped session until the
+        // ELM327 handshake has been redone, and the trip log depends on seeing it.
         updateConnectionState(isError ? .error : .disconnected)
+
+        guard let t = transport, t.beginStandingReconnect() else { return false }
+        awaitingStandingReconnect = true
+        return true
+    }
+
+    /// Rebuilds the session after the transport restored a dropped link on its own.
+    ///
+    /// A live GATT link is not a live ELM327: the adapter has been power-cycled or
+    /// idle, so its echo/headers/protocol settings are back at defaults and the
+    /// handshake has to be redone before any PID will decode.
+    private func resumeStandingSession() async {
+        guard awaitingStandingReconnect, let t = transport else { return }
+        awaitingStandingReconnect = false
+
+        updateConnectionState(.initializing)
+        do {
+            _ = try await Elm327Initializer(transport: t).initialize()
+        } catch {
+            updateConnectionState(.error)
+            await disconnect()
+            return
+        }
+        updateConnectionState(.connected)
+
+        let profile = activeProfile
+        let s = newScheduler(transport: t, profile: profile)
+        scheduler = s
+        s.start(requests: profile.requests)
     }
 
     // MARK: - Polling control
@@ -213,6 +264,7 @@ public final class ObdManager {
     }
 
     public func disconnect() async {
+        awaitingStandingReconnect = false
         stateWatchTask?.cancel()
         stateWatchTask = nil
         scheduler?.stop()

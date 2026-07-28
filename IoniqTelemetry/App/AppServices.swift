@@ -41,6 +41,11 @@ final class AppServices {
     let obdManager: ObdManager
     let bleScanner = BleScanner()
 
+    /// Raw decoder output, before correction. `ConnectedCarService` is the only
+    /// subscriber: it fixes regen-vs-charging and speed, then publishes the result
+    /// to `telemetry`, which is what every other surface reads.
+    let rawTelemetry = PassthroughSubject<VehicleTelemetry, Never>()
+
     /// Owns the drive pipeline. Not observable — it needs `self`, and @Observable
     /// cannot back a lazy property.
     @ObservationIgnored private(set) var connectedCar: ConnectedCarService!
@@ -148,14 +153,14 @@ final class AppServices {
             .store(in: &cancellables)
     }
 
-    /// Publishes OBD output to the telemetry repository, which every other
-    /// consumer reads. Trip logging deliberately does *not* happen here:
-    /// `ConnectedCarService` is the single consumer that corrects the frame
-    /// (regen vs charging, GPS-derived speed) before anything is persisted.
+    /// Publishes OBD output to `rawTelemetry`, never straight to the repository.
+    /// `ConnectedCarService` is the single consumer that corrects the frame (regen
+    /// vs charging, GPS-derived speed) and only then updates `telemetry` — so the
+    /// UI, CarPlay and the trip log all see one corrected view of the drive.
     private func bindObdStream() {
         obdManager.onTelemetryUpdated = { [weak self] sample in
             Task { @MainActor in
-                self?.telemetry.update(sample)
+                self?.rawTelemetry.send(sample)
             }
         }
 
@@ -166,16 +171,31 @@ final class AppServices {
         }
     }
 
-    /// Reconnects to the adapter used last session, if one was saved.
-    private func autoConnectLastAdapter() async {
-        guard let address = userPreferences.lastObdDeviceAddress, !address.isEmpty else { return }
+    /// True once an adapter has been saved, so the supervisor knows there is
+    /// something to reconnect to.
+    var hasSavedAdapter: Bool {
+        !(userPreferences.lastObdDeviceAddress ?? "").isEmpty
+    }
+
+    /// Set when the user disconnects by hand. Someone who taps Disconnect wants to
+    /// stay disconnected, so the supervisor's reconnect loop stands down until they
+    /// connect again — otherwise the adapter comes back a few seconds later and the
+    /// button looks broken.
+    private(set) var autoReconnectSuppressed = false
+
+    /// Reconnects to the adapter used last session, if one was saved. Called at
+    /// launch and again by `ConnectedCarService` whenever the link drops.
+    @discardableResult
+    func autoConnectLastAdapter() async -> Bool {
+        guard let address = userPreferences.lastObdDeviceAddress, !address.isEmpty else { return false }
         let device = ObdDevice(
             name: userPreferences.lastObdDeviceName ?? "OBD Adapter",
             address: address,
             type: ObdDeviceType(rawValue: userPreferences.lastObdTransportType ?? "") ?? .ble,
             isPaired: true
         )
-        await connect(to: device)
+        if case .success = await connect(to: device) { return true }
+        return false
     }
 
     // MARK: - Adapter control
@@ -184,6 +204,7 @@ final class AppServices {
     @discardableResult
     func connect(to device: ObdDevice) async -> Result<Void, Error> {
         bleScanner.stop()
+        autoReconnectSuppressed = false
         let result = await obdManager.connect(device: device)
         if case .success = result {
             await preferences.update { prefs in
@@ -197,7 +218,10 @@ final class AppServices {
         return result
     }
 
-    func disconnect() async {
+    /// - Parameter userInitiated: true for the Settings button, false when
+    ///   `ConnectedCarService` is tearing down a dead session to rebuild it.
+    func disconnect(userInitiated: Bool = true) async {
+        if userInitiated { autoReconnectSuppressed = true }
         await obdManager.disconnect()
     }
 

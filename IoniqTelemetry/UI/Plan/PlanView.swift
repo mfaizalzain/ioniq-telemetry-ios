@@ -905,12 +905,14 @@ private struct AvailabilityBadge: View {
     }
 }
 
+/// Results only — there is no empty state. The list is populated by asking the
+/// planner's assistant for chargers nearby; a bare lookup button sitting under the
+/// route sections read as a stray control with nothing around it.
 private struct NearbyChargersSection: View {
     let viewModel: PlanViewModel
 
     var body: some View {
         if !viewModel.nearbyChargers.isEmpty {
-            // Show charger list when results exist
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
@@ -955,13 +957,6 @@ private struct NearbyChargersSection: View {
                         .padding(.vertical, 3)
                     }
                 }
-            }
-        } else {
-            // Show a button to trigger the lookup
-            Button {
-                Task { await viewModel.loadNearbyChargers() }
-            } label: {
-                Label("Find Nearby Chargers", systemImage: "bolt.car")
             }
         }
     }

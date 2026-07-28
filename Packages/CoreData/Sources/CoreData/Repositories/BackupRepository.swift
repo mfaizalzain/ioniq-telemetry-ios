@@ -137,7 +137,7 @@ public enum BackupError: LocalizedError {
     public var errorDescription: String? {
         switch self {
         case .unreadable:
-            return "That file isn't a readable Ioniq Telemetry backup."
+            return "That file isn't a readable IONIQ Telemetry backup."
         case .tooNew(let version):
             return "This backup was written by a newer version of the app (format \(version))."
         }
