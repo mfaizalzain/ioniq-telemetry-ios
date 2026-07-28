@@ -35,9 +35,10 @@
       "request": "220100",
       "pollTier": "FAST",
       "signals": [
-        {"id": "ambient_temp", "startByte": 8, "length": 1, "formula": "A/2-40", "unit": "C", "min": -40, "max": 70},
-        {"id": "cabin_temp", "startByte": 30, "length": 1, "formula": "A/2-40", "unit": "C", "min": -40, "max": 70},
-        {"id": "set_temp", "startByte": 14, "length": 1, "formula": "A/2", "unit": "C", "min": 15, "max": 32}
+        {"id": "ambient_temp", "startByte": 9, "length": 1, "formula": "A/2-40", "unit": "C", "min": -40, "max": 70},
+        {"id": "cabin_temp", "startByte": 8, "length": 1, "formula": "A/2-40", "unit": "C", "min": -40, "max": 70},
+        {"id": "set_temp", "startByte": 14, "length": 1, "formula": "A/2", "unit": "C", "min": 15, "max": 32},
+        {"id": "speed_kph", "startByte": 32, "length": 1, "formula": "A", "unit": "km/h", "min": 0, "max": 250}
       ]
     },
     {
