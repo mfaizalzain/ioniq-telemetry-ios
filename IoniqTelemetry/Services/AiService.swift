@@ -11,7 +11,7 @@ import Foundation
 final class AiService {
 
     private let session: URLSession
-    private let baseURLGemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    private let baseURLGemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-001:generateContent"
     private let baseURLDeepSeek = "https://api.deepseek.com/v1/chat/completions"
 
     init() {
