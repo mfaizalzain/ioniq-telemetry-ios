@@ -65,12 +65,14 @@ final class AiService {
         trips: [TripEntity],
         period: DigestPeriod,
         apiKey: String,
+        vehicleName: String = "Ioniq 5",
+        countryCode: String? = nil,
         aiProvider: AiProvider = .gemini
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
-        guard !trips.isEmpty else { return "No trips recorded this \\(period.label.lowercased())." }
+        guard !trips.isEmpty else { return "No trips recorded this \(period.label.lowercased())." }
 
-        let prompt = buildDigestPrompt(trips: trips, period: period)
+        let prompt = buildDigestPrompt(trips: trips, period: period, vehicleName: vehicleName, countryCode: countryCode)
         return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
 
@@ -203,7 +205,7 @@ final class AiService {
 
     // MARK: - Digest Prompt
 
-    private func buildDigestPrompt(trips: [TripEntity], period: DigestPeriod) -> String {
+    private func buildDigestPrompt(trips: [TripEntity], period: DigestPeriod, vehicleName: String, countryCode: String?) -> String {
         let totalDistance = trips.reduce(0) { $0 + $1.distanceKm }
         let totalEnergy = trips.reduce(0) { $0 + $1.energyUsedKwh }
         let avgConsumption = totalEnergy > 0 ? totalDistance / totalEnergy * 100 : 0
@@ -219,18 +221,23 @@ final class AiService {
             return aConsumption > bConsumption
         }
 
-        var lines = [
-            "You are an AI driving assistant for an E-GMP electric vehicle.",
-            "Write a \(period.label.lowercased()) driving digest in 2-3 sentences.",
-            "Be friendly and encouraging. Use natural plain text without markdown.",
-            "",
-            "\(period.label) SUMMARY (\(tripCount) trips):",
-            "- Total distance: \(String(format: "%.0f", totalDistance)) km",
-            "- Total energy: \(String(format: "%.1f", totalEnergy)) kWh",
-            "- Average efficiency: \(String(format: "%.1f", avgConsumption)) kWh/100km",
-            "- Average speed: \(String(format: "%.0f", avgSpeed)) km/h",
-            "- Total driving time: \(totalDurationMinutes >= 60 ? "\(Int(totalDurationMinutes) / 60)h \(Int(totalDurationMinutes) % 60)m" : "\(Int(totalDurationMinutes))m")",
+        let periodLabel = period.label.lowercased()
+        var statsLines = [
+            "Trips: \(tripCount)",
+            "Total distance: \(String(format: "%.1f", totalDistance)) km",
+            "Total energy: \(String(format: "%.1f", totalEnergy)) kWh",
         ]
+        if avgConsumption > 0 {
+            statsLines.append("Average efficiency: \(String(format: "%.1f", avgConsumption)) kWh/100km")
+        }
+        if avgSpeed > 0 {
+            statsLines.append("Average speed: \(String(format: "%.0f", avgSpeed)) km/h")
+        }
+        if totalDurationMinutes > 0 {
+            let h = Int(totalDurationMinutes) / 60
+            let m = Int(totalDurationMinutes) % 60
+            statsLines.append("Total driving time: \(h > 0 ? "\(h)h " : "")\(m)m")
+        }
 
         // Cost saved vs petrol
         let costPerKwh = 0.12
@@ -238,7 +245,7 @@ final class AiService {
         let petrolCost = Double(totalDistance) / 100.0 * 8.0 * 1.50
         let saved = petrolCost - totalCost
         if saved > 0 {
-            lines.append("- Cost saved vs petrol: $\(String(format: "%.2f", saved))")
+            statsLines.append("Cost saved vs petrol: $\(String(format: "%.2f", saved))")
         }
 
         // Best day
@@ -246,7 +253,7 @@ final class AiService {
             let dayConsumption = dayTrips.compactMap { $0.avgConsumptionKwhPer100km }.reduce(0, +) / max(Float(dayTrips.count), 1)
             let formatter = DateFormatter()
             formatter.setLocalizedDateFormatFromTemplate("EEEE")
-            lines.append("- Best efficiency day: \(formatter.string(from: day)) (\(String(format: "%.1f", dayConsumption)) kWh/100km)")
+            statsLines.append("Most efficient day: \(formatter.string(from: day)) (\(String(format: "%.1f", dayConsumption)) kWh/100km)")
         }
 
         // Efficiency trend
@@ -258,14 +265,25 @@ final class AiService {
             let secondAvg = secondHalf.compactMap { $0.avgConsumptionKwhPer100km }.reduce(0, +) / max(Float(secondHalf.count), 1)
             if firstAvg > 0, secondAvg > 0 {
                 let trend = secondAvg < firstAvg ? "improving" : "declining"
-                lines.append("- Efficiency trend: \(trend) (from \(String(format: "%.1f", firstAvg)) to \(String(format: "%.1f", secondAvg)) kWh/100km)")
+                statsLines.append("Efficiency trend: \(trend) (from \(String(format: "%.1f", firstAvg)) to \(String(format: "%.1f", secondAvg)) kWh/100km)")
             }
         }
 
-        lines.append("")
-        lines.append("Write 2-3 concise, encouraging sentences.")
+        let statsJoined = statsLines.joined(separator: "\n")
 
-        return lines.joined(separator: "\n")
+        let countryStr = countryCode.map { " for \($0)" } ?? ""
+        return """
+        You are an EV driving analyst for a \(vehicleName) driver.
+
+        Summarise the driver's last \(periodLabel) with these trip stats:
+        \(statsJoined)
+
+        Write 2-3 natural sentences covering:
+        1. Total distance driven and estimated cost saved vs petrol\(countryStr), in local currency
+        2. Their most efficient day this \(periodLabel)
+        3. One notable pattern or tip
+        Be encouraging and specific to their data.
+        """
     }
 
     // MARK: - Prompt helpers
