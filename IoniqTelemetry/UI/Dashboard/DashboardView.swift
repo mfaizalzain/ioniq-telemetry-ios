@@ -68,6 +68,15 @@ struct DashboardView: View {
                 MetricTilesGrid(viewModel: viewModel)
                 TirePressureVisualizerCard(viewModel: viewModel)
 
+                AIDigestSection(
+                    isPro: viewModel.isPro,
+                    aiKey: viewModel.aiKey,
+                    aiProvider: viewModel.aiProvider,
+                    aiFeaturesEnabled: viewModel.aiFeaturesEnabled,
+                    vehicleName: viewModel.vehicleName,
+                    trips: viewModel.recentTrips
+                )
+
                 // AI-powered cards — shown only when telemetry data is available
                 if viewModel.hasData {
                     BatteryHealthReportView(viewModel: viewModel)

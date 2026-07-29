@@ -46,6 +46,7 @@
 		BC4FC850E415F1E32168B495 /* BatteryHealthReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24E658A0630C85D5EADB297 /* BatteryHealthReportView.swift */; };
 		C806C545266A393FF6046E31 /* CoreData in Frameworks */ = {isa = PBXBuildFile; productRef = CE94BDBFAE6356B793FDC1B5 /* CoreData */; };
 		CD14EF3A45BD2BABB770F360 /* TripsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DA8DC491CA28199554CE44 /* TripsViewModel.swift */; };
+		D367EF32920B8BBA7A9066E0 /* AIDigestSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAFDDF866DA9EAF02A85E40 /* AIDigestSection.swift */; };
 		DA711EE94721F86CDFC4F3D2 /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1025A4ECE56E6140DA4895E4 /* Speech.framework */; };
 		DDBA760A7159403F6F7ED913 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F928199730EF5D5C4706F89A /* MapKit.framework */; };
 		DE5B89219B64A8133FF439A2 /* CoreUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5D04FA331DABD94427A1A3F /* CoreUI */; };
@@ -76,6 +77,7 @@
 		27EDF8359710AED96EF1DC16 /* VehicleLocationProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleLocationProvider.swift; sourceTree = "<group>"; };
 		39E4C656FFEE54E2D359DFD6 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		3BD0F36BBF1F0EC4A7BF4C1D /* CoreUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreUI; path = Packages/CoreUI; sourceTree = SOURCE_ROOT; };
+		3DAFDDF866DA9EAF02A85E40 /* AIDigestSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDigestSection.swift; sourceTree = "<group>"; };
 		3F6099A4448EEBE22D1F18A1 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		47AD48321C5F8754904DC3A3 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		54C12EF4A0F03A94394B3443 /* SwiftData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData.framework; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
@@ -235,6 +237,7 @@
 			isa = PBXGroup;
 			children = (
 				DDCE0A05C9CDA1B45C3F7580 /* AiAssistantChatView.swift */,
+				3DAFDDF866DA9EAF02A85E40 /* AIDigestSection.swift */,
 				B24E658A0630C85D5EADB297 /* BatteryHealthReportView.swift */,
 				9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */,
 				47AD48321C5F8754904DC3A3 /* DashboardViewModel.swift */,
@@ -466,6 +469,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D367EF32920B8BBA7A9066E0 /* AIDigestSection.swift in Sources */,
 				F991904E691DCA5B7CA8D426 /* AdapterPickerSheet.swift in Sources */,
 				F3B564D252CFF1EA0DF1F0D1 /* AiAndRoutingSections.swift in Sources */,
 				01111CB25591DB0C9A00AD24 /* AiAssistantChatView.swift in Sources */,
