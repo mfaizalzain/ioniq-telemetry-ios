@@ -153,10 +153,23 @@ struct BatteryHeroCard: View {
 
     private var socPercent: Float? { viewModel.socPercent }
     private var fillFraction: Float { min(max((socPercent ?? 0) / 100, 0), 1) }
+ private var fillColor: Color {
+     guard let soc = socPercent else { return .blue }
+     if soc > 50 { return Color(red: 0.15, green: 0.39, blue: 0.92) }
+     if soc > 20 { return Color.appAmber }
+     return Color.appRed
+ }
 
-    var body: some View {
-        GroupBox {
-            VStack(spacing: 10) {
+ var body: some View {
+     GroupBox {
+         ZStack(alignment: .bottomLeading) {
+             // Fill level overlay — width = SOC percentage, bottom-anchored
+             Rectangle()
+                 .fill(fillColor.opacity(0.20))
+                 .frame(width: CGFloat(fillFraction) * (UIScreen.main.bounds.width - 64))
+                 .animation(.easeOut(duration: 0.8), value: fillFraction)
+
+             VStack(spacing: 10) {
                 ZStack {
                     // SwiftUI trims clockwise from 3 o'clock, so the 160° rotation
                     // puts the 140° gap centred at the bottom.
@@ -231,6 +244,7 @@ struct BatteryHeroCard: View {
                             .clipShape(RoundedRectangle(cornerRadius: 8))
                     }
                 }
+            }
             }
             .padding(20)
         }
