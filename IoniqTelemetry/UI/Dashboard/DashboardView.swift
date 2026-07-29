@@ -147,14 +147,9 @@ struct BatteryHeroCard: View {
     let viewModel: DashboardViewModel
     @State private var showThermalTip = false
 
-    /// Gauge geometry, shared with the Android build: a 220° arc starting at 160°,
-    /// leaving a 140° gap centred at the bottom.
-    private static let startAngle: Double = 160
-    private static let sweepFraction: CGFloat = 220.0 / 360.0
-
     private var socPercent: Float? { viewModel.socPercent }
     private var fillFraction: Float { min(max((socPercent ?? 0) / 100, 0), 1) }
- private var fillColor: Color {
+    private var fillColor: Color {
      guard let soc = socPercent else { return .blue }
      if soc > 50 { return Color(red: 0.15, green: 0.39, blue: 0.92) }
      if soc > 20 { return Color.appAmber }
@@ -171,39 +166,14 @@ struct BatteryHeroCard: View {
                  .animation(.easeOut(duration: 0.8), value: fillFraction)
 
              VStack(spacing: 10) {
-                ZStack {
-                    // SwiftUI trims clockwise from 3 o'clock, so the 160° rotation
-                    // puts the 140° gap centred at the bottom.
-                    Circle()
-                        .trim(from: 0, to: Self.sweepFraction)
-                        .stroke(Color.appOutline, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                        .rotationEffect(.degrees(Self.startAngle))
-                        .frame(width: 100, height: 100)
-
-                    Circle()
-                        .trim(from: 0, to: Self.sweepFraction * CGFloat(fillFraction))
-                        .stroke(
-                            AngularGradient(
-                                colors: [.appAccent.opacity(0.75), .electricTeal],
-                                center: .center,
-                                startAngle: .degrees(Self.startAngle),
-                                endAngle: .degrees(Self.startAngle + 220)
-                            ),
-                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
-                        )
-                        .rotationEffect(.degrees(Self.startAngle))
-                        .frame(width: 100, height: 100)
-                        .animation(.easeOut(duration: 0.4), value: fillFraction)
-
-                    HStack(alignment: .firstTextBaseline, spacing: 1) {
-                        Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
-                            .font(.system(size: 28, weight: .bold))
-                            .tracking(-1.5)
-                        Text("%")
-                            .font(.system(size: 16, weight: .medium))
-                    }
-                    .foregroundStyle(Color.appOnSurface)
+                HStack(alignment: .firstTextBaseline, spacing: 1) {
+                    Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
+                        .font(.system(size: 48, weight: .bold))
+                        .tracking(-1.5)
+                    Text("%")
+                        .font(.system(size: 24, weight: .medium))
                 }
+                .foregroundStyle(Color.appOnSurface)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel("State of charge")
                 .accessibilityValue(socPercent.map { "\(Int($0.rounded())) percent" } ?? "No data")
