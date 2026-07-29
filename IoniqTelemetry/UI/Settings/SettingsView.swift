@@ -250,7 +250,7 @@ private struct AiSection: View {
                 .tint(.primary)
             }
         } header: {
-            Text("AI & Intelligence")
+            Text("AI Features (Gemini)")
         } footer: {
             if viewModel.isPro && (viewModel.preferences.geminiApiKey ?? "").isEmpty {
                 Text("Add a Gemini API key to enable AI-powered features. Your own key means requests land on your free quota, not a shared pool. Your trip data, battery stats, and vehicle telemetry are sent to Google Gemini to generate responses.")
