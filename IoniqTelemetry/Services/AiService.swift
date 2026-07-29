@@ -33,7 +33,8 @@ final class AiService {
         recentTrips: [TripEntity],
         telemetrySamples: [SampleEntity],
         efficiencyBaseline: Double?,
-        apiKey: String
+        apiKey: String,
+        countryCode: String? = nil
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
 
@@ -172,12 +173,7 @@ final class AiService {
             lines.append("- Energy recovered: \(String(format: "%.1f", regenKwh)) kWh (\(String(format: "%.0f", share))%)")
         }
 
-        // Cost estimation
-        let costPerKwh = 0.12 // average US residential rate per kWh
-        let tripCost = Double(trip.energyUsedKwh) * costPerKwh
-        let petrolCost = Double(trip.distanceKm) / 100.0 * 8.0 * 1.5 // 8L/100km x $1.50/L
-        let saved = petrolCost - tripCost
-        if saved > 0 {
+        // Cost estimation — Gemini handles with local rates
             lines.append("- Cost: $\(String(format: "%.2f", tripCost)) vs ~$\(String(format: "%.2f", petrolCost)) petrol (saved $\(String(format: "%.2f", saved)))")
         }
 
