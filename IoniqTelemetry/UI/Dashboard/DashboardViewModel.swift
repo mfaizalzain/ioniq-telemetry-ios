@@ -86,6 +86,15 @@ final class DashboardViewModel {
         formatter.unitsStyle = .full
         return formatter.localizedString(for: telemetry.timestamp, relativeTo: Date())
     }
+
+    // MARK: - Trip data (since-charge stats)
+
+    /// True when trip odometer/energy data is available to show.
+    var hasTripData: Bool { false }
+
+    var tripDistanceText: String { distanceKm(nil) }
+    var tripEnergyText: String { "— kWh" }
+    var tripDurationText: String? { nil }
 }
 
 // MARK: - Formatting

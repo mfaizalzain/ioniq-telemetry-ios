@@ -66,12 +66,14 @@ struct DashboardView: View {
                 }
 
                 BatteryHeroCard(viewModel: viewModel)
+
+                // "Since Charge" trip row — shown only when trip data is available
+                if viewModel.hasTripData {
+                    TripStatRow(viewModel: viewModel)
+                }
+
                 MetricTilesGrid(viewModel: viewModel)
                 TirePressureVisualizerCard(viewModel: viewModel)
-
-                if let tip = viewModel.thermalTip {
-                    ThermalTipCard(tip: tip)
-                }
             }
             .padding(.vertical)
         }
@@ -135,6 +137,7 @@ private struct StaleDataBanner: View {
 
 struct BatteryHeroCard: View {
     let viewModel: DashboardViewModel
+    @State private var showThermalTip = false
 
     /// Gauge geometry, shared with the Android build: a 220° arc starting at 160°,
     /// leaving a 140° gap centred at the bottom.
@@ -173,7 +176,7 @@ struct BatteryHeroCard: View {
 
                     HStack(alignment: .firstTextBaseline, spacing: 1) {
                         Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
-                            .font(.system(size: 32, weight: .bold))
+                            .font(.system(size: 28, weight: .bold))
                             .tracking(-1.5)
                         Text("%")
                             .font(.system(size: 16, weight: .medium))
@@ -188,49 +191,44 @@ struct BatteryHeroCard: View {
                     ChargingChip(viewModel: viewModel)
                 }
 
-                HStack(spacing: 16) {
-                    statBadge(
-                        label: "BMS SOC",
-                        value: viewModel.telemetry.socBms.map { String(format: "%.1f%%", $0) } ?? "—"
-                    )
-                    statBadge(
-                        label: "HEALTH SOH",
-                        value: viewModel.telemetry.soh.map { String(format: "%.0f%%", $0) } ?? "—"
-                    )
-                    statBadge(
-                        label: "PACK TEMP",
-                        value: viewModel.temperature(viewModel.packTempC.map(Float.init)),
-                        color: .packTemp(viewModel.packTempC)
-                    )
+                // Collapsible thermal tip integrated inside the hero card
+                if let tip = viewModel.thermalTip {
+                    Button {
+                        showThermalTip.toggle()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "thermometer.medium")
+                                .foregroundStyle(Color.appAmber)
+                            Text("Thermal")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.appAmber)
+                            Image(systemName: showThermalTip ? "chevron.up" : "chevron.down")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.appAmber.opacity(0.12))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    if showThermalTip {
+                        Text(tip)
+                            .font(.ioniqBody)
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.appSurfaceVariant.opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
                 }
             }
             .padding(20)
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
-    }
-
-    private func statBadge(label: String, value: String, color: Color = .appOnSurface) -> some View {
-        VStack(spacing: 4) {
-            // One line always: "HEALTH SOH" wraps at narrow widths, which made that
-            // badge taller than its neighbours and knocked the values out of line.
-            Text(label)
-                .font(.ioniqCaption)
-                .foregroundStyle(.secondary)
-                .ioniqStatLabel()
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(value)
-                .font(.system(size: 14, weight: .medium))
-                .foregroundStyle(color)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(8)
-        .background(Color.appSurfaceVariant.opacity(0.6))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
-        .accessibilityElement(children: .combine)
     }
 }
 
@@ -256,6 +254,33 @@ private struct ChargingChip: View {
     }
 }
 
+// MARK: - Since Charge Trip Row
+
+private struct TripStatRow: View {
+    let viewModel: DashboardViewModel
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Label(viewModel.tripDistanceText, systemImage: "arrow.triangle.swap")
+            Divider()
+                .frame(height: 14)
+            Label(viewModel.tripEnergyText, systemImage: "bolt")
+            if let duration = viewModel.tripDurationText {
+                Divider()
+                    .frame(height: 14)
+                Label(duration, systemImage: "clock")
+            }
+        }
+        .font(.caption.weight(.medium))
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.appSurfaceVariant.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        .padding(.horizontal)
+    }
+}
+
 // MARK: - Metric Tiles
 
 struct MetricTilesGrid: View {
@@ -264,36 +289,84 @@ struct MetricTilesGrid: View {
     private var telemetry: VehicleTelemetry { viewModel.telemetry }
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-            MetricTile(
-                icon: "bolt.fill",
-                label: viewModel.isRegenerating ? "POWER · REGEN" : "POWER",
-                value: DashboardViewModel.format(telemetry.powerKw, unit: "kW", decimals: 1),
-                valueColor: viewModel.isRegenerating ? .appGreen : .appOnSurface
-            )
-            MetricTile(
-                icon: "chart.line.uptrend.xyaxis",
-                label: "CELL Δ",
-                // cellVoltDelta is in volts; millivolts is the readable unit here.
-                value: telemetry.cellVoltDelta.map { String(format: "%.0f mV", $0 * 1000) } ?? "—",
-                valueColor: .cellDelta(telemetry.cellVoltDelta)
-            )
-            MetricTile(
-                icon: "battery.100percent.bolt",
-                label: "HV VOLTAGE",
-                value: DashboardViewModel.format(telemetry.packVoltage, unit: "V", decimals: 0),
-                valueColor: .appAccent
-            )
-            MetricTile(
-                icon: "battery.25percent",
-                label: "AUX BATTERY",
-                value: DashboardViewModel.format(telemetry.auxVoltage, unit: "V", decimals: 1),
-                // Below ~12.0 V the 12 V battery is draining faster than the DC-DC
-                // replaces it — the classic E-GMP no-start warning.
-                valueColor: (telemetry.auxVoltage ?? 12.6) < 12.0 ? .appAmber : .appGreen
-            )
+        GroupBox {
+            VStack(spacing: 8) {
+                // Header
+                HStack {
+                    Image(systemName: "chart.bar.fill")
+                        .font(.caption)
+                    Text("LIVE METRICS")
+                        .font(.ioniqCaption.weight(.medium))
+                        .ioniqStatLabel()
+                    Spacer()
+                }
+                .foregroundStyle(.secondary)
+
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                    // Row 1
+                    MetricTile(
+                        icon: "bolt.fill",
+                        label: viewModel.isRegenerating ? "POWER · REGEN" : "POWER",
+                        value: DashboardViewModel.format(telemetry.powerKw, unit: "kW", decimals: 1),
+                        valueColor: viewModel.isRegenerating ? .appGreen : .appOnSurface
+                    )
+                    MetricTile(
+                        icon: "chart.line.uptrend.xyaxis",
+                        label: "CELL Δ",
+                        // cellVoltDelta is in volts; millivolts is the readable unit here.
+                        value: telemetry.cellVoltDelta.map { String(format: "%.0f mV", $0 * 1000) } ?? "—",
+                        valueColor: .cellDelta(telemetry.cellVoltDelta)
+                    )
+
+                    // Row 2
+                    MetricTile(
+                        icon: "speedometer",
+                        label: "SPEED",
+                        value: viewModel.speed(telemetry.speedKph),
+                        valueColor: .appAccent
+                    )
+                    MetricTile(
+                        icon: "battery.100percent",
+                        label: "BMS SOC",
+                        value: telemetry.socBms.map { String(format: "%.1f%%", $0) } ?? "—",
+                        valueColor: .appOnSurface
+                    )
+
+                    // Row 3
+                    MetricTile(
+                        icon: "battery.100percent.bolt",
+                        label: "HV VOLTAGE",
+                        value: DashboardViewModel.format(telemetry.packVoltage, unit: "V", decimals: 0),
+                        valueColor: .appAccent
+                    )
+                    MetricTile(
+                        icon: "heart.text.clipboard",
+                        label: "SOH",
+                        value: telemetry.soh.map { String(format: "%.0f%%", $0) } ?? "—",
+                        valueColor: .appGreen
+                    )
+
+                    // Row 4
+                    MetricTile(
+                        icon: "battery.25percent",
+                        label: "AUX BATTERY",
+                        value: DashboardViewModel.format(telemetry.auxVoltage, unit: "V", decimals: 1),
+                        // Below ~12.0 V the 12 V battery is draining faster than the DC-DC
+                        // replaces it — the classic E-GMP no-start warning.
+                        valueColor: (telemetry.auxVoltage ?? 12.6) < 12.0 ? .appAmber : .appGreen
+                    )
+                    MetricTile(
+                        icon: "thermometer.medium",
+                        label: "PACK TEMP",
+                        value: viewModel.temperature(viewModel.packTempC.map(Float.init)),
+                        valueColor: .packTemp(viewModel.packTempC)
+                    )
+                }
+            }
+            .padding(12)
         }
-        .padding(.horizontal, 12)
+        .padding(.horizontal)
+        .backgroundStyle(.ultraThinMaterial)
     }
 }
 
@@ -332,7 +405,6 @@ struct TirePressureVisualizerCard: View {
                 HStack(spacing: 12) {
                     tireSquare("RL", pressures?.rl, temps?.rl)
                     Spacer()
-                    Spacer().frame(width: 32)
                     Spacer()
                     tireSquare("RR", pressures?.rr, temps?.rr)
                 }
@@ -377,28 +449,5 @@ struct TirePressureVisualizerCard: View {
     private func formattedKpa(_ kpa: Float?) -> String {
         guard let kpa else { return "—" }
         return "\(Int(kpa)) kPa"
-    }
-}
-
-// MARK: - Thermal Tip
-
-struct ThermalTipCard: View {
-    let tip: String
-
-    var body: some View {
-        GroupBox {
-            HStack(spacing: 12) {
-                Image(systemName: "thermometer.medium")
-                    .font(.title2)
-                    .foregroundStyle(Color.appAmber)
-                Text(tip)
-                    .font(.ioniqBody)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(12)
-        }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
-        .accessibilityElement(children: .combine)
     }
 }
