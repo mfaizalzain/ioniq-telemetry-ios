@@ -94,6 +94,7 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
            let val = RoutingProvider(rawValue: raw) { prefs.routingProvider = val }
 
         prefs.geminiApiKey = KeychainStore.read(SecretKey.gemini)
+        prefs.aiFeaturesEnabled = defaults.bool(forKey: "aiFeaturesEnabled", default: true)
         prefs.aiCoachingEnabled = defaults.bool(forKey: "aiCoachingEnabled", default: true)
         prefs.chargerOccupancyAlerts = defaults.bool(forKey: "chargerOccupancyAlerts", default: false)
         prefs.googlePoiSearch = defaults.bool(forKey: "googlePoiSearch", default: false)
@@ -133,6 +134,7 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         KeychainStore.write(prefs.openChargeMapApiKey, account: SecretKey.openChargeMap)
         defaults.set(prefs.routingProvider.rawValue, forKey: "routingProvider")
         KeychainStore.write(prefs.geminiApiKey, account: SecretKey.gemini)
+        defaults.set(prefs.aiFeaturesEnabled, forKey: "aiFeaturesEnabled")
         defaults.set(prefs.aiCoachingEnabled, forKey: "aiCoachingEnabled")
         defaults.set(prefs.chargerOccupancyAlerts, forKey: "chargerOccupancyAlerts")
         defaults.set(prefs.googlePoiSearch, forKey: "googlePoiSearch")

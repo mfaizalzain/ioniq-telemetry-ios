@@ -101,6 +101,9 @@ public struct UserPreferences: Sendable {
     /// Pro/User BYOK feature: while driving or charging, user-supplied Google Gemini API key
     /// for plain-language diagnostics, battery thermal throttling explanations, and energy coaching.
     public var geminiApiKey: String?
+    /// Master toggle for all Gemini-powered features. When off the API key is kept
+    /// but no telemetry data is sent to Gemini for any AI feature.
+    public var aiFeaturesEnabled: Bool
     public var aiCoachingEnabled: Bool
     /// Pro feature: while driving, alert when every charger with live availability
     /// near the next stop is occupied and it's within ~10 min. Uses the Google
@@ -139,6 +142,7 @@ public struct UserPreferences: Sendable {
         openChargeMapApiKey: String? = nil,
         routingProvider: RoutingProvider = .appleMaps,
         geminiApiKey: String? = nil,
+        aiFeaturesEnabled: Bool = true,
         aiCoachingEnabled: Bool = true,
         chargerOccupancyAlerts: Bool = false,
         googlePoiSearch: Bool = false,
@@ -168,6 +172,7 @@ public struct UserPreferences: Sendable {
         self.openChargeMapApiKey = openChargeMapApiKey
         self.routingProvider = routingProvider
         self.geminiApiKey = geminiApiKey
+        self.aiFeaturesEnabled = aiFeaturesEnabled
         self.aiCoachingEnabled = aiCoachingEnabled
         self.chargerOccupancyAlerts = chargerOccupancyAlerts
         self.googlePoiSearch = googlePoiSearch

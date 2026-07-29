@@ -174,8 +174,6 @@ final class AiService {
         }
 
         // Cost estimation — Gemini handles with local rates
-            lines.append("- Cost: $\(String(format: "%.2f", tripCost)) vs ~$\(String(format: "%.2f", petrolCost)) petrol (saved $\(String(format: "%.2f", saved)))")
-        }
 
         lines.append("")
         lines.append("Write a friendly, informative 3-4 sentence summary. Start with a greeting. Mention the most notable aspect of the trip.")

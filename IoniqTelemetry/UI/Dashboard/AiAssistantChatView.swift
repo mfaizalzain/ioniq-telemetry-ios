@@ -17,7 +17,7 @@ struct AiAssistantChatView: View {
     private let aiService = AiService()
 
     private var canUseAi: Bool {
-        services.isPro && !(services.userPreferences.geminiApiKey ?? "").isEmpty
+        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.geminiApiKey ?? "").isEmpty
     }
 
     var body: some View {

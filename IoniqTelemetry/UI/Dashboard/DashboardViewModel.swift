@@ -16,6 +16,7 @@ final class DashboardViewModel {
     private(set) var thermalTip: String?
     private(set) var isPro = false
     private(set) var geminiApiKey: String?
+    private(set) var aiFeaturesEnabled = true
     private(set) var recentTrips: [TripEntity] = []
 
     private let thermalAdvisor = ThermalAdvisor()
@@ -45,6 +46,7 @@ final class DashboardViewModel {
                 self.vehicleName = Ioniq5Constants.vehicleNameFor(prefs.activeProfileId)
                 self.unitSystem = prefs.unitSystem
                 self.geminiApiKey = prefs.geminiApiKey
+                self.aiFeaturesEnabled = prefs.aiFeaturesEnabled
             }
             .store(in: &cancellables)
 

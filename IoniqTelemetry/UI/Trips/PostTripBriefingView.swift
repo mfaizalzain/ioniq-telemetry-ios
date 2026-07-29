@@ -11,6 +11,7 @@ struct PostTripBriefingView: View {
     let samples: [SampleEntity]
     let isPro: Bool
     let geminiApiKey: String?
+    let aiFeaturesEnabled: Bool
     let efficiencyBaseline: Double?
 
     @State private var briefing: String?
@@ -30,6 +31,8 @@ struct PostTripBriefingView: View {
 
                 if !isPro {
                     lockMessage
+                } else if !aiFeaturesEnabled {
+                    featuresDisabledMessage
                 } else if geminiApiKey == nil || geminiApiKey?.isEmpty == true {
                     noKeyMessage
                 } else if let briefing {
@@ -66,7 +69,7 @@ struct PostTripBriefingView: View {
 
     @MainActor
     private func loadBriefing() async {
-        guard isPro, let apiKey = geminiApiKey, !apiKey.isEmpty, briefing == nil, !isLoading else { return }
+        guard isPro, aiFeaturesEnabled, let apiKey = geminiApiKey, !apiKey.isEmpty, briefing == nil, !isLoading else { return }
         isLoading = true
         errorMessage = nil
         do {
@@ -100,6 +103,17 @@ struct PostTripBriefingView: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Text("Add a Gemini API key in Settings to enable AI briefings.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var featuresDisabledMessage: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "poweroff")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Text("AI Features are turned off. Enable them in Settings.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

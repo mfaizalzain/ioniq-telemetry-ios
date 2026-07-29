@@ -246,6 +246,7 @@ private struct BackupSettings: Codable {
     var googleMapsApiKey: String?
     var orsApiKey: String?
     var geminiApiKey: String?
+    var aiFeaturesEnabled: Bool?
     var aiCoachingEnabled: Bool?
     var chargerOccupancyAlerts: Bool?
     var googlePoiSearch: Bool?
@@ -270,6 +271,7 @@ private struct BackupSettings: Codable {
         googleMapsApiKey = prefs.googleMapsApiKey
         orsApiKey = prefs.orsApiKey
         geminiApiKey = prefs.geminiApiKey
+        aiFeaturesEnabled = prefs.aiFeaturesEnabled
         aiCoachingEnabled = prefs.aiCoachingEnabled
         chargerOccupancyAlerts = prefs.chargerOccupancyAlerts
         googlePoiSearch = prefs.googlePoiSearch
@@ -300,6 +302,7 @@ private struct BackupSettings: Codable {
         next.googleMapsApiKey = googleMapsApiKey ?? current.googleMapsApiKey
         next.orsApiKey = orsApiKey ?? current.orsApiKey
         next.geminiApiKey = geminiApiKey ?? current.geminiApiKey
+        if let aiFeaturesEnabled { next.aiFeaturesEnabled = aiFeaturesEnabled }
         if let aiCoachingEnabled { next.aiCoachingEnabled = aiCoachingEnabled }
         if let chargerOccupancyAlerts { next.chargerOccupancyAlerts = chargerOccupancyAlerts }
         if let googlePoiSearch { next.googlePoiSearch = googlePoiSearch }

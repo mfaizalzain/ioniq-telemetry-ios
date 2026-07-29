@@ -180,7 +180,7 @@ struct BatteryHealthReportView: View {
     }
 
     private var canUseAi: Bool {
-        services.isPro && !(services.userPreferences.geminiApiKey ?? "").isEmpty
+        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.geminiApiKey ?? "").isEmpty
     }
 
     private func generateReport() async {

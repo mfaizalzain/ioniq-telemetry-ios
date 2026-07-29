@@ -217,6 +217,18 @@ private struct AiSection: View {
                 )
 
                 Toggle(isOn: Binding(
+                    get: { viewModel.preferences.aiFeaturesEnabled },
+                    set: { viewModel.setAiFeaturesEnabled($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Enable AI Features")
+                        Text("Turn off to keep your API key saved but stop sending telemetry to Gemini")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Toggle(isOn: Binding(
                     get: { viewModel.preferences.aiCoachingEnabled },
                     set: { viewModel.setAiCoachingEnabled($0) }
                 )) {

@@ -71,6 +71,7 @@ struct DashboardView: View {
                 AIDigestSection(
                     isPro: viewModel.isPro,
                     geminiApiKey: viewModel.geminiApiKey,
+                    aiFeaturesEnabled: viewModel.aiFeaturesEnabled,
                     trips: viewModel.recentTrips
                 )
 

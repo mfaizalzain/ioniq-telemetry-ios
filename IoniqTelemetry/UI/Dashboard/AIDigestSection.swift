@@ -8,6 +8,7 @@ import SwiftUI
 struct AIDigestSection: View {
     let isPro: Bool
     let geminiApiKey: String?
+    let aiFeaturesEnabled: Bool
     let trips: [TripEntity]
 
     @State private var digestText: String?
@@ -27,13 +28,15 @@ struct AIDigestSection: View {
                         .foregroundStyle(.secondary)
                         .ioniqStatLabel()
                     Spacer()
-                    if isPro && geminiApiKey?.isEmpty == false {
+                    if isPro && aiFeaturesEnabled && geminiApiKey?.isEmpty == false {
                         periodPicker
                     }
                 }
 
                 if !isPro {
                     lockMessage
+                } else if !aiFeaturesEnabled {
+                    featuresDisabledMessage
                 } else if geminiApiKey == nil || geminiApiKey?.isEmpty == true {
                     noKeyMessage
                 } else if trips.isEmpty {
@@ -74,7 +77,7 @@ struct AIDigestSection: View {
 
     @MainActor
     private func loadDigest() async {
-        guard isPro, let apiKey = geminiApiKey, !apiKey.isEmpty, !trips.isEmpty else { return }
+        guard isPro, aiFeaturesEnabled, let apiKey = geminiApiKey, !apiKey.isEmpty, !trips.isEmpty else { return }
         isLoading = true
         errorMessage = nil
         digestText = nil
@@ -131,6 +134,17 @@ struct AIDigestSection: View {
                 .font(.caption)
                 .foregroundStyle(.tertiary)
             Text("Add a Gemini API key in Settings to enable AI digests.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var featuresDisabledMessage: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "poweroff")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            Text("AI Features are turned off. Enable them in Settings.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

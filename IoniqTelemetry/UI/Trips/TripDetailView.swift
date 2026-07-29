@@ -55,6 +55,7 @@ struct TripDetailView: View {
                     samples: samples,
                     isPro: viewModel.isPro,
                     geminiApiKey: viewModel.geminiApiKey,
+                    aiFeaturesEnabled: viewModel.aiFeaturesEnabled,
                     efficiencyBaseline: viewModel.efficiencyBaseline
                 )
             }
