@@ -5,6 +5,7 @@ import SwiftUI
 
 /// AI-generated weekly or monthly driving digest section for the dashboard.
 /// Requires Pro entitlement and an AI API key stored in user preferences.
+/// Collapsed by default; user taps to expand and fetch. Result cached for the session.
 struct AIDigestSection: View {
     let isPro: Bool
     let aiKey: String?
@@ -12,6 +13,7 @@ struct AIDigestSection: View {
     let aiFeaturesEnabled: Bool
     let trips: [TripEntity]
 
+    @State private var expanded = false
     @State private var digestText: String?
     @State private var selectedPeriod: DigestPeriod = .weekly
     @State private var isLoading = false
@@ -22,48 +24,69 @@ struct AIDigestSection: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                // Header
-                HStack {
-                    Label("AI DIGEST", systemImage: "calendar.badge.clock")
-                        .font(.ioniqCaption)
-                        .foregroundStyle(.secondary)
-                        .ioniqStatLabel()
-                    Spacer()
+                // Header — tap to expand/collapse
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        expanded.toggle()
+                    }
+                    // Auto-fetch on first expand
+                    if expanded && digestText == nil && errorMessage == nil && !isLoading
+                        && isPro && aiFeaturesEnabled && aiKey?.isEmpty == false && !trips.isEmpty {
+                        Task { await loadDigest() }
+                    }
+                } label: {
+                    HStack {
+                        Label("AI DIGEST", systemImage: "calendar.badge.clock")
+                            .font(.ioniqCaption)
+                            .foregroundStyle(.secondary)
+                            .ioniqStatLabel()
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+
+                if expanded {
+                    // Period picker (only when usable)
                     if isPro && aiFeaturesEnabled && aiKey?.isEmpty == false {
                         periodPicker
                     }
-                }
 
-                if !isPro {
-                    lockMessage
-                } else if !aiFeaturesEnabled {
-                    featuresDisabledMessage
-                } else if aiKey == nil || aiKey?.isEmpty == true {
-                    noKeyMessage
-                } else if trips.isEmpty {
-                    Text("No trips yet this \(selectedPeriod.label.lowercased()).")
-                        .font(.subheadline)
-                        .foregroundStyle(.tertiary)
-                } else if let digestText {
-                    Text(digestText)
-                        .font(.subheadline)
-                        .foregroundStyle(.primary)
-                } else if isLoading {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Text("Generating digest…")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                } else if let errorMessage {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Could not generate digest")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(Color.appAmber)
-                        Text(errorMessage)
-                            .font(.caption2)
+                    if !isPro {
+                        lockMessage
+                    } else if !aiFeaturesEnabled {
+                        featuresDisabledMessage
+                    } else if aiKey == nil || aiKey?.isEmpty == true {
+                        noKeyMessage
+                    } else if trips.isEmpty {
+                        Text("No trips yet this \(selectedPeriod.label.lowercased()).")
+                            .font(.subheadline)
                             .foregroundStyle(.tertiary)
+                    } else if let digestText {
+                        Text(digestText)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                    } else if isLoading {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Generating digest…")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if let errorMessage {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Could not generate digest")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(Color.appAmber)
+                            Text(errorMessage)
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
                     }
                 }
             }
@@ -71,9 +94,6 @@ struct AIDigestSection: View {
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
-        .task(id: selectedPeriod) {
-            await loadDigest()
-        }
     }
 
     @MainActor
