@@ -83,6 +83,20 @@ final class PlanViewModel {
     /// Said up front rather than after a request times out — planning a route is
     /// the one thing on this screen that cannot work offline.
     private(set) var isOffline = false
+    
+    // MARK: - Natural-language planning
+
+    var aiInput = ""
+    private(set) var aiBusy = false
+    private(set) var aiInterpretation: String?
+    private(set) var aiError: String?
+
+    /// The card only appears behind the same gate as the rest of the AI features.
+    var canUseAi: Bool {
+        isPro && preferences.aiKey != nil && !preferences.aiKey!.isEmpty && preferences.aiFeaturesEnabled
+    }
+
+    var aiProviderLabel: String { preferences.aiProvider.label }
     private(set) var isPro = false
 
     private let services: AppServices
@@ -143,6 +157,65 @@ final class PlanViewModel {
     var canPlan: Bool {
         origin.selected != nil && destination.selected != nil && !isPlanning
     }
+
+    // MARK: - Natural-language planning
+
+    /// Parses a natural-language trip request using the configured AI provider,
+    /// then fills the endpoint fields with what the AI extracted.
+    func planFromNaturalLanguage() async {
+        let text = aiInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, !aiBusy else { return }
+        guard let apiKey = preferences.aiKey, !apiKey.isEmpty else {
+            aiError = "Add your API key in Settings to plan by conversation."
+            return
+        }
+
+        aiBusy = true
+        aiInterpretation = nil
+        aiError = nil
+        defer { aiBusy = false }
+
+        let location = await locationProvider.currentLocation()
+        let locationContext: String
+        if let loc = location {
+            locationContext = String(format: "Current location: lat %.4f, lon %.4f", loc.lat, loc.lon)
+        } else {
+            locationContext = "Current location: unknown"
+        }
+
+        let prompt = """
+        You are an EV trip planning assistant. The user wants to plan a trip.
+        \(locationContext)
+
+        The user says: \(text)
+
+        If they ask about nearby charging, respond with a summary of nearby options.
+        If they specify a destination, extract the destination and waypoints clearly.
+        Keep your response concise (2-3 sentences).
+        """
+
+        let aiService = AiService()
+        do {
+            let response = try await aiService.askCopilotWithContext(
+                query: prompt,
+                telemetryContext: locationContext,
+                apiKey: apiKey,
+                aiProvider: preferences.aiProvider
+            )
+            aiInterpretation = response
+        } catch {
+            aiError = error.localizedDescription
+        }
+    }
+
+    /// Clears the prompt along with the echo of the last parse.
+    func clearAiInput() {
+        aiInput = ""
+        aiInterpretation = nil
+        aiError = nil
+    }
+
+    func dismissAiError() { aiError = nil }
 
     /// Every routed point in order: origin, stopovers, destination.
     private var routeStops: [LatLon] {

@@ -19,6 +19,9 @@ struct PlanView: View {
                             RoutingNoticeBar(message: notice, onDismiss: viewModel.dismissRoutingNotice)
                         }
 
+                        if viewModel.canUseAi {
+                            AiPlanCard(viewModel: viewModel)
+                        }
                         RouteBuilderCard(viewModel: viewModel, showSaveTrip: $showSaveTrip)
 
                         if let plan = viewModel.plan {
@@ -79,6 +82,135 @@ private struct RoutingNoticeBar: View {
         .padding(12)
         .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 10))
         .padding(.horizontal)
+    }
+}
+
+// MARK: - AI planning
+
+private struct AiPlanCard: View {
+    let viewModel: PlanViewModel
+    @State private var expanded = false
+
+    private static let quickPrompt = "Find chargers near me"
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(Color.appAccent)
+                        Text("AI Assistant")
+                            .font(.subheadline.weight(.semibold))
+                        Text(viewModel.aiProviderLabel.uppercased())
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.appAccent.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.appAccent)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if expanded {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            TextField("e.g. Find chargers near me, or drive to Penang…",
+                                      text: Binding(
+                                        get: { viewModel.aiInput },
+                                        set: { viewModel.aiInput = $0 }
+                                      ),
+                                      axis: .vertical)
+                            .lineLimit(1...3)
+                            .textFieldStyle(.plain)
+                            .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
+
+                            if !viewModel.aiInput.isEmpty {
+                                Button {
+                                    viewModel.clearAiInput()
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityLabel("Clear")
+                            }
+                        }
+                        .padding(10)
+                        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
+
+                        Button {
+                            Task { await viewModel.planFromNaturalLanguage() }
+                        } label: {
+                            if viewModel.aiBusy {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.up.circle.fill").font(.title2)
+                            }
+                        }
+                        .tint(Color.appAccent)
+                        .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .accessibilityLabel("Plan this trip")
+                    }
+
+                    if viewModel.aiInput.isEmpty && !viewModel.aiBusy && viewModel.aiInterpretation == nil {
+                        Button {
+                            viewModel.aiInput = Self.quickPrompt
+                            Task { await viewModel.planFromNaturalLanguage() }
+                        } label: {
+                            Text(Self.quickPrompt)
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.appSurface, in: Capsule())
+                        }
+                        .tint(.primary)
+                    }
+
+                    if let interpretation = viewModel.aiInterpretation {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color.appGreen)
+                            Text(interpretation)
+                                .font(.caption)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+
+                    if let error = viewModel.aiError {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundStyle(Color.appAmber)
+                            Text(error).font(.caption)
+                            Spacer()
+                            Button {
+                                viewModel.dismissAiError()
+                            } label: {
+                                Image(systemName: "xmark").font(.caption2)
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .padding(14)
+        }
+        .padding(.horizontal)
+        .backgroundStyle(Color.appAccent.opacity(0.08))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color.appAccent.opacity(0.3), lineWidth: 1)
+                .padding(.horizontal)
+        }
     }
 }
 
