@@ -15,7 +15,8 @@ final class DashboardViewModel {
     private(set) var unitSystem: UnitSystem = .metric
     private(set) var thermalTip: String?
     private(set) var isPro = false
-    private(set) var geminiApiKey: String?
+    private(set) var aiKey: String?
+    private(set) var aiProvider = AiProvider.gemini
     private(set) var aiFeaturesEnabled = true
     private(set) var recentTrips: [TripEntity] = []
 
@@ -46,6 +47,8 @@ final class DashboardViewModel {
                 self.vehicleName = Ioniq5Constants.vehicleNameFor(prefs.activeProfileId)
                 self.unitSystem = prefs.unitSystem
                 self.geminiApiKey = prefs.geminiApiKey
+                self.aiKey = prefs.aiKey
+                self.aiProvider = prefs.aiProvider
                 self.aiFeaturesEnabled = prefs.aiFeaturesEnabled
             }
             .store(in: &cancellables)

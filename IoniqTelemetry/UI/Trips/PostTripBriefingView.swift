@@ -4,13 +4,14 @@ import CoreUI
 import SwiftUI
 
 /// AI-generated post-trip briefing card, shown on the trip detail screen.
-/// Requires Pro entitlement and a Gemini API key stored in user preferences.
+/// Requires Pro entitlement and an AI API key stored in user preferences.
 struct PostTripBriefingView: View {
     let trip: TripEntity
     let recentTrips: [TripEntity]
     let samples: [SampleEntity]
     let isPro: Bool
-    let geminiApiKey: String?
+    let aiKey: String?
+    let aiProvider: AiProvider
     let aiFeaturesEnabled: Bool
     let efficiencyBaseline: Double?
 
@@ -33,7 +34,7 @@ struct PostTripBriefingView: View {
                     lockMessage
                 } else if !aiFeaturesEnabled {
                     featuresDisabledMessage
-                } else if geminiApiKey == nil || geminiApiKey?.isEmpty == true {
+                } else if aiKey == nil || aiKey?.isEmpty == true {
                     noKeyMessage
                 } else if let briefing {
                     Text(briefing)
@@ -69,7 +70,7 @@ struct PostTripBriefingView: View {
 
     @MainActor
     private func loadBriefing() async {
-        guard isPro, aiFeaturesEnabled, let apiKey = geminiApiKey, !apiKey.isEmpty, briefing == nil, !isLoading else { return }
+        guard isPro, aiFeaturesEnabled, let apiKey = aiKey, !apiKey.isEmpty, briefing == nil, !isLoading else { return }
         isLoading = true
         errorMessage = nil
         do {
@@ -78,7 +79,8 @@ struct PostTripBriefingView: View {
                 recentTrips: recentTrips,
                 telemetrySamples: samples,
                 efficiencyBaseline: efficiencyBaseline,
-                apiKey: apiKey
+                apiKey: apiKey,
+                aiProvider: aiProvider
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -102,7 +104,7 @@ struct PostTripBriefingView: View {
             Image(systemName: "key.fill")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
-            Text("Add a Gemini API key in Settings to enable AI briefings.")
+            Text("Add an API key in Settings to enable AI briefings.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

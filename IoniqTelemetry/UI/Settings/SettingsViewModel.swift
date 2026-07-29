@@ -155,6 +155,8 @@ final class SettingsViewModel {
     func setReserveSoc(_ value: Float) { update { $0.reserveSocPercent = value } }
     func setTargetArrivalSoc(_ value: Float) { update { $0.targetArrivalSocPercent = value } }
     func setGeminiApiKey(_ value: String) { update { $0.geminiApiKey = value.isEmpty ? nil : value } }
+    func setDeepseekApiKey(_ value: String) { update { $0.deepseekApiKey = value.isEmpty ? nil : value } }
+    func setAiProvider(_ value: AiProvider) { update { $0.aiProvider = value } }
     func setAiFeaturesEnabled(_ value: Bool) { update { $0.aiFeaturesEnabled = value } }
     func setAiCoachingEnabled(_ value: Bool) { update { $0.aiCoachingEnabled = value } }
 

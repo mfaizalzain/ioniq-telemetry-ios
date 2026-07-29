@@ -67,7 +67,7 @@ struct BatteryHealthReportView: View {
 
                 // Status text
                 if !canUseAi {
-                    Label("Full AI battery health report available with Pro + Gemini key.",
+                    Label("Full AI battery health report available with Pro + API key.",
                           systemImage: "sparkles")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -180,12 +180,12 @@ struct BatteryHealthReportView: View {
     }
 
     private var canUseAi: Bool {
-        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.geminiApiKey ?? "").isEmpty
+        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.aiKey ?? "").isEmpty
     }
 
     private func generateReport() async {
-        guard let apiKey = services.userPreferences.geminiApiKey, !apiKey.isEmpty else {
-            errorMessage = "Add a Gemini API key in Settings."
+        guard let apiKey = services.userPreferences.aiKey, !apiKey.isEmpty else {
+            errorMessage = "Add an AI API key in Settings."
             return
         }
         guard services.isPro else {
@@ -221,7 +221,8 @@ struct BatteryHealthReportView: View {
                 sohHistory: sohHistory,
                 voltageDeltas: voltageDeltas,
                 chargeSpeeds: chargeSpeeds,
-                apiKey: apiKey
+                apiKey: apiKey,
+                aiProvider: services.userPreferences.aiProvider
             )
         } catch {
             errorMessage = error.localizedDescription

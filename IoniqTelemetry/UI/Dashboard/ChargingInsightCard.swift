@@ -2,7 +2,7 @@ import CoreData
 import CoreDomain
 import SwiftUI
 
-/// A card that displays AI-generated charging trend insights powered by Gemini.
+/// A card that displays AI-generated charging trend insights powered by AI.
 /// Shows a summary when available and refreshes on tap.
 struct ChargingInsightCard: View {
     @Environment(AppServices.self) private var services
@@ -70,7 +70,7 @@ struct ChargingInsightCard: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else if !canUseAi {
                     VStack(alignment: .leading, spacing: 4) {
-                        Label("Charging Insights are available with Pro and a Gemini API key.",
+                        Label("Charging Insights are available with Pro and an API key.",
                               systemImage: "sparkles")
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -94,12 +94,12 @@ struct ChargingInsightCard: View {
     }
 
     private var canUseAi: Bool {
-        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.geminiApiKey ?? "").isEmpty
+        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.aiKey ?? "").isEmpty
     }
 
     private func refresh() async {
-        guard let apiKey = services.userPreferences.geminiApiKey, !apiKey.isEmpty else {
-            errorMessage = "Add a Gemini API key in Settings."
+        guard let apiKey = services.userPreferences.aiKey, !apiKey.isEmpty else {
+            errorMessage = "Add an AI API key in Settings."
             return
         }
         guard services.isPro else {
@@ -115,7 +115,8 @@ struct ChargingInsightCard: View {
             let sessions = try services.tripLog.chargeSessions()
             insight = try await aiService.generateChargingInsight(
                 chargeSessions: sessions,
-                apiKey: apiKey
+                apiKey: apiKey,
+                aiProvider: services.userPreferences.aiProvider
             )
         } catch {
             errorMessage = error.localizedDescription

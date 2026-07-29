@@ -20,6 +20,19 @@ public enum ThemeMode: String, Sendable {
 ///
 /// [openRouteService] is the recommended default — signup is an email and a token,
 /// no card, and one key also covers geocoding and returns elevation gain.
+/// Which AI model provider to use for AI-powered features.
+public enum AiProvider: String, Sendable, CaseIterable {
+    case gemini = "GEMINI"
+    case deepseek = "DEEPSEEK"
+
+    public var label: String {
+        switch self {
+        case .gemini: return "Gemini"
+        case .deepseek: return "DeepSeek"
+        }
+    }
+}
+
 public enum RoutingProvider: String, Sendable {
     /// Built-in MapKit — no key needed. No elevation data.
     case appleMaps = "APPLE_MAPS"
@@ -101,6 +114,10 @@ public struct UserPreferences: Sendable {
     /// Pro/User BYOK feature: while driving or charging, user-supplied Google Gemini API key
     /// for plain-language diagnostics, battery thermal throttling explanations, and energy coaching.
     public var geminiApiKey: String?
+    /// Pro/User BYOK: DeepSeek API key for the same AI features when [aiProvider] is [.deepseek].
+    public var deepseekApiKey: String?
+    /// Which AI provider to use for AI-powered features (Gemini or DeepSeek).
+    public var aiProvider: AiProvider
     /// Master toggle for all Gemini-powered features. When off the API key is kept
     /// but no telemetry data is sent to Gemini for any AI feature.
     public var aiFeaturesEnabled: Bool
@@ -142,6 +159,8 @@ public struct UserPreferences: Sendable {
         openChargeMapApiKey: String? = nil,
         routingProvider: RoutingProvider = .appleMaps,
         geminiApiKey: String? = nil,
+        deepseekApiKey: String? = nil,
+        aiProvider: AiProvider = .gemini,
         aiFeaturesEnabled: Bool = true,
         aiCoachingEnabled: Bool = true,
         chargerOccupancyAlerts: Bool = false,
@@ -172,6 +191,8 @@ public struct UserPreferences: Sendable {
         self.openChargeMapApiKey = openChargeMapApiKey
         self.routingProvider = routingProvider
         self.geminiApiKey = geminiApiKey
+        self.deepseekApiKey = deepseekApiKey
+        self.aiProvider = aiProvider
         self.aiFeaturesEnabled = aiFeaturesEnabled
         self.aiCoachingEnabled = aiCoachingEnabled
         self.chargerOccupancyAlerts = chargerOccupancyAlerts
@@ -196,7 +217,15 @@ public struct UserPreferences: Sendable {
         }
     }
 
-    /// True when the selected routing provider has a usable key.
+    /// The API key for the selected AI provider, or nil when not set.
+    public var aiKey: String? {
+        switch aiProvider {
+        case .gemini: return geminiApiKey
+        case .deepseek: return deepseekApiKey
+        }
+    }
+
+    /// True when the selected AI provider has a usable key.
     public var canPlanRoutes: Bool {
         if routingProvider == .appleMaps { return true }
         return routingKeyFor() != nil

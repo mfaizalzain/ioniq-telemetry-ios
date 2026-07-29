@@ -4,10 +4,11 @@ import CoreUI
 import SwiftUI
 
 /// AI-generated weekly or monthly driving digest section for the dashboard.
-/// Requires Pro entitlement and a Gemini API key stored in user preferences.
+/// Requires Pro entitlement and an AI API key stored in user preferences.
 struct AIDigestSection: View {
     let isPro: Bool
-    let geminiApiKey: String?
+    let aiKey: String?
+    let aiProvider: AiProvider
     let aiFeaturesEnabled: Bool
     let trips: [TripEntity]
 
@@ -28,7 +29,7 @@ struct AIDigestSection: View {
                         .foregroundStyle(.secondary)
                         .ioniqStatLabel()
                     Spacer()
-                    if isPro && aiFeaturesEnabled && geminiApiKey?.isEmpty == false {
+                    if isPro && aiFeaturesEnabled && aiKey?.isEmpty == false {
                         periodPicker
                     }
                 }
@@ -37,7 +38,7 @@ struct AIDigestSection: View {
                     lockMessage
                 } else if !aiFeaturesEnabled {
                     featuresDisabledMessage
-                } else if geminiApiKey == nil || geminiApiKey?.isEmpty == true {
+                } else if aiKey == nil || aiKey?.isEmpty == true {
                     noKeyMessage
                 } else if trips.isEmpty {
                     Text("No trips yet this \(selectedPeriod.label.lowercased()).")
@@ -77,7 +78,7 @@ struct AIDigestSection: View {
 
     @MainActor
     private func loadDigest() async {
-        guard isPro, aiFeaturesEnabled, let apiKey = geminiApiKey, !apiKey.isEmpty, !trips.isEmpty else { return }
+        guard isPro, aiFeaturesEnabled, let apiKey = aiKey, !apiKey.isEmpty, !trips.isEmpty else { return }
         isLoading = true
         errorMessage = nil
         digestText = nil
@@ -100,7 +101,8 @@ struct AIDigestSection: View {
             digestText = try await aiService.generateDigest(
                 trips: filteredTrips,
                 period: selectedPeriod,
-                apiKey: apiKey
+                apiKey: apiKey,
+                aiProvider: aiProvider
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -133,7 +135,7 @@ struct AIDigestSection: View {
             Image(systemName: "key.fill")
                 .font(.caption)
                 .foregroundStyle(.tertiary)
-            Text("Add a Gemini API key in Settings to enable AI digests.")
+            Text("Add an API key in Settings to enable AI digests.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

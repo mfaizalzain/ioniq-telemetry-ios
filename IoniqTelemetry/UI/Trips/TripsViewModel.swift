@@ -23,7 +23,8 @@ final class TripsViewModel {
     private(set) var errorMessage: String?
     private(set) var unitSystem: UnitSystem = .metric
     private(set) var isPro = false
-    private(set) var geminiApiKey: String?
+    private(set) var aiKey: String?
+    private(set) var aiProvider = AiProvider.gemini
     private(set) var aiFeaturesEnabled = true
 
     /// Vehicle baseline efficiency in kWh/100km. Derived from recent trips when data
@@ -48,6 +49,8 @@ final class TripsViewModel {
             .sink { [weak self] in
                 self?.unitSystem = $0.unitSystem
                 self?.geminiApiKey = $0.geminiApiKey
+                self?.aiKey = $0.aiKey
+                self?.aiProvider = $0.aiProvider
                 self?.aiFeaturesEnabled = $0.aiFeaturesEnabled
             }
             .store(in: &cancellables)

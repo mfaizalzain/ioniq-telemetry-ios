@@ -208,13 +208,33 @@ private struct AiSection: View {
     var body: some View {
         Section {
             if viewModel.isPro {
-                SecretField(
-                    placeholder: "Gemini API key",
-                    initialValue: viewModel.preferences.geminiApiKey ?? "",
-                    onCommit: { viewModel.setGeminiApiKey($0) },
-                    helpTitle: "Get a key at Google AI Studio",
-                    helpURL: URL(string: "https://aistudio.google.com/apikey")
-                )
+                Picker("AI Provider", selection: Binding(
+                    get: { viewModel.preferences.aiProvider },
+                    set: { viewModel.setAiProvider($0) }
+                )) {
+                    ForEach(AiProvider.allCases, id: \.self) { provider in
+                        Text(provider.label).tag(provider)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if viewModel.preferences.aiProvider == .gemini {
+                    SecretField(
+                        placeholder: "API key",
+                        initialValue: viewModel.preferences.geminiApiKey ?? "",
+                        onCommit: { viewModel.setGeminiApiKey($0) },
+                        helpTitle: "Get a key at Google AI Studio",
+                        helpURL: URL(string: "https://aistudio.google.com/apikey")
+                    )
+                } else {
+                    SecretField(
+                        placeholder: "DeepSeek API key",
+                        initialValue: viewModel.preferences.deepseekApiKey ?? "",
+                        onCommit: { viewModel.setDeepseekApiKey($0) },
+                        helpTitle: "Get a key at DeepSeek Platform",
+                        helpURL: URL(string: "https://platform.deepseek.com/api_keys")
+                    )
+                }
 
                 Toggle(isOn: Binding(
                     get: { viewModel.preferences.aiFeaturesEnabled },
@@ -222,7 +242,7 @@ private struct AiSection: View {
                 )) {
                     VStack(alignment: .leading, spacing: 1) {
                         Text("Enable AI Features")
-                        Text("Turn off to keep your API key saved but stop sending telemetry to Gemini")
+                        Text("Turn off to keep your API key saved but stop sending telemetry")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -252,7 +272,7 @@ private struct AiSection: View {
                             .foregroundStyle(Color.appAccent)
                     } label: {
                         VStack(alignment: .leading, spacing: 1) {
-                            Label("Gemini AI Features", systemImage: "rectangle.3.group")
+                            Label("AI Features", systemImage: "rectangle.3.group")
                             Text("Charging Intelligence, Battery Reports & AI AiAssistant")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -262,14 +282,22 @@ private struct AiSection: View {
                 .tint(.primary)
             }
         } header: {
-            Text("AI Features (Gemini)")
+            Text("AI Features")
         } footer: {
-            if viewModel.isPro && (viewModel.preferences.geminiApiKey ?? "").isEmpty {
-                Text("Add a Gemini API key to enable AI-powered features. Your own key means requests land on your free quota, not a shared pool. Your trip data, battery stats, and vehicle telemetry are sent to Google Gemini to generate responses.")
-            } else if viewModel.isPro {
-                Text("AI features use your Gemini API key. Battery Health Reports, Charging Insights, and the AI AiAssistant all draw from the same key. Your trip data and vehicle telemetry are sent to Google Gemini to generate responses.")
+            if viewModel.isPro {
+                let keyMissing: Bool = {
+                    switch viewModel.preferences.aiProvider {
+                    case .gemini: return (viewModel.preferences.geminiApiKey ?? "").isEmpty
+                    case .deepseek: return (viewModel.preferences.deepseekApiKey ?? "").isEmpty
+                    }
+                }()
+                if keyMissing {
+                    Text("Add a \(viewModel.preferences.aiProvider.label) API key to enable AI-powered features. Your own key means requests land on your free quota, not a shared pool. Your trip data, battery stats, and vehicle telemetry are sent to \(viewModel.preferences.aiProvider.label) to generate responses.")
+                } else {
+                    Text("AI features use your \(viewModel.preferences.aiProvider.label) API key. Battery Health Reports, Charging Insights, and the AI AiAssistant all draw from the same key. Your trip data and vehicle telemetry are sent to \(viewModel.preferences.aiProvider.label) to generate responses.")
+                }
             } else {
-                Text("Charging Intelligence, Battery Health Reports and the AI AiAssistant with vehicle context are Pro features that need a Gemini API key.")
+                Text("Charging Intelligence, Battery Health Reports and the AI AiAssistant with vehicle context are Pro features that need an API key.")
             }
         }
     }

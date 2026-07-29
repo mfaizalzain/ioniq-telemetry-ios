@@ -2,15 +2,17 @@ import CoreData
 import CoreDomain
 import Foundation
 
-/// Gemini-powered AI service for charging insights, battery health reports, and
-/// contextual aiAssistant chat. All methods require a valid Gemini API key and Pro
-/// entitlement (gated at the call site).
+/// AI-powered service for charging insights, battery health reports, and
+/// contextual aiAssistant chat. Supports Gemini (via Google AI) and DeepSeek
+/// (OpenAI-compatible API). All methods require a valid API key for the selected
+/// provider and Pro entitlement (gated at the call site).
 @Observable
 @MainActor
 final class AiService {
 
     private let session: URLSession
-    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    private let baseURLGemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent"
+    private let baseURLDeepSeek = "https://api.deepseek.com/v1/chat/completions"
 
     init() {
         let config = URLSessionConfiguration.ephemeral
@@ -26,7 +28,8 @@ final class AiService {
     ///   - recentTrips: Recent trips for context (e.g. efficiency trend).
     ///   - telemetrySamples: Telemetry samples for this trip.
     ///   - efficiencyBaseline: Vehicle baseline efficiency in kWh/100km.
-    ///   - apiKey: Gemini API key.
+    ///   - apiKey: API key for the selected provider.
+    ///   - aiProvider: The AI provider to use (Gemini or DeepSeek).
     /// - Returns: AI-generated briefing text.
     func generatePostTripBriefing(
         trip: TripEntity,
@@ -34,6 +37,7 @@ final class AiService {
         telemetrySamples: [SampleEntity],
         efficiencyBaseline: Double?,
         apiKey: String,
+        aiProvider: AiProvider = .gemini,
         countryCode: String? = nil
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
@@ -44,7 +48,7 @@ final class AiService {
             telemetrySamples: telemetrySamples,
             efficiencyBaseline: efficiencyBaseline
         )
-        return try await sendPrompt(prompt, apiKey: apiKey)
+        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
 
     // MARK: - AI Digest
@@ -53,18 +57,20 @@ final class AiService {
     /// - Parameters:
     ///   - trips: Trips in the period.
     ///   - period: Weekly or monthly.
-    ///   - apiKey: Gemini API key.
+    ///   - apiKey: API key for the selected provider.
+    ///   - aiProvider: The AI provider to use (Gemini or DeepSeek).
     /// - Returns: AI-generated digest text.
     func generateDigest(
         trips: [TripEntity],
         period: DigestPeriod,
-        apiKey: String
+        apiKey: String,
+        aiProvider: AiProvider = .gemini
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
-        guard !trips.isEmpty else { return "No trips recorded this \(period.label.lowercased())." }
+        guard !trips.isEmpty else { return "No trips recorded this \\(period.label.lowercased())." }
 
         let prompt = buildDigestPrompt(trips: trips, period: period)
-        return try await sendPrompt(prompt, apiKey: apiKey)
+        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
 
     // MARK: - Charging Insight
@@ -72,18 +78,20 @@ final class AiService {
     /// Generates a plain-language insight about recent charge sessions.
     /// - Parameters:
     ///   - chargeSessions: Last 30 charge sessions (most recent first).
-    ///   - apiKey: Gemini API key.
+    ///   - apiKey: API key for the selected provider.
+    ///   - aiProvider: The AI provider to use (Gemini or DeepSeek).
     /// - Returns: AI-generated insight text.
     func generateChargingInsight(
         chargeSessions: [ChargeSessionEntity],
-        apiKey: String
+        apiKey: String,
+        aiProvider: AiProvider = .gemini
     ) async throws -> String {
         guard !chargeSessions.isEmpty else { return "No charge sessions to analyse." }
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
 
         let recent = Array(chargeSessions.prefix(30))
         let prompt = buildChargingPrompt(sessions: recent)
-        return try await sendPrompt(prompt, apiKey: apiKey)
+        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
 
     // MARK: - Battery Health Report
@@ -94,7 +102,8 @@ final class AiService {
         sohHistory: [(Date, Double)],
         voltageDeltas: [Double],
         chargeSpeeds: [(Date, Double)],
-        apiKey: String
+        apiKey: String,
+        aiProvider: AiProvider = .gemini
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
 
@@ -103,7 +112,7 @@ final class AiService {
             voltageDeltas: voltageDeltas,
             chargeSpeeds: chargeSpeeds
         )
-        return try await sendPrompt(prompt, apiKey: apiKey)
+        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
 
     // MARK: - AiAssistant with Context
@@ -112,7 +121,8 @@ final class AiService {
     func askCopilotWithContext(
         query: String,
         telemetryContext: String,
-        apiKey: String
+        apiKey: String,
+        aiProvider: AiProvider = .gemini
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
         guard !query.isEmpty else { throw AiError.emptyQuery }
@@ -128,7 +138,7 @@ final class AiService {
 
             Provide a clear, concise answer based on the context above.
             """
-        return try await sendPrompt(prompt, apiKey: apiKey)
+        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
 
     // MARK: - Post-Trip Briefing Prompt
@@ -297,6 +307,114 @@ final class AiService {
 
     // MARK: - Private
 
+    /// Dispatches the prompt to the selected AI provider.
+    private func sendPrompt(provider: AiProvider, apiKey: String, prompt: String) async throws -> String {
+        switch provider {
+        case .gemini:
+            return try await callGemini(prompt: prompt, apiKey: apiKey)
+        case .deepseek:
+            return try await callDeepSeek(systemPrompt: nil, userMessage: prompt, apiKey: apiKey)
+        }
+    }
+
+    /// Calls the Gemini API (Google AI Studio).
+    private func callGemini(prompt: String, apiKey: String) async throws -> String {
+        guard let url = URL(string: "\(baseURLGemini)?key=\(apiKey)") else {
+            throw AiError.invalidURL
+        }
+
+        let body: [String: Any] = [
+            "contents": [
+                ["parts": [["text": prompt]]]
+            ],
+            "generationConfig": [
+                "temperature": 0.3,
+                "maxOutputTokens": 1024,
+                "topP": 0.95,
+                "topK": 40
+            ]
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AiError.networkError("No response")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "—"
+            throw AiError.apiError(httpResponse.statusCode, body)
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let candidates = json["candidates"] as? [[String: Any]],
+              let first = candidates.first,
+              let content = first["content"] as? [String: Any],
+              let parts = content["parts"] as? [[String: Any]],
+              let text = parts.first?["text"] as? String else {
+            throw AiError.decodingError
+        }
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Calls the DeepSeek API (OpenAI-compatible format).
+    /// - Parameters:
+    ///   - systemPrompt: Optional system message. When nil the prompt is sent as a user message.
+    ///   - userMessage: The user's message content.
+    ///   - apiKey: DeepSeek API key.
+    /// - Returns: The model's response text.
+    private func callDeepSeek(systemPrompt: String?, userMessage: String, apiKey: String) async throws -> String {
+        guard let url = URL(string: baseURLDeepSeek) else {
+            throw AiError.invalidURL
+        }
+
+        var messages: [[String: Any]] = []
+        if let systemPrompt, !systemPrompt.isEmpty {
+            messages.append(["role": "system", "content": systemPrompt])
+        }
+        messages.append(["role": "user", "content": userMessage])
+
+        let body: [String: Any] = [
+            "model": "deepseek-chat",
+            "messages": messages,
+            "max_tokens": 1024,
+            "temperature": 0.3
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AiError.networkError("No response")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? "—"
+            throw AiError.apiError(httpResponse.statusCode, body)
+        }
+
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let choices = json["choices"] as? [[String: Any]],
+              let first = choices.first,
+              let message = first["message"] as? [String: Any],
+              let text = message["content"] as? String else {
+            throw AiError.decodingError
+        }
+
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private func buildChargingPrompt(sessions: [ChargeSessionEntity]) -> String {
         var lines = [
             "Analyse the following \(sessions.count) charging sessions for an E-GMP electric vehicle.",
@@ -375,51 +493,6 @@ final class AiService {
 
         return lines.joined(separator: "\n")
     }
-
-    private func sendPrompt(_ prompt: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: "\(baseURL)?key=\(apiKey)") else {
-            throw AiError.invalidURL
-        }
-
-        let body: [String: Any] = [
-            "contents": [
-                ["parts": [["text": prompt]]]
-            ],
-            "generationConfig": [
-                "temperature": 0.3,
-                "maxOutputTokens": 1024,
-                "topP": 0.95,
-                "topK": 40
-            ]
-        ]
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: body)
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw AiError.networkError("No response")
-        }
-
-        guard httpResponse.statusCode == 200 else {
-            let body = String(data: data, encoding: .utf8) ?? "—"
-            throw AiError.apiError(httpResponse.statusCode, body)
-        }
-
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let candidates = json["candidates"] as? [[String: Any]],
-              let first = candidates.first,
-              let content = first["content"] as? [String: Any],
-              let parts = content["parts"] as? [[String: Any]],
-              let text = parts.first?["text"] as? String else {
-            throw AiError.decodingError
-        }
-
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
 }
 
 // MARK: - Errors
@@ -435,7 +508,7 @@ enum AiError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .missingApiKey:
-            return "Gemini API key is not set. Add it in Settings."
+            return "AI API key is not set. Add it in Settings."
         case .emptyQuery:
             return "Please enter a question."
         case .invalidURL:

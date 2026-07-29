@@ -17,7 +17,7 @@ struct AiAssistantChatView: View {
     private let aiService = AiService()
 
     private var canUseAi: Bool {
-        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.geminiApiKey ?? "").isEmpty
+        services.isPro && services.userPreferences.aiFeaturesEnabled && !(services.userPreferences.aiKey ?? "").isEmpty
     }
 
     var body: some View {
@@ -52,7 +52,7 @@ struct AiAssistantChatView: View {
                             .foregroundStyle(Color.appAccent)
                         Text("AI AiAssistant with Vehicle Context")
                             .font(.subheadline.weight(.medium))
-                        Text("Ask questions about your battery, efficiency, and driving patterns — powered by Gemini. Available with Pro and a Gemini API key.")
+                        Text("Ask questions about your battery, efficiency, and driving patterns. Available with Pro and an API key.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.center)
@@ -175,7 +175,7 @@ struct AiAssistantChatView: View {
 
     private func sendMessage() async {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty, let apiKey = services.userPreferences.geminiApiKey, !apiKey.isEmpty else { return }
+        guard !text.isEmpty, let apiKey = services.userPreferences.aiKey, !apiKey.isEmpty else { return }
 
         inputText = ""
         errorMessage = nil
@@ -218,7 +218,8 @@ struct AiAssistantChatView: View {
             let response = try await aiService.askCopilotWithContext(
                 query: text,
                 telemetryContext: context,
-                apiKey: apiKey
+                apiKey: apiKey,
+                aiProvider: services.userPreferences.aiProvider
             )
             let assistantMessage = AiAssistantMessage(role: .assistant, text: response)
             messages.append(assistantMessage)

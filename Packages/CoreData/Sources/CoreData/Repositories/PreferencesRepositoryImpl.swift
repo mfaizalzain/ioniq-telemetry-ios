@@ -17,8 +17,9 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         static let ors = "orsApiKey"
         static let openChargeMap = "openChargeMapApiKey"
         static let gemini = "geminiApiKey"
+        static let deepseek = "deepseekApiKey"
 
-        static let all = [googleMaps, ors, openChargeMap, gemini]
+        static let all = [googleMaps, ors, openChargeMap, gemini, deepseek]
     }
 
     private let defaults = UserDefaults.standard
@@ -94,6 +95,9 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
            let val = RoutingProvider(rawValue: raw) { prefs.routingProvider = val }
 
         prefs.geminiApiKey = KeychainStore.read(SecretKey.gemini)
+        prefs.deepseekApiKey = KeychainStore.read(SecretKey.deepseek)
+        if let raw = defaults.string(forKey: "aiProvider"),
+           let val = AiProvider(rawValue: raw) { prefs.aiProvider = val }
         prefs.aiFeaturesEnabled = defaults.bool(forKey: "aiFeaturesEnabled", default: true)
         prefs.aiCoachingEnabled = defaults.bool(forKey: "aiCoachingEnabled", default: true)
         prefs.chargerOccupancyAlerts = defaults.bool(forKey: "chargerOccupancyAlerts", default: false)
@@ -134,6 +138,8 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         KeychainStore.write(prefs.openChargeMapApiKey, account: SecretKey.openChargeMap)
         defaults.set(prefs.routingProvider.rawValue, forKey: "routingProvider")
         KeychainStore.write(prefs.geminiApiKey, account: SecretKey.gemini)
+        KeychainStore.write(prefs.deepseekApiKey, account: SecretKey.deepseek)
+        defaults.set(prefs.aiProvider.rawValue, forKey: "aiProvider")
         defaults.set(prefs.aiFeaturesEnabled, forKey: "aiFeaturesEnabled")
         defaults.set(prefs.aiCoachingEnabled, forKey: "aiCoachingEnabled")
         defaults.set(prefs.chargerOccupancyAlerts, forKey: "chargerOccupancyAlerts")
