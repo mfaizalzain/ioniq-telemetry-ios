@@ -1,5 +1,6 @@
 import CarPlay
 import Combine
+import CoreData
 import CoreDomain
 import CoreRouting
 import Foundation
@@ -45,6 +46,15 @@ final class CarPlayCoordinator {
     private var connectionState: ObdConnectionState = .disconnected
     private var lastRefresh = Date.distantPast
     private var cancellables = Set<AnyCancellable>()
+
+    /// Learned consumption from recent trip history, or nil when insufficient data.
+    /// Mirrors Android Auto's learnedConsumptionKwhPer100Km in ChargerReach.kt.
+    private var learnedConsumption: Float?
+
+    /// Last batch of fetched chargers, so we can re-rank on telemetry updates
+    /// without re-fetching from the API.
+    private var fetchedChargers: [Charger] = []
+    private var lastOrigin: LatLon?
 
     init(interfaceController: CPInterfaceController, services: AppServices) {
         self.interfaceController = interfaceController
@@ -94,11 +104,17 @@ final class CarPlayCoordinator {
         lastRefresh = now
         refreshStatus()
         refreshCharging()
+        refreshChargers()
     }
 
     // MARK: - Status
 
     private func refreshStatus() {
+        // Compute learned consumption from recent trip history (matching Android Auto)
+        learnedConsumption = (try? services.tripLog.trips()).flatMap { trips in
+            learnedConsumptionKwhPer100Km(trips: trips)
+        }
+
         let soc = telemetry.socDisplay ?? telemetry.socBms
         var items: [CPInformationItem] = [
             CPInformationItem(title: "Charge", detail: soc.map { String(format: "%.0f%%", $0) } ?? "—"),
@@ -121,10 +137,13 @@ final class CarPlayCoordinator {
             services.userPreferences.activeProfileId,
             customKwh: services.userPreferences.customUsableBatteryKwh
         )
-        // A nominal cruise figure — the physics model needs a route, and this is a
-        // glanceable estimate rather than a planning number.
-        let kwhPer100km = 19.0
-        let km = usableKwh * Double(soc) / 100 / kwhPer100km * 100
+        // Android Auto multi-step range calculation (ChargerReach.kt):
+        //   1. Learn from trip history if enough data exists
+        //   2. Adjust baseline for HVAC in extreme temperatures
+        //   3. range = soc% × usableKwh / effectiveConsumption × 100
+        let ambientTempC = telemetry.ambientTempC
+        let consumption = effectiveConsumptionKwhPer100Km(ambientTempC: ambientTempC, learned: learnedConsumption)
+        let km = estimatedRangeKm(socPercent: Double(soc), usableKwh: usableKwh, consumptionKwhPer100Km: Double(consumption))
         return String(format: "%.0f km", km)
     }
 
@@ -190,11 +209,55 @@ final class CarPlayCoordinator {
         guard let chargers = try? await services.chargers.chargersNear(center: center, radiusKm: 30) else {
             return
         }
+
+        let soc = telemetry.socDisplay ?? telemetry.socBms
+        let usableKwh = Ioniq5RoutingConstants.usableKwhForProfile(
+            services.userPreferences.activeProfileId,
+            customKwh: services.userPreferences.customUsableBatteryKwh
+        )
+        let ambient = telemetry.ambientTempC
+
+        let candidates = rankChargers(
+            chargers: chargers,
+            origin: center,
+            socPercent: soc,
+            usableKwh: Float(usableKwh),
+            ambientTempC: ambient,
+            learnedKwhPer100Km: learnedConsumption
+        )
+
+        // Cache for re-ranking on telemetry updates
+        fetchedChargers = chargers
+        lastOrigin = center
+
         // CarPlay caps a POI template at 12 entries; sending more is dropped
-        // silently, so trim to the nearest deliberately.
-        let nearest = Array(chargers.prefix(12))
+        // silently, so trim to the nearest within comfort/tight bounds first.
+        let visible = candidates.prefix(12)
         chargersTemplate.setPointsOfInterest(
-            nearest.map { CarPlayPointOfInterest.make(from: $0, origin: center) },
+            visible.map { CarPlayPointOfInterest.make(from: $0, origin: center) },
+            selectedIndex: NSNotFound
+        )
+    }
+
+    /// Re-rank cached chargers with fresh telemetry data — no API fetch needed.
+    private func refreshChargers() {
+        guard let origin = lastOrigin, !fetchedChargers.isEmpty else { return }
+        let soc = telemetry.socDisplay ?? telemetry.socBms
+        let usableKwh = Ioniq5RoutingConstants.usableKwhForProfile(
+            services.userPreferences.activeProfileId,
+            customKwh: services.userPreferences.customUsableBatteryKwh
+        )
+        let candidates = rankChargers(
+            chargers: fetchedChargers,
+            origin: origin,
+            socPercent: soc,
+            usableKwh: Float(usableKwh),
+            ambientTempC: telemetry.ambientTempC,
+            learnedKwhPer100Km: learnedConsumption
+        )
+        let visible = candidates.prefix(12)
+        chargersTemplate.setPointsOfInterest(
+            visible.map { CarPlayPointOfInterest.make(from: $0, origin: origin) },
             selectedIndex: NSNotFound
         )
     }
@@ -231,6 +294,144 @@ final class CarPlayCoordinator {
 }
 
 // MARK: - Helpers
+
+// MARK: - Range calculation helpers
+//
+// Mirrors Android Auto's ChargerReach.kt — same constants, same multi-step
+// estimation: learn from trip history, adjust for HVAC, compute range.
+
+/// Baseline consumption matching the Android Auto dashboard range tile.
+private let baseConsumptionKwhPer100Km: Float = 19
+
+/// Straight-line distance under-reads by ~1.3× on mixed road networks.
+/// Kept as a constant even though CarPlay doesn't use it directly, so the
+/// consumption logic stays identical to the Android source.
+private let roadDetourFactor: Float = 1.3
+
+/// Speed assumed when converting HVAC draw (W) into kWh/100 km.
+private let assumedSpeedKph: Float = 60
+
+/// HVAC load already inside `baseConsumptionKwhPer100Km` (19 kWh/100 km at 20°C).
+private let baselineHvacW: Double = hvacPowerW(ambientC: 20)
+
+/// Driving distance required before the driver's own efficiency is trusted.
+private let learnedConsumptionMinKm: Float = 50
+
+/// How far back trip history is drawn from for the learned figure (60 days).
+private let learnedConsumptionWindow: TimeInterval = 60 * 24 * 60 * 60
+
+/// Sanity band for a learned figure.
+private let plausibleConsumptionRange: ClosedRange<Float> = 8...40
+
+/// The driver's own recent consumption from logged trip history, or nil
+/// when there is not enough data.
+/// Mirrors Android's `learnedConsumptionKwhPer100Km()` in ChargerReach.kt.
+private func learnedConsumptionKwhPer100Km(trips: [TripEntity]) -> Float? {
+    let cutoff = Date().addingTimeInterval(-learnedConsumptionWindow)
+    let recent = trips.filter { $0.startTime >= cutoff && $0.endTime != nil }
+    let distanceKm = recent.reduce(0) { $0 + $1.distanceKm }
+    let energyKwh = recent.reduce(0) { $0 + $1.energyUsedKwh }
+    guard distanceKm >= learnedConsumptionMinKm, energyKwh > 0 else { return nil }
+    let consumption = (energyKwh / distanceKm * 100)
+    return plausibleConsumptionRange.contains(consumption) ? consumption : nil
+}
+
+/// Effective consumption for current conditions. Learned data wins outright
+/// (it already includes real HVAC draw); otherwise the baseline is adjusted
+/// for extreme temperatures.
+/// Mirrors Android's `effectiveConsumptionKwhPer100Km()` in ChargerReach.kt.
+private func effectiveConsumptionKwhPer100Km(
+    ambientTempC: Int?,
+    learned: Float?
+) -> Float {
+    if let learned { return learned }
+    guard let ambientTempC else { return baseConsumptionKwhPer100Km }
+    let excessHvacW = max(hvacPowerW(ambientC: Float(ambientTempC)) - baselineHvacW, 0)
+    let hvacKwhPer100Km = Float((excessHvacW / 1000) / Double(assumedSpeedKph) * 100)
+    return baseConsumptionKwhPer100Km + hvacKwhPer100Km
+}
+
+/// Range remaining at `socPercent` of a `usableKwh` pack, in km.
+/// Mirrors Android's `estimatedRangeKm()` in ChargerReach.kt.
+private func estimatedRangeKm(
+    socPercent: Double,
+    usableKwh: Double,
+    consumptionKwhPer100Km: Double
+) -> Double {
+    guard consumptionKwhPer100Km > 0 else { return 0 }
+    return socPercent / 100 * usableKwh / consumptionKwhPer100Km * 100
+}
+
+// MARK: - Charger reachability
+//
+// Mirrors Android Auto's ChargerReach.kt — ranks chargers by whether the
+// current charge can actually reach them.
+
+/// How comfortably a charger can be reached on the current charge.
+enum Reach: Comparable {
+    case comfortable
+    case tight
+    case outOfRange
+    case unknown
+}
+
+/// A charger with estimated reachability data.
+struct ChargerCandidate {
+    let charger: Charger
+    let straightLineKm: Double
+    let driveKm: Double
+    let arrivalSoc: Float?
+    let reach: Reach
+
+    var isUltraFast: Bool { charger.maxPowerKw >= ultraFastKw }
+}
+
+private let ultraFastKw: Float = 150
+private let comfortReserveSoc: Float = 10
+private let searchRadiusKm: Double = 30
+
+/// SOC-aware ranking of nearby chargers.
+/// Mirrors Android's `rankChargers()` in ChargerReach.kt.
+private func rankChargers(
+    chargers: [Charger],
+    origin: LatLon,
+    socPercent: Float?,
+    usableKwh: Float,
+    ambientTempC: Int? = nil,
+    learnedKwhPer100Km: Float? = nil
+) -> [ChargerCandidate] {
+    let consumption = effectiveConsumptionKwhPer100Km(ambientTempC: ambientTempC, learned: learnedKwhPer100Km)
+
+    return chargers
+        .map { charger in
+            let straightLineKm = approxDistanceKm(origin, LatLon(lat: charger.lat, lon: charger.lon))
+            let driveKm = straightLineKm * Double(roadDetourFactor)
+            let arrivalSoc = socPercent.map { soc -> Float in
+                let kwhNeeded = Float(driveKm / 100.0) * consumption
+                return soc - (kwhNeeded / usableKwh * 100)
+            }
+            return ChargerCandidate(
+                charger: charger,
+                straightLineKm: straightLineKm,
+                driveKm: driveKm,
+                arrivalSoc: arrivalSoc,
+                reach: arrivalSoc.map { $0 >= comfortReserveSoc ? .comfortable : $0 > 0 ? .tight : .outOfRange } ?? .unknown
+            )
+        }
+        .sorted { a, b in
+            if a.reach != b.reach { return a.reach < b.reach }
+            return a.straightLineKm < b.straightLineKm
+        }
+}
+
+/// Equirectangular approximation — accurate well past the ~10 km radius this
+/// screen queries, and cheap enough to run per charger on every invalidate.
+/// Mirrors Android's `approxDistanceKm()` in ChargerReach.kt.
+private func approxDistanceKm(_ a: LatLon, _ b: LatLon) -> Double {
+    let dLat = (a.lat - b.lat) * 111.0
+    let dLon = (a.lon - b.lon) * 111.0 * cos((a.lat + b.lat) / 2 * .pi / 180)
+    return sqrt(dLat * dLat + dLon * dLon)
+}
 
 enum ConnectionLabel {
     static func text(for state: ObdConnectionState) -> String {

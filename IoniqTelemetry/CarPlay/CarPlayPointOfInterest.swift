@@ -10,7 +10,8 @@ import MapKit
 /// the sanctioned way to do that without being a navigation app.
 enum CarPlayPointOfInterest {
 
-    static func make(from charger: Charger, origin: LatLon) -> CPPointOfInterest {
+    static func make(from candidate: ChargerCandidate, origin: LatLon) -> CPPointOfInterest {
+        let charger = candidate.charger
         let coordinate = CLLocationCoordinate2D(latitude: charger.lat, longitude: charger.lon)
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = charger.name
@@ -18,10 +19,10 @@ enum CarPlayPointOfInterest {
         let poi = CPPointOfInterest(
             location: mapItem,
             title: charger.name,
-            subtitle: subtitle(for: charger, origin: origin),
+            subtitle: subtitle(for: candidate, origin: origin),
             summary: charger.operator,
             detailTitle: charger.name,
-            detailSubtitle: subtitle(for: charger, origin: origin),
+            detailSubtitle: subtitle(for: candidate, origin: origin),
             detailSummary: charger.usageCost,
             pinImage: nil
         )
@@ -42,14 +43,27 @@ enum CarPlayPointOfInterest {
         return poi
     }
 
-    private static func subtitle(for charger: Charger, origin: LatLon) -> String {
+    private static func subtitle(for candidate: ChargerCandidate, origin: LatLon) -> String {
+        let charger = candidate.charger
         var parts: [String] = []
         if charger.maxPowerKw > 0 {
-            parts.append(String(format: "%.0f kW", charger.maxPowerKw))
+            let ultra = candidate.isUltraFast ? " ⚡" : ""
+            parts.append(String(format: "%.0f kW%@", charger.maxPowerKw, ultra))
         }
         parts.append(String(format: "%.1f km", distanceKm(origin, charger)))
-        if let price = charger.pricePerKwh {
-            parts.append(String(format: "%.2f/kWh", price))
+        if let arrival = candidate.arrivalSoc {
+            switch candidate.reach {
+            case .comfortable:
+                parts.append("arrive ~\(Int(arrival))%")
+            case .tight:
+                parts.append("tight ~\(Int(arrival))%")
+            case .outOfRange:
+                parts.append("out of range")
+            case .unknown:
+                parts.append("arrive ~\(Int(arrival))%")
+            }
+        } else {
+            parts.append("plug OBD for range")
         }
         if !charger.isOperational {
             parts.append("Out of service")
