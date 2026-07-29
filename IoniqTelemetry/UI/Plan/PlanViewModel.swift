@@ -160,8 +160,7 @@ final class PlanViewModel {
 
     // MARK: - Natural-language planning
 
-    /// Parses a natural-language trip request using the configured AI provider,
-    /// then fills the endpoint fields with what the AI extracted.
+    /// Parses a natural-language trip request using the configured AI provider.
     func planFromNaturalLanguage() async {
         let text = aiInput.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !aiBusy else { return }
@@ -174,6 +173,17 @@ final class PlanViewModel {
         aiInterpretation = nil
         aiError = nil
         defer { aiBusy = false }
+
+        // Charger query — bypass AI, load them directly
+        if isChargerQuery(text) {
+            await loadNearbyChargers()
+            if !nearbyChargers.isEmpty {
+                aiInterpretation = "Found \(nearbyChargers.count) nearby charging stations."
+            } else {
+                aiInterpretation = "No chargers found nearby."
+            }
+            return
+        }
 
         let location = await locationProvider.currentLocation()
         let locationContext: String
@@ -189,8 +199,7 @@ final class PlanViewModel {
 
         The user says: \(text)
 
-        If they ask about nearby charging, respond with a summary of nearby options.
-        If they specify a destination, extract the destination and waypoints clearly.
+        Extract the destination and waypoints clearly.
         Keep your response concise (2-3 sentences).
         """
 
@@ -206,6 +215,10 @@ final class PlanViewModel {
         } catch {
             aiError = error.localizedDescription
         }
+    }
+
+    private func isChargerQuery(_ text: String) -> Bool {
+        ["charger", "charging", "near me", "nearby"].contains { text.localizedCaseInsensitiveContains($0) }
     }
 
     /// Clears the prompt along with the echo of the last parse.
