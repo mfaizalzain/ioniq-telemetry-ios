@@ -41,6 +41,44 @@ public final class BackupRepository: @unchecked Sendable {
         return try encoder.encode(backup)
     }
 
+    /// Exports a backup directly to a timestamped file in the given directory and
+    /// prunes old backups there, keeping only the last 5.
+    ///
+    /// - Parameter directory: A writable directory URL (e.g. Documents/autobackup/).
+    /// - Returns: The URL of the newly written file.
+    public func exportToPersistentFile(preferences prefs: UserPreferences, directory: URL) throws -> URL {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let data = try export(preferences: prefs)
+
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        let filename = "ioniq-telemetry-auto-\(formatter.string(from: Date())).json"
+        let fileURL = directory.appendingPathComponent(filename)
+        try data.write(to: fileURL, options: .atomic)
+
+        // Prune: keep last 5, delete the oldest ones.
+        let contents = try FileManager.default.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.creationDateKey],
+            options: .skipsHiddenFiles
+        )
+        let backupFiles = contents
+            .filter { $0.lastPathComponent.hasPrefix("ioniq-telemetry-auto-") && $0.pathExtension == "json" }
+            .sorted { lhs, rhs in
+                let lhsDate = (try? lhs.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+                let rhsDate = (try? rhs.resourceValues(forKeys: [.creationDateKey]).creationDate) ?? .distantPast
+                return lhsDate > rhsDate
+            }
+        if backupFiles.count > 5 {
+            for stale in backupFiles.dropFirst(5) {
+                try? FileManager.default.removeItem(at: stale)
+            }
+        }
+
+        return fileURL
+    }
+
     public static func suggestedFilename(now: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmm"
@@ -214,6 +252,9 @@ private struct BackupSettings: Codable {
     var chargerSource: String?
     var estimatedSohPercent: Float?
     var estimatedSohTimestamp: Int64?
+    var autoBackupEnabled: Bool?
+    var autoBackupFrequency: String?
+    var lastAutoBackupDate: TimeInterval?
 
     init(_ prefs: UserPreferences) {
         activeProfileId = prefs.activeProfileId
@@ -235,6 +276,9 @@ private struct BackupSettings: Codable {
         chargerSource = prefs.chargerSource.rawValue
         estimatedSohPercent = prefs.estimatedSohPercent
         estimatedSohTimestamp = prefs.estimatedSohTimestamp
+        autoBackupEnabled = prefs.autoBackupEnabled
+        autoBackupFrequency = prefs.autoBackupFrequency.rawValue
+        lastAutoBackupDate = prefs.lastAutoBackupDate?.timeIntervalSince1970
     }
 
     /// Absent fields keep whatever is currently set rather than resetting to
@@ -264,6 +308,11 @@ private struct BackupSettings: Codable {
         }
         next.estimatedSohPercent = estimatedSohPercent ?? current.estimatedSohPercent
         if let estimatedSohTimestamp { next.estimatedSohTimestamp = estimatedSohTimestamp }
+        if let autoBackupEnabled { next.autoBackupEnabled = autoBackupEnabled }
+        if let autoBackupFrequency, let val = AutoBackupFrequency(rawValue: autoBackupFrequency) {
+            next.autoBackupFrequency = val
+        }
+        if let lastAutoBackupDate { next.lastAutoBackupDate = Date(timeIntervalSince1970: lastAutoBackupDate) }
         return next
     }
 }

@@ -194,6 +194,32 @@ final class SettingsViewModel {
         try await services.backup.restore(from: Data(contentsOf: url))
     }
 
+    // MARK: - Auto Backup
+
+    func setAutoBackupEnabled(_ enabled: Bool) {
+        update { $0.autoBackupEnabled = enabled }
+        AppServices.shared.scheduleOrCancelAutoBackup()
+    }
+
+    func setAutoBackupFrequency(_ frequency: AutoBackupFrequency) {
+        update { $0.autoBackupFrequency = frequency }
+        AppServices.shared.scheduleOrCancelAutoBackup()
+    }
+
+    /// Performs an immediate backup to the persistent autobackup directory and
+    /// records the timestamp so the UI reflects it straight away.
+    func performAutoBackup() async throws {
+        let directory = AppServices.autoBackupDirectory()
+        try services.backup.exportToPersistentFile(preferences: preferences, directory: directory)
+        // Update last-backup timestamp in preferences so the UI updates.
+        let now = Date()
+        await services.preferences.update { prefs in
+            var next = prefs
+            next.lastAutoBackupDate = now
+            return next
+        }
+    }
+
     private func update(_ mutate: @escaping @Sendable (inout UserPreferences) -> Void) {
         Task {
             await services.preferences.update { current in

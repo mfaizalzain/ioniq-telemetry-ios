@@ -1,4 +1,5 @@
 import Combine
+import Foundation
 
 public enum UnitSystem: String, Sendable {
     case metric = "METRIC"
@@ -38,6 +39,30 @@ public enum ChargerSource: String, Sendable {
     case appleMaps = "APPLE_MAPS"
     case googlePlaces = "GOOGLE_PLACES"
     case combined = "COMBINED"
+}
+
+/// How often the app automatically exports a backup in the background.
+public enum AutoBackupFrequency: String, Sendable, CaseIterable {
+    case daily = "DAILY"
+    case weekly = "WEEKLY"
+    case monthly = "MONTHLY"
+
+    public var label: String {
+        switch self {
+        case .daily: return "Daily"
+        case .weekly: return "Weekly"
+        case .monthly: return "Monthly"
+        }
+    }
+
+    /// Earliest begin date offset from now for BGProcessingTask scheduling.
+    public var schedulingInterval: TimeInterval {
+        switch self {
+        case .daily: return 24 * 60 * 60
+        case .weekly: return 7 * 24 * 60 * 60
+        case .monthly: return 30 * 24 * 60 * 60
+        }
+    }
 }
 
 public struct UserPreferences: Sendable {
@@ -85,6 +110,12 @@ public struct UserPreferences: Sendable {
     public var googlePoiSearch: Bool
     /// Where charger locations come from. See [ChargerSource].
     public var chargerSource: ChargerSource
+    /// Automatically export a backup in the background at the chosen frequency.
+    public var autoBackupEnabled: Bool
+    /// How often to run the automatic backup.
+    public var autoBackupFrequency: AutoBackupFrequency
+    /// When the last automatic backup was completed (nil = never).
+    public var lastAutoBackupDate: Date?
 
     public init(
         unitSystem: UnitSystem = .metric,
@@ -111,7 +142,10 @@ public struct UserPreferences: Sendable {
         aiCoachingEnabled: Bool = true,
         chargerOccupancyAlerts: Bool = false,
         googlePoiSearch: Bool = false,
-        chargerSource: ChargerSource = .openChargeMap
+        chargerSource: ChargerSource = .openChargeMap,
+        autoBackupEnabled: Bool = false,
+        autoBackupFrequency: AutoBackupFrequency = .weekly,
+        lastAutoBackupDate: Date? = nil
     ) {
         self.unitSystem = unitSystem
         self.connectorTypes = connectorTypes
@@ -138,6 +172,9 @@ public struct UserPreferences: Sendable {
         self.chargerOccupancyAlerts = chargerOccupancyAlerts
         self.googlePoiSearch = googlePoiSearch
         self.chargerSource = chargerSource
+        self.autoBackupEnabled = autoBackupEnabled
+        self.autoBackupFrequency = autoBackupFrequency
+        self.lastAutoBackupDate = lastAutoBackupDate
     }
 
     /// The API key for [provider], or null when the user hasn't supplied one yet.

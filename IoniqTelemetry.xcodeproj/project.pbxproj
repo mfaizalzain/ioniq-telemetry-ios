@@ -36,6 +36,7 @@
 		7D8AD819E4D270C82B43EE9F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */; };
 		86FD1D0BE18C53A9F2D136FC /* CoreRouting in Frameworks */ = {isa = PBXBuildFile; productRef = 361EBE86862C04F207736117 /* CoreRouting */; };
 		95F25117F336829F31773888 /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8172C23BE112C6BFD8D27007 /* AppRootView.swift */; };
+		98C6902DC4B69DBF5BAD183A /* AutoBackupSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90AC2B6E80595CC2D5854FA4 /* AutoBackupSection.swift */; };
 		A7DB6651E2C7C759E0DB7FA2 /* Charts.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C2E780AE209C0CDA7D504DD2 /* Charts.framework */; };
 		B1A4DA9B674AAAF6B40425DD /* IoniqTelemetryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734AFC3926EFA5634B2080D6 /* IoniqTelemetryApp.swift */; };
 		B2FF332CEFAD88246DC5B1C1 /* PaywallViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C8ADDBDBC5A342476500F5 /* PaywallViewModel.swift */; };
@@ -90,6 +91,7 @@
 		8172C23BE112C6BFD8D27007 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		88D3784E71C842EED4005A96 /* TripDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripDetailView.swift; sourceTree = "<group>"; };
 		89B30D3916F39057886D6B58 /* VehiclePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclePickerSheet.swift; sourceTree = "<group>"; };
+		90AC2B6E80595CC2D5854FA4 /* AutoBackupSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AutoBackupSection.swift; sourceTree = "<group>"; };
 		9A602CFDC8597B98B79771BF /* CarPlayPointOfInterest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayPointOfInterest.swift; sourceTree = "<group>"; };
 		9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		9FAD7209721D00BF6A517CFA /* MapsNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapsNavigation.swift; sourceTree = "<group>"; };
@@ -257,6 +259,7 @@
 			children = (
 				B42B4D82470CE7E0B542CE25 /* AdapterPickerSheet.swift */,
 				133D14427B0062FE116986F1 /* AiAndRoutingSections.swift */,
+				90AC2B6E80595CC2D5854FA4 /* AutoBackupSection.swift */,
 				5DEEE118E6C9CB6769158C33 /* BackupSection.swift */,
 				89B30D3916F39057886D6B58 /* VehiclePickerSheet.swift */,
 			);
@@ -462,6 +465,7 @@
 				7174DAD475B5F29FFCBFF102 /* AlertNotifier.swift in Sources */,
 				95F25117F336829F31773888 /* AppRootView.swift in Sources */,
 				7B55233B7E5EEAA127719D42 /* AppServices.swift in Sources */,
+				98C6902DC4B69DBF5BAD183A /* AutoBackupSection.swift in Sources */,
 				40BA11C929641C52B97C9013 /* BackupSection.swift in Sources */,
 				BABC7C03FA75D309033AE7FC /* CarPlayCoordinator.swift in Sources */,
 				69F5F70B3E2F96A762AA0C92 /* CarPlayPointOfInterest.swift in Sources */,

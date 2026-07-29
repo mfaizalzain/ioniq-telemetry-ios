@@ -46,6 +46,7 @@ struct SettingsView: View {
             ChargerAvailabilitySection(viewModel: viewModel, showPaywall: $showPaywall)
             AiSection(viewModel: viewModel, showPaywall: $showPaywall)
             BackupSection(viewModel: viewModel)
+            AutoBackupSection(viewModel: viewModel)
             UnitsSection(viewModel: viewModel)
             AppearanceSection(viewModel: viewModel)
             ProSection(viewModel: viewModel, showPaywall: $showPaywall)

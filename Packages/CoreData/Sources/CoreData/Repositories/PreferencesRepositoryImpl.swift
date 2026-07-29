@@ -101,6 +101,13 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         if let raw = defaults.string(forKey: "chargerSource"),
            let val = ChargerSource(rawValue: raw) { prefs.chargerSource = val }
 
+        prefs.autoBackupEnabled = defaults.bool(forKey: "autoBackupEnabled", default: false)
+        if let raw = defaults.string(forKey: "autoBackupFrequency"),
+           let val = AutoBackupFrequency(rawValue: raw) { prefs.autoBackupFrequency = val }
+        if let interval = defaults.object(forKey: "lastAutoBackupDate") as? TimeInterval {
+            prefs.lastAutoBackupDate = Date(timeIntervalSince1970: interval)
+        }
+
         return prefs
     }
 
@@ -130,6 +137,13 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(prefs.chargerOccupancyAlerts, forKey: "chargerOccupancyAlerts")
         defaults.set(prefs.googlePoiSearch, forKey: "googlePoiSearch")
         defaults.set(prefs.chargerSource.rawValue, forKey: "chargerSource")
+        defaults.set(prefs.autoBackupEnabled, forKey: "autoBackupEnabled")
+        defaults.set(prefs.autoBackupFrequency.rawValue, forKey: "autoBackupFrequency")
+        if let date = prefs.lastAutoBackupDate {
+            defaults.set(date.timeIntervalSince1970, forKey: "lastAutoBackupDate")
+        } else {
+            defaults.removeObject(forKey: "lastAutoBackupDate")
+        }
     }
 
     private static func setFloatOrNil(_ value: Float?, forKey key: String, in defaults: UserDefaults) {

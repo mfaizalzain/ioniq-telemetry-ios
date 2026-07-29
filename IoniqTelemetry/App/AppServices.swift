@@ -5,6 +5,7 @@ import CoreOBD
 import CoreRouting
 import Foundation
 import SwiftData
+import BackgroundTasks
 
 /// Composition root. Owns every repository and the OBD stack, and joins the OBD
 /// telemetry stream to the shared telemetry repository and the trip log.
@@ -131,6 +132,8 @@ final class AppServices {
         }
 
         await autoConnectLastAdapter()
+
+        registerAutoBackupTask()
     }
 
     private func bindPreferences() {
@@ -235,6 +238,74 @@ final class AppServices {
             next.lastObdTransportType = nil
             return next
         }
+    }
+
+    // MARK: - Auto Backup
+
+    /// Identifier registered in Info.plist for the background backup task.
+    private static let autoBackupTaskIdentifier = "com.fmz.IoniqTelemetry.autobackup"
+
+    /// Registers the BGTaskScheduler task handler and schedules the first run if
+    /// auto-backup is enabled. Called once during app launch.
+    private func registerAutoBackupTask() {
+        BGTaskScheduler.shared.register(forTaskWithIdentifier: Self.autoBackupTaskIdentifier, using: nil) { task in
+            Task {
+                await self.handleAutoBackupTask(task as! BGProcessingTask)
+            }
+        }
+        scheduleOrCancelAutoBackup()
+    }
+
+    /// Schedules or cancels the background backup task based on current preferences.
+    /// Called whenever the user toggles auto-backup or changes the frequency, and
+    /// also after a background run completes so the next one is booked.
+    func scheduleOrCancelAutoBackup() {
+        guard userPreferences.autoBackupEnabled else {
+            BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.autoBackupTaskIdentifier)
+            return
+        }
+
+        let request = BGProcessingTaskRequest(identifier: Self.autoBackupTaskIdentifier)
+        request.requiresNetworkConnectivity = false
+        request.requiresExternalPower = false
+        request.earliestBeginDate = Date().addingTimeInterval(
+            userPreferences.autoBackupFrequency.schedulingInterval
+        )
+
+        do {
+            try BGTaskScheduler.shared.submit(request)
+        } catch {
+            print("[AutoBackup] failed to schedule: \(error.localizedDescription)")
+        }
+    }
+
+    /// The actual background task body: export, record the timestamp, and
+    /// re-schedule the next run.
+    private func handleAutoBackupTask(_ task: BGProcessingTask) async {
+        let directory = Self.autoBackupDirectory()
+        do {
+            try backup.exportToPersistentFile(preferences: userPreferences, directory: directory)
+            await preferences.update { prefs in
+                var next = prefs
+                next.lastAutoBackupDate = Date()
+                return next
+            }
+            task.setTaskCompleted(success: true)
+        } catch {
+            print("[AutoBackup] export failed: \(error.localizedDescription)")
+            task.setTaskCompleted(success: false)
+        }
+        // Schedule the next run regardless of success or failure — a transient
+        // error (e.g. disk full) should not kill the schedule permanently.
+        scheduleOrCancelAutoBackup()
+    }
+
+    /// The directory where auto-backup files are stored (Documents/autobackup/).
+    /// Files here are visible via iTunes File Sharing and the Files app because
+    /// UIFileSharingEnabled is set in Info.plist.
+    static func autoBackupDirectory() -> URL {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documents.appendingPathComponent("autobackup", isDirectory: true)
     }
 
     // MARK: - Helpers
