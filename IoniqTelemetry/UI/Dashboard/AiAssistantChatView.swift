@@ -215,7 +215,7 @@ struct AiAssistantChatView: View {
             """
 
         do {
-            let response = try await aiService.askAiAssistantWithContext(
+            let response = try await aiService.askCopilotWithContext(
                 query: text,
                 telemetryContext: context,
                 apiKey: apiKey
@@ -259,4 +259,18 @@ private struct MessageBubble: View {
         .padding(.horizontal, 14)
         .accessibilityElement(children: .combine)
     }
+}
+
+// MARK: - Model
+
+/// A single message in the AI assistant chat.
+private struct AiAssistantMessage: Identifiable {
+    let id = UUID()
+    let role: MessageRole
+    let text: String
+}
+
+private enum MessageRole {
+    case user
+    case assistant
 }

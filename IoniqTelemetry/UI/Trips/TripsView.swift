@@ -207,6 +207,19 @@ struct TripCard: View {
             }
 
             SocBar(startSoc: trip.startSoc, endSoc: trip.endSoc)
+
+            if let note = trip.note, !note.isEmpty {
+                Label {
+                    Text(truncatedNote(note))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                } icon: {
+                    Image(systemName: "note.text")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                }
+            }
         }
         .padding(.vertical, 6)
     }
@@ -224,6 +237,14 @@ struct TripCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+
+    /// Trim note to ~50 characters with ellipsis if longer.
+    private func truncatedNote(_ note: String) -> String {
+        let maxLen = 50
+        guard note.count > maxLen else { return note }
+        let end = note.index(note.startIndex, offsetBy: maxLen)
+        return String(note[..<end]).trimmingCharacters(in: .whitespaces) + "…"
     }
 }
 

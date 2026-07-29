@@ -73,7 +73,7 @@ struct DashboardView: View {
                     geminiApiKey: viewModel.geminiApiKey,
                     trips: viewModel.recentTrips
                 )
-            }
+
                 // AI-powered cards — shown only when telemetry data is available
                 if viewModel.hasData {
                     ChargingInsightCard(viewModel: viewModel)

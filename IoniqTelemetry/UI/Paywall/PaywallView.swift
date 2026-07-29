@@ -86,7 +86,7 @@ private struct FeatureList: View {
         ("wand.and.stars", "AI Trip Briefing", "AI-powered summary after every trip"),
         ("calendar.badge.clock", "Weekly AI Digest", "Weekly and monthly driving summaries"),
         ("bolt.batteryblock", "Charging Intelligence", "Charge speed trends and degradation analysis"),
-        ("("brain.head.profile", "AI Assistant with Context", "Ask questions about your vehicle with real telemetry context")
+        ("brain.head.profile", "AI Assistant with Context", "Ask questions about your vehicle with real telemetry context"),
         ("heart.text.clipboard", "Battery Health Report", "SOH tracking and battery health assessment")
     ]
 
