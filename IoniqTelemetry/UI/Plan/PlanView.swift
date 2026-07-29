@@ -39,7 +39,7 @@ struct PlanView: View {
             }
             .background(Color.appBackground)
             .navigationTitle("Plan")
-            .alert("Save this trip", isPresented: $showSaveTrip) {
+            .alert("Save this plan", isPresented: $showSaveTrip) {
                 TextField("Name", text: $tripName)
                 Button("Cancel", role: .cancel) { tripName = "" }
                 Button("Save") {
@@ -625,7 +625,7 @@ private struct ItineraryTimeline: View {
                     Button {
                         showSaveTrip = true
                     } label: {
-                        Label("Save trip", systemImage: "star")
+                        Label("Save plan", systemImage: "star")
                             .font(.caption)
                     }
                     .disabled(!viewModel.canSaveTrip)
