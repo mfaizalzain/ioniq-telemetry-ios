@@ -22,14 +22,10 @@ struct PlanView: View {
                         if viewModel.canUseAi {
                             AiPlanCard(viewModel: viewModel)
                         }
-                        RouteBuilderCard(viewModel: viewModel)
-                        FavoritePlaceChips(viewModel: viewModel)
-                        BatteryParametersCard(viewModel: viewModel)
-                        PlanActionSection(viewModel: viewModel)
+                        RouteBuilderCard(viewModel: viewModel, showSaveTrip: $showSaveTrip)
 
                         if let plan = viewModel.plan {
-                            ItineraryTimeline(plan: plan, viewModel: viewModel)
-                            PlanActionsRow(viewModel: viewModel, showSaveTrip: $showSaveTrip)
+                            ItineraryTimeline(plan: plan, viewModel: viewModel, showSaveTrip: $showSaveTrip)
                             ChargersAlongRouteSection(viewModel: viewModel)
                         }
 
@@ -98,6 +94,7 @@ private struct RoutingNoticeBar: View {
 /// wrong itinerary that looks exactly like a right one.
 private struct AiPlanCard: View {
     let viewModel: PlanViewModel
+    @State private var expanded = false
 
     /// One chip, matching Android: the others were guesses at phrasing the parser
     /// may not handle, and a suggestion that fails reads as the feature being broken.
@@ -106,97 +103,108 @@ private struct AiPlanCard: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "sparkles").foregroundStyle(Color.appAccent)
-                    Text("AI Assistant")
-                        .font(.subheadline.weight(.semibold))
-                    Text("GEMINI AI")
-                        .font(.caption2.weight(.bold))
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(Color.appAccent.opacity(0.15), in: Capsule())
-                        .foregroundStyle(Color.appAccent)
-                    Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles").foregroundStyle(Color.appAccent)
+                        Text("AI Assistant")
+                            .font(.subheadline.weight(.semibold))
+                        Text("GEMINI AI")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.appAccent.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.appAccent)
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .buttonStyle(.plain)
 
-                HStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        TextField("e.g. Find chargers near me, or drive to Penang with 30% reserve…", text: Binding(
-                            get: { viewModel.aiInput },
-                            set: { viewModel.aiInput = $0 }
-                        ), axis: .vertical)
-                        .lineLimit(1...3)
-                        .textFieldStyle(.plain)
-                        .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
+                if expanded {
+                    HStack(spacing: 8) {
+                        HStack(spacing: 6) {
+                            TextField("e.g. Find chargers near me, or drive to Penang with 30% reserve…", text: Binding(
+                                get: { viewModel.aiInput },
+                                set: { viewModel.aiInput = $0 }
+                            ), axis: .vertical)
+                            .lineLimit(1...3)
+                            .textFieldStyle(.plain)
+                            .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
 
-                        // A long dictated sentence is tedious to clear a character
-                        // at a time, and the parse it produced is stale anyway.
-                        if !viewModel.aiInput.isEmpty {
+                            // A long dictated sentence is tedious to clear a character
+                            // at a time, and the parse it produced is stale anyway.
+                            if !viewModel.aiInput.isEmpty {
+                                Button {
+                                    viewModel.clearAiInput()
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(.tertiary)
+                                .accessibilityLabel("Clear")
+                            }
+                        }
+                        .padding(10)
+                        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
+
+                        Button {
+                            Task { await viewModel.planFromNaturalLanguage() }
+                        } label: {
+                            if viewModel.aiBusy {
+                                ProgressView().controlSize(.small)
+                            } else {
+                                Image(systemName: "arrow.up.circle.fill").font(.title2)
+                            }
+                        }
+                        .tint(Color.appAccent)
+                        .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                        .accessibilityLabel("Plan this trip")
+                    }
+
+                    if viewModel.aiInput.isEmpty && !viewModel.aiBusy && viewModel.aiInterpretation == nil {
+                        Button {
+                            viewModel.aiInput = Self.quickPrompt
+                            Task { await viewModel.planFromNaturalLanguage() }
+                        } label: {
+                            Text(Self.quickPrompt)
+                                .font(.caption)
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(Color.appSurface, in: Capsule())
+                        }
+                        .tint(.primary)
+                    }
+
+                    if let interpretation = viewModel.aiInterpretation {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Color.appGreen)
+                            Text(interpretation)
+                                .font(.caption)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+
+                    if let error = viewModel.aiError {
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "exclamationmark.circle.fill")
+                                .foregroundStyle(Color.appAmber)
+                            Text(error).font(.caption)
+                            Spacer()
                             Button {
-                                viewModel.clearAiInput()
+                                viewModel.dismissAiError()
                             } label: {
-                                Image(systemName: "xmark.circle.fill")
+                                Image(systemName: "xmark").font(.caption2)
                             }
                             .buttonStyle(.plain)
-                            .foregroundStyle(.tertiary)
-                            .accessibilityLabel("Clear")
+                            .foregroundStyle(.secondary)
                         }
-                    }
-                    .padding(10)
-                    .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
-
-                    Button {
-                        Task { await viewModel.planFromNaturalLanguage() }
-                    } label: {
-                        if viewModel.aiBusy {
-                            ProgressView().controlSize(.small)
-                        } else {
-                            Image(systemName: "arrow.up.circle.fill").font(.title2)
-                        }
-                    }
-                    .tint(Color.appAccent)
-                    .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespaces).isEmpty)
-                    .accessibilityLabel("Plan this trip")
-                }
-
-                if viewModel.aiInput.isEmpty && !viewModel.aiBusy && viewModel.aiInterpretation == nil {
-                    Button {
-                        viewModel.aiInput = Self.quickPrompt
-                        Task { await viewModel.planFromNaturalLanguage() }
-                    } label: {
-                        Text(Self.quickPrompt)
-                            .font(.caption)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
-                            .background(Color.appSurface, in: Capsule())
-                    }
-                    .tint(.primary)
-                }
-
-                if let interpretation = viewModel.aiInterpretation {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(Color.appGreen)
-                        Text(interpretation)
-                            .font(.caption)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .accessibilityElement(children: .combine)
-                }
-
-                if let error = viewModel.aiError {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "exclamationmark.circle.fill")
-                            .foregroundStyle(Color.appAmber)
-                        Text(error).font(.caption)
-                        Spacer()
-                        Button {
-                            viewModel.dismissAiError()
-                        } label: {
-                            Image(systemName: "xmark").font(.caption2)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(.secondary)
                     }
                 }
             }
@@ -216,10 +224,13 @@ private struct AiPlanCard: View {
 
 private struct RouteBuilderCard: View {
     let viewModel: PlanViewModel
+    @Binding var showSaveTrip: Bool
+    @State private var advancedExpanded = false
 
     var body: some View {
         GroupBox {
             VStack(spacing: 10) {
+                // Endpoint fields
                 HStack(spacing: 8) {
                     VStack(spacing: 8) {
                         EndpointField(viewModel: viewModel, slot: .origin,
@@ -245,6 +256,7 @@ private struct RouteBuilderCard: View {
                     .accessibilityLabel("Swap origin and destination")
                 }
 
+                // Inline favourite places + Use my location / Add stopover
                 HStack {
                     Button {
                         Task { await viewModel.useCurrentLocation() }
@@ -259,11 +271,200 @@ private struct RouteBuilderCard: View {
                     }
                 }
                 .tint(Color.appAccent)
+
+                // Inline favourite places chips
+                if !viewModel.favoritePlaces.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(viewModel.favoritePlaces, id: \.id) { place in
+                                Menu {
+                                    Button("Set as origin") { viewModel.selectFavorite(place, for: .origin) }
+                                    Button("Set as destination") { viewModel.selectFavorite(place, for: .destination) }
+                                    Button("Add as stopover") { viewModel.addFavoriteAsWaypoint(place) }
+                                } label: {
+                                    HStack(spacing: 5) {
+                                        Image(systemName: "star.fill").font(.caption2)
+                                        Text(place.name).font(.caption)
+                                    }
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Color.appSurface, in: Capsule())
+                                }
+                                .tint(.primary)
+                            }
+                        }
+                    }
+                }
+
+                Divider()
+
+                // Collapsible Advanced section (battery parameters)
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { advancedExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "bolt.fill")
+                            .foregroundStyle(Color.appAccent)
+                            .font(.caption)
+                        Text("Advanced")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(advancedExpanded ? 180 : 0))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if advancedExpanded {
+                    VStack(alignment: .leading, spacing: 14) {
+                        // Departure charge
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("DEPARTURE CHARGE")
+                                    .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                                if viewModel.usesLiveSoc && viewModel.liveSocAvailable {
+                                    Text("LIVE")
+                                        .font(.caption2.weight(.bold))
+                                        .padding(.horizontal, 5).padding(.vertical, 1)
+                                        .background(Color.appGreen.opacity(0.2), in: Capsule())
+                                        .foregroundStyle(Color.appGreen)
+                                }
+                                Spacer()
+                                percentBadge(viewModel.departureSoc)
+                            }
+                            Slider(
+                                value: Binding(
+                                    get: { viewModel.departureSoc },
+                                    set: { viewModel.setDepartureSoc($0) }
+                                ),
+                                in: 10...100, step: 5
+                            )
+                            .tint(Color.appAccent)
+
+                            if !viewModel.usesLiveSoc && viewModel.liveSocAvailable {
+                                Button("Use live charge from car") { viewModel.useLiveSoc() }
+                                    .font(.caption)
+                                    .tint(Color.appAccent)
+                            }
+                        }
+
+                        // Arrival reserve
+                        sliderRow("ARRIVAL RESERVE", value: Binding(
+                            get: { viewModel.arrivalReserve },
+                            set: { viewModel.arrivalReserve = $0 }
+                        ), range: 5...50)
+
+                        // Corridor radius
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                Text("CHARGER CORRIDOR")
+                                    .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                                Spacer()
+                                Text("\(Int(viewModel.corridorRadiusKm)) km")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Color.appAccent.opacity(0.18), in: Capsule())
+                                    .foregroundStyle(Color.appAccent)
+                            }
+                            Slider(
+                                value: Binding(
+                                    get: { viewModel.corridorRadiusKm },
+                                    set: { viewModel.setCorridorRadius($0) }
+                                ),
+                                in: 2...25, step: 1
+                            )
+                            .tint(Color.appAccent)
+                        }
+                    }
+                    .padding(.leading, 4)
+                }
+
+                Divider()
+
+                // Plan Route button (card footer)
+                VStack(spacing: 8) {
+                    Button {
+                        Task { await viewModel.plan() }
+                    } label: {
+                        HStack {
+                            if viewModel.isPlanning { ProgressView().tint(Color.appOnAccent) }
+                            Text(viewModel.isPlanning ? (viewModel.statusMessage ?? "Planning…") : "Plan Route")
+                                .fontWeight(.semibold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        // Explicit fill and label rather than `.borderedProminent` + tint:
+                        // the system pairs the bright accent with a light label, which is
+                        // unreadable on it.
+                        .foregroundStyle(viewModel.canPlan ? Color.appOnAccent : Color.appOnSurface.opacity(0.4))
+                        .background(
+                            viewModel.canPlan ? Color.appAccent : Color.appSurfaceVariant,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!viewModel.canPlan)
+
+                    // Up front, not after a 20 s timeout: routing needs the network, and a
+                    // driver in a car park should be told that before they wait.
+                    if viewModel.isOffline {
+                        Label(
+                            "You're offline. Route planning needs a connection — this will work again once you have signal.",
+                            systemImage: "wifi.slash"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(Color.appAmber)
+                        .multilineTextAlignment(.center)
+                    }
+
+                    if let error = viewModel.errorMessage {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(Color.appAmber)
+                            .multilineTextAlignment(.center)
+                    }
+
+                    // Distinct from `errorMessage`: the plan is usable, the charger data
+                    // behind it just couldn't be refreshed. Saying nothing would let a
+                    // driver route to a station that closed since the cache was written.
+                    if viewModel.chargersAreCached {
+                        Label(
+                            "Charger data couldn't be refreshed — showing saved results, which may be out of date.",
+                            systemImage: "wifi.exclamationmark"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                    }
+                }
             }
             .padding(14)
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
+    }
+
+    private func percentBadge(_ value: Float) -> some View {
+        Text("\(Int(value))%")
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Color.appAccent.opacity(0.18), in: Capsule())
+            .foregroundStyle(Color.appAccent)
+    }
+
+    private func sliderRow(_ title: String, value: Binding<Float>, range: ClosedRange<Float>) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(title).font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                Spacer()
+                percentBadge(value.wrappedValue)
+            }
+            Slider(value: value, in: range, step: 5)
+                .tint(Color.appAccent)
+                .accessibilityValue("\(Int(value.wrappedValue)) percent")
+        }
     }
 }
 
@@ -350,257 +551,6 @@ private struct EndpointField: View {
     }
 }
 
-// MARK: - Favourite places
-
-private struct FavoritePlaceChips: View {
-    let viewModel: PlanViewModel
-    @State private var renaming: SavedPlaceEntity?
-    @State private var draftName = ""
-
-    var body: some View {
-        if !viewModel.favoritePlaces.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(viewModel.favoritePlaces, id: \.id) { place in
-                        Menu {
-                            Button("Set as origin") { viewModel.selectFavorite(place, for: .origin) }
-                            Button("Set as destination") { viewModel.selectFavorite(place, for: .destination) }
-                            Button("Add as stopover") { viewModel.addFavoriteAsWaypoint(place) }
-                            Button("Rename…") {
-                                draftName = place.name
-                                renaming = place
-                            }
-                            Button("Remove", role: .destructive) { viewModel.deleteFavorite(place) }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Image(systemName: "star.fill").font(.caption2)
-                                Text(place.name).font(.caption)
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.appSurface, in: Capsule())
-                        }
-                        .tint(.primary)
-                    }
-                }
-                .padding(.horizontal)
-            }
-            .alert("Rename place", isPresented: Binding(
-                get: { renaming != nil },
-                set: { if !$0 { renaming = nil } }
-            )) {
-                TextField("Name", text: $draftName)
-                Button("Cancel", role: .cancel) { renaming = nil }
-                Button("Save") {
-                    if let place = renaming { viewModel.renameFavorite(place, to: draftName) }
-                    renaming = nil
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Parameters
-
-private struct BatteryParametersCard: View {
-    let viewModel: PlanViewModel
-
-    var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("DEPARTURE CHARGE")
-                            .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                        if viewModel.usesLiveSoc && viewModel.liveSocAvailable {
-                            Text("LIVE")
-                                .font(.caption2.weight(.bold))
-                                .padding(.horizontal, 5).padding(.vertical, 1)
-                                .background(Color.appGreen.opacity(0.2), in: Capsule())
-                                .foregroundStyle(Color.appGreen)
-                        }
-                        Spacer()
-                        percentBadge(viewModel.departureSoc)
-                    }
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.departureSoc },
-                            set: { viewModel.setDepartureSoc($0) }
-                        ),
-                        in: 10...100, step: 5
-                    )
-                    .tint(Color.appAccent)
-
-                    if !viewModel.usesLiveSoc && viewModel.liveSocAvailable {
-                        Button("Use live charge from car") { viewModel.useLiveSoc() }
-                            .font(.caption)
-                            .tint(Color.appAccent)
-                    }
-                }
-
-                sliderRow("ARRIVAL RESERVE", value: Binding(
-                    get: { viewModel.arrivalReserve },
-                    set: { viewModel.arrivalReserve = $0 }
-                ), range: 5...50)
-
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text("CHARGER CORRIDOR")
-                            .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                        Spacer()
-                        Text("\(Int(viewModel.corridorRadiusKm)) km")
-                            .font(.caption.weight(.semibold))
-                            .padding(.horizontal, 8).padding(.vertical, 3)
-                            .background(Color.appAccent.opacity(0.18), in: Capsule())
-                            .foregroundStyle(Color.appAccent)
-                    }
-                    Slider(
-                        value: Binding(
-                            get: { viewModel.corridorRadiusKm },
-                            set: { viewModel.setCorridorRadius($0) }
-                        ),
-                        in: 2...25, step: 1
-                    )
-                    .tint(Color.appAccent)
-                }
-            }
-            .padding(14)
-        }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
-    }
-
-    private func percentBadge(_ value: Float) -> some View {
-        Text("\(Int(value))%")
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Color.appAccent.opacity(0.18), in: Capsule())
-            .foregroundStyle(Color.appAccent)
-    }
-
-    private func sliderRow(_ title: String, value: Binding<Float>, range: ClosedRange<Float>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title).font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                Spacer()
-                percentBadge(value.wrappedValue)
-            }
-            Slider(value: value, in: range, step: 5)
-                .tint(Color.appAccent)
-                .accessibilityValue("\(Int(value.wrappedValue)) percent")
-        }
-    }
-}
-
-// MARK: - Action
-
-private struct PlanActionSection: View {
-    let viewModel: PlanViewModel
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Button {
-                Task { await viewModel.plan() }
-            } label: {
-                HStack {
-                    if viewModel.isPlanning { ProgressView().tint(Color.appOnAccent) }
-                    Text(viewModel.isPlanning ? (viewModel.statusMessage ?? "Planning…") : "Plan Route")
-                        .fontWeight(.semibold)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                // Explicit fill and label rather than `.borderedProminent` + tint:
-                // the system pairs the bright accent with a light label, which is
-                // unreadable on it.
-                .foregroundStyle(viewModel.canPlan ? Color.appOnAccent : Color.appOnSurface.opacity(0.4))
-                .background(
-                    viewModel.canPlan ? Color.appAccent : Color.appSurfaceVariant,
-                    in: RoundedRectangle(cornerRadius: 12)
-                )
-            }
-            .buttonStyle(.plain)
-            .disabled(!viewModel.canPlan)
-
-            // Up front, not after a 20 s timeout: routing needs the network, and a
-            // driver in a car park should be told that before they wait.
-            if viewModel.isOffline {
-                Label(
-                    "You're offline. Route planning needs a connection — this will work again once you have signal.",
-                    systemImage: "wifi.slash"
-                )
-                .font(.caption)
-                .foregroundStyle(Color.appAmber)
-                .multilineTextAlignment(.center)
-            }
-
-            if let error = viewModel.errorMessage {
-                Label(error, systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
-                    .foregroundStyle(Color.appAmber)
-                    .multilineTextAlignment(.center)
-            }
-
-            // Distinct from `errorMessage`: the plan is usable, the charger data
-            // behind it just couldn't be refreshed. Saying nothing would let a
-            // driver route to a station that closed since the cache was written.
-            if viewModel.chargersAreCached {
-                Label(
-                    "Charger data couldn't be refreshed — showing saved results, which may be out of date.",
-                    systemImage: "wifi.exclamationmark"
-                )
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-            }
-        }
-        .padding(.horizontal)
-    }
-}
-
-private struct PlanActionsRow: View {
-    let viewModel: PlanViewModel
-    @Binding var showSaveTrip: Bool
-
-    var body: some View {
-        VStack(spacing: 8) {
-            if !viewModel.excludedChargerIds.isEmpty {
-                Button {
-                    viewModel.restoreExcludedChargers()
-                } label: {
-                    Label(
-                        "Restore \(viewModel.excludedChargerIds.count) excluded charger\(viewModel.excludedChargerIds.count == 1 ? "" : "s")",
-                        systemImage: "arrow.uturn.backward"
-                    )
-                    .font(.caption)
-                }
-                .tint(Color.appAccent)
-            }
-            if let plan = viewModel.plan {
-                Button {
-                    MapsNavigation.navigateTrip(plan)
-                } label: {
-                    Label("Navigate this trip", systemImage: "arrow.triangle.turn.up.right.circle.fill")
-                        .font(.footnote.weight(.medium))
-                }
-                .tint(Color.appAccent)
-            }
-
-            HStack {
-                Button {
-                    showSaveTrip = true
-                } label: {
-                    Label("Save trip", systemImage: "star")
-                }
-                .disabled(!viewModel.canSaveTrip)
-                Spacer()
-                Button("Clear plan", role: .destructive) { viewModel.clearPlan() }
-            }
-            .font(.footnote)
-        }
-        .padding(.horizontal)
-    }
-}
-
 // MARK: - Itinerary
 
 /// Route elevation, led by the figure that actually drives consumption.
@@ -637,6 +587,7 @@ private struct ElevationLine: View {
 private struct ItineraryTimeline: View {
     let plan: TripPlan
     let viewModel: PlanViewModel
+    @Binding var showSaveTrip: Bool
 
     var body: some View {
         GroupBox {
@@ -646,6 +597,42 @@ private struct ItineraryTimeline: View {
                     ElevationLine(elevation: elevation)
                         .padding(.top, 6)
                 }
+
+                // Header actions: Save, Clear, Navigate
+                HStack {
+                    if !viewModel.excludedChargerIds.isEmpty {
+                        Button {
+                            viewModel.restoreExcludedChargers()
+                        } label: {
+                            Label(
+                                "Restore \(viewModel.excludedChargerIds.count)",
+                                systemImage: "arrow.uturn.backward"
+                            )
+                            .font(.caption)
+                        }
+                        .tint(Color.appAccent)
+                    }
+                    if let plan = viewModel.plan {
+                        Button {
+                            MapsNavigation.navigateTrip(plan)
+                        } label: {
+                            Label("Navigate", systemImage: "arrow.triangle.turn.up.right.circle.fill")
+                                .font(.caption.weight(.medium))
+                        }
+                        .tint(Color.appAccent)
+                    }
+                    Spacer()
+                    Button {
+                        showSaveTrip = true
+                    } label: {
+                        Label("Save trip", systemImage: "star")
+                            .font(.caption)
+                    }
+                    .disabled(!viewModel.canSaveTrip)
+                    Button("Clear", role: .destructive) { viewModel.clearPlan() }
+                        .font(.caption)
+                }
+                .padding(.top, 8)
 
                 Divider().padding(.vertical, 10)
 
@@ -1058,4 +1045,3 @@ private func ChargerPriceText(charger: Charger) -> String {
     }
     return ""
 }
-
