@@ -11,7 +11,7 @@ final class DashboardViewModel {
 
     private(set) var telemetry = VehicleTelemetry()
     private(set) var connectionState: ObdConnectionState = .disconnected
-    private(set) var vehicleName = "E-GMP"
+    private(set) var vehicleName: String
     private(set) var unitSystem: UnitSystem = .metric
     private(set) var thermalTip: String?
     private(set) var isPro = false
@@ -26,6 +26,14 @@ final class DashboardViewModel {
 
     init(services: AppServices) {
         self.services = services
+
+        // Set initial vehicle name from current preferences
+        let initialPrefs = services.preferences.currentPreferences
+        self.vehicleName = Ioniq5Constants.vehicleNameFor(initialPrefs.activeProfileId)
+        self.unitSystem = initialPrefs.unitSystem
+        self.aiKey = initialPrefs.aiKey
+        self.aiProvider = initialPrefs.aiProvider
+        self.aiFeaturesEnabled = initialPrefs.aiFeaturesEnabled
         services.telemetry.state
             .receive(on: DispatchQueue.main)
             .sink { [weak self] sample in
