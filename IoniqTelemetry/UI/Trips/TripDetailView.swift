@@ -51,8 +51,8 @@ struct TripDetailView: View {
 
                 PostTripBriefingView(
                     trip: trip,
-                    recentTrips: viewModel.recentTrips,
-                    samples: viewModel.samples,
+                    recentTrips: viewModel.trips,
+                    samples: samples,
                     isPro: viewModel.isPro,
                     aiKey: viewModel.aiKey,
                     aiProvider: viewModel.aiProvider,

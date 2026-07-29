@@ -48,7 +48,6 @@ final class TripsViewModel {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
                 self?.unitSystem = $0.unitSystem
-                self?.geminiApiKey = $0.geminiApiKey
                 self?.aiKey = $0.aiKey
                 self?.aiProvider = $0.aiProvider
                 self?.aiFeaturesEnabled = $0.aiFeaturesEnabled

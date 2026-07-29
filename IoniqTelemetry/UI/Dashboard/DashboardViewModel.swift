@@ -46,7 +46,6 @@ final class DashboardViewModel {
                 guard let self else { return }
                 self.vehicleName = Ioniq5Constants.vehicleNameFor(prefs.activeProfileId)
                 self.unitSystem = prefs.unitSystem
-                self.geminiApiKey = prefs.geminiApiKey
                 self.aiKey = prefs.aiKey
                 self.aiProvider = prefs.aiProvider
                 self.aiFeaturesEnabled = prefs.aiFeaturesEnabled
