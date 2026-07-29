@@ -154,6 +154,8 @@ final class SettingsViewModel {
     }
     func setReserveSoc(_ value: Float) { update { $0.reserveSocPercent = value } }
     func setTargetArrivalSoc(_ value: Float) { update { $0.targetArrivalSocPercent = value } }
+    func setGeminiApiKey(_ value: String) { update { $0.geminiApiKey = value.isEmpty ? nil : value } }
+    func setAiCoachingEnabled(_ value: Bool) { update { $0.aiCoachingEnabled = value } }
 
     /// Why charger occupancy alerts cannot run, or nil when they can. Surfaced so a
     /// disabled toggle explains itself instead of just looking broken.

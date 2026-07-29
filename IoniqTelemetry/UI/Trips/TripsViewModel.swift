@@ -22,6 +22,17 @@ final class TripsViewModel {
     private(set) var summary: TripSummary?
     private(set) var errorMessage: String?
     private(set) var unitSystem: UnitSystem = .metric
+    private(set) var isPro = false
+    private(set) var geminiApiKey: String?
+
+    /// Vehicle baseline efficiency in kWh/100km. Derived from recent trips when data
+    /// is available, or nil before enough data exists.
+    var efficiencyBaseline: Double? {
+        let completed = trips.filter { $0.endTime != nil && $0.avgConsumptionKwhPer100km != nil && $0.avgConsumptionKwhPer100km! > 0 }
+        guard completed.count >= 3 else { return nil }
+        let avg = completed.compactMap { Double($0.avgConsumptionKwhPer100km!) }.reduce(0, +) / Double(completed.count)
+        return avg
+    }
 
     /// Set after a delete so the UI can offer an undo before the row is gone for good.
     private(set) var recentlyDeleted: TripEntity?
@@ -33,7 +44,15 @@ final class TripsViewModel {
         self.services = services
         services.preferences.preferences
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.unitSystem = $0.unitSystem }
+            .sink { [weak self] in
+                self?.unitSystem = $0.unitSystem
+                self?.geminiApiKey = $0.geminiApiKey
+            }
+            .store(in: &cancellables)
+
+        services.entitlement.isPro
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.isPro = $0 }
             .store(in: &cancellables)
     }
 

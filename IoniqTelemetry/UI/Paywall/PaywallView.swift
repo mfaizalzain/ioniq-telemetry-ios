@@ -82,7 +82,12 @@ private struct FeatureList: View {
     private static let features: [(icon: String, title: String, detail: String)] = [
         ("bell.badge", "Charger Occupancy Alerts", "Know before you arrive at a full charger"),
         ("map", "Live Charger Availability", "Connector status on nearby chargers, with your Google key"),
-        ("calendar", "365-Day Trip History", "Up from 90 days on the free tier")
+        ("calendar", "365-Day Trip History", "Up from 90 days on the free tier"),
+        ("wand.and.stars", "AI Trip Briefing", "AI-powered summary after every trip"),
+        ("calendar.badge.clock", "Weekly AI Digest", "Weekly and monthly driving summaries"),
+        ("bolt.batteryblock", "Charging Intelligence", "Charge speed trends and degradation analysis"),
+        ("("brain.head.profile", "AI Assistant with Context", "Ask questions about your vehicle with real telemetry context")
+        ("heart.text.clipboard", "Battery Health Report", "SOH tracking and battery health assessment")
     ]
 
     var body: some View {

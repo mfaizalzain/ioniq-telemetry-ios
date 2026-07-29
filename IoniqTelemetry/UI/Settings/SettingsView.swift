@@ -43,6 +43,7 @@ struct SettingsView: View {
             AdapterSection(viewModel: viewModel, showAdapterPicker: $showAdapterPicker)
             RoutingSection(viewModel: viewModel, showPaywall: $showPaywall)
             DataSection(viewModel: viewModel)
+            AiSection(viewModel: viewModel, showPaywall: $showPaywall)
             DisplaySection(viewModel: viewModel)
             ProSection(viewModel: viewModel, showPaywall: $showPaywall)
             AboutSection()
@@ -193,6 +194,70 @@ private struct AdapterSection: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(Color.appRed)
+            }
+        }
+    }
+}
+
+// MARK: - AI
+
+private struct AiSection: View {
+    let viewModel: SettingsViewModel
+    @Binding var showPaywall: Bool
+
+    var body: some View {
+        Section {
+            if viewModel.isPro {
+                SecretField(
+                    placeholder: "Gemini API key",
+                    initialValue: viewModel.preferences.geminiApiKey ?? "",
+                    onCommit: { viewModel.setGeminiApiKey($0) },
+                    helpTitle: "Get a key at Google AI Studio",
+                    helpURL: URL(string: "https://aistudio.google.com/apikey")
+                )
+
+                Toggle(isOn: Binding(
+                    get: { viewModel.preferences.aiCoachingEnabled },
+                    set: { viewModel.setAiCoachingEnabled($0) }
+                )) {
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("AI Coaching")
+                        Text("Charging insights, battery reports & aiAssistant")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } else {
+                Button {
+                    showPaywall = true
+                } label: {
+                    LabeledContent {
+                        Text("PRO")
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.appAccent.opacity(0.2), in: Capsule())
+                            .foregroundStyle(Color.appAccent)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Label("Gemini AI Features", systemImage: "brain.head.profile")
+                            Text("Charging Intelligence, Battery Reports & AI AiAssistant")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .tint(.primary)
+            }
+        } header: {
+            Text("AI & Intelligence")
+        } footer: {
+            if viewModel.isPro && (viewModel.preferences.geminiApiKey ?? "").isEmpty {
+                Text("Add a Gemini API key to enable AI-powered features. Your own key means requests land on your free quota, not a shared pool.")
+            } else if viewModel.isPro {
+                Text("AI features use your Gemini API key. Battery Health Reports, Charging Insights, and the AI AiAssistant all draw from the same key.")
+            } else {
+                Text("Charging Intelligence, Battery Health Reports and the AI AiAssistant with vehicle context are Pro features that need a Gemini API key.")
             }
         }
     }

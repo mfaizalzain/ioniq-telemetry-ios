@@ -48,6 +48,15 @@ struct TripDetailView: View {
                 }
 
                 noteCard
+
+                PostTripBriefingView(
+                    trip: trip,
+                    recentTrips: viewModel.trips,
+                    samples: samples,
+                    isPro: viewModel.isPro,
+                    geminiApiKey: viewModel.geminiApiKey,
+                    efficiencyBaseline: viewModel.efficiencyBaseline
+                )
             }
             .padding(.vertical)
         }

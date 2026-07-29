@@ -37,6 +37,7 @@ struct DashboardView: View {
         }
         .task {
             if viewModel == nil { viewModel = DashboardViewModel(services: services) }
+            viewModel?.refreshTrips()
         }
     }
 
@@ -66,6 +67,19 @@ struct DashboardView: View {
 
                 MetricTilesGrid(viewModel: viewModel)
                 TirePressureVisualizerCard(viewModel: viewModel)
+
+                AIDigestSection(
+                    isPro: viewModel.isPro,
+                    geminiApiKey: viewModel.geminiApiKey,
+                    trips: viewModel.recentTrips
+                )
+            }
+                // AI-powered cards — shown only when telemetry data is available
+                if viewModel.hasData {
+                    ChargingInsightCard(viewModel: viewModel)
+                    BatteryHealthReportView(viewModel: viewModel)
+                    AiAssistantChatView(viewModel: viewModel)
+                }
             }
             .padding(.vertical)
         }

@@ -1,4 +1,5 @@
 import Combine
+import CoreData
 import CoreDomain
 import CoreRouting
 import Foundation
@@ -13,11 +14,16 @@ final class DashboardViewModel {
     private(set) var vehicleName = "E-GMP"
     private(set) var unitSystem: UnitSystem = .metric
     private(set) var thermalTip: String?
+    private(set) var isPro = false
+    private(set) var geminiApiKey: String?
+    private(set) var recentTrips: [TripEntity] = []
 
     private let thermalAdvisor = ThermalAdvisor()
+    private let services: AppServices
     private var cancellables = Set<AnyCancellable>()
 
     init(services: AppServices) {
+        self.services = services
         services.telemetry.state
             .receive(on: DispatchQueue.main)
             .sink { [weak self] sample in
@@ -38,7 +44,13 @@ final class DashboardViewModel {
                 guard let self else { return }
                 self.vehicleName = Ioniq5Constants.vehicleNameFor(prefs.activeProfileId)
                 self.unitSystem = prefs.unitSystem
+                self.geminiApiKey = prefs.geminiApiKey
             }
+            .store(in: &cancellables)
+
+        services.entitlement.isPro
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in self?.isPro = $0 }
             .store(in: &cancellables)
     }
 
@@ -95,6 +107,12 @@ final class DashboardViewModel {
     var tripDistanceText: String { distanceKm(nil) }
     var tripEnergyText: String { "— kWh" }
     var tripDurationText: String? { nil }
+
+    /// Loads recent trips from the trip log. Call when the dashboard appears or
+    /// trips may have changed.
+    func refreshTrips() {
+        recentTrips = (try? services.tripLog.trips()) ?? []
+    }
 }
 
 // MARK: - Formatting
