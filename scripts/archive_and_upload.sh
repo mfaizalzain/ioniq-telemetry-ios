@@ -2,8 +2,8 @@
 #
 # Archives a Release build and uploads it to TestFlight.
 #
-# Requires an App Store Connect API key in the environment:
-#   ASC_KEY_ID, ASC_ISSUER_ID, and ASC_KEY_PATH (path to the .p8).
+# Uses the Apple ID app-specific password stored in the macOS keychain
+# (service: AC_PASSWORD, account: faizalmzain@gmail.com).
 #
 # Usage: scripts/archive_and_upload.sh [--no-upload]
 set -euo pipefail
@@ -62,15 +62,20 @@ if [[ "${1:-}" == "--no-upload" ]]; then
   exit 0
 fi
 
-: "${ASC_KEY_ID:?set ASC_KEY_ID}"
-: "${ASC_ISSUER_ID:?set ASC_ISSUER_ID}"
-: "${ASC_KEY_PATH:?set ASC_KEY_PATH}"
+: "${AC_PASSWORD:?set AC_PASSWORD in keychain}"
+echo "Checking AC_PASSWORD keychain entry..."
+security find-generic-password -s "AC_PASSWORD" -a "faizalmzain@gmail.com" >/dev/null 2>&1 || {
+  echo "Error: AC_PASSWORD not found in keychain."
+  echo "Generate at appleid.apple.com/account/manage and run:"
+  echo "  security add-generic-password -a faizalmzain@gmail.com -s AC_PASSWORD -w 'xxxx-xxxx-xxxx-xxxx'"
+  exit 1
+}
 
 echo "==> Uploading to TestFlight"
 xcrun altool --upload-app \
-  --type ios \
-  --file "$BUILD_DIR/$SCHEME.ipa" \
-  --apiKey "$ASC_KEY_ID" \
-  --apiIssuer "$ASC_ISSUER_ID"
+  -f "$BUILD_DIR/$SCHEME.ipa" \
+  -t ios \
+  -u faizalmzain@gmail.com \
+  -p "@keychain:AC_PASSWORD"
 
 echo "==> Done. Build $NEXT uploaded."
