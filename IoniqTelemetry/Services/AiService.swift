@@ -47,7 +47,8 @@ final class AiService {
             trip: trip,
             recentTrips: recentTrips,
             telemetrySamples: telemetrySamples,
-            efficiencyBaseline: efficiencyBaseline
+            efficiencyBaseline: efficiencyBaseline,
+            countryCode: countryCode
         )
         return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
@@ -159,48 +160,32 @@ final class AiService {
         trip: TripEntity,
         recentTrips: [TripEntity],
         telemetrySamples: [SampleEntity],
-        efficiencyBaseline: Double?
+        efficiencyBaseline: Double?,
+        countryCode: String?
     ) -> String {
-        var lines = [
-            "You are an AI driving assistant for an E-GMP electric vehicle.",
-            "Generate a very concise post-trip briefing in 3-4 sentences.",
-            "Be specific with numbers and compare to the driver's baseline where available.",
-            "Do NOT use markdown or bullet points — write natural plain text.",
-            "",
-            "TRIP SUMMARY:",
-            "- Distance: \(String(format: "%.1f", trip.distanceKm)) km",
-            "- Duration: \(durationString(from: trip))",
-            "- Energy used: \(String(format: "%.1f", trip.energyUsedKwh)) kWh",
-            "- Average speed: \(avgSpeedString(from: trip))",
-            "- Start SOC: \(String(format: "%.0f", trip.startSoc))%",
-            "- End SOC: \(String(format: "%.0f", trip.endSoc ?? 0))%",
-        ]
+        let vehicleName = "Ioniq 5"
+        let usableKwh = 77.4
+        let tripJson = buildTripJson(trip: trip, samples: telemetrySamples)
+        let recentSummary = buildRecentTripsSummary(recentTrips: recentTrips)
+        let baselineStr = efficiencyBaseline.map { String(format: "%.1f", $0) } ?? "unknown"
+        let countryStr = countryCode.map { " for \($0)" } ?? ""
 
-        // Efficiency
-        if let consumption = trip.avgConsumptionKwhPer100km {
-            lines.append("- Efficiency: \(String(format: "%.1f", consumption)) kWh/100km")
-            if let baseline = efficiencyBaseline, baseline > 0 {
-                let diff = consumption - Float(baseline)
-                if abs(diff) > 0.5 {
-                    let sign = diff > 0 ? "worse" : "better"
-                    lines.append("- Baseline: \(String(format: "%.1f", baseline)) kWh/100km (\(sign) by \(String(format: "%.1f", abs(diff))))")
-                }
-            }
-        }
+        return """
+        You are an EV efficiency coach for a \(vehicleName) (\(String(format: "%.0f", usableKwh)) kWh battery).
 
-        // Regen from samples
-        let regen = computeRegen(from: telemetrySamples)
-        if let regenKwh = regen.regenKwh, regenKwh > 0.1, let totalDraw = regen.totalDraw, totalDraw > 0 {
-            let share = (regenKwh / totalDraw) * 100
-            lines.append("- Energy recovered: \(String(format: "%.1f", regenKwh)) kWh (\(String(format: "%.0f", share))%)")
-        }
+        This trip data (JSON):
+        \(tripJson)
 
-        // Cost estimation — Gemini handles with local rates
+        Recent trips for comparison:
+        \(recentSummary)
 
-        lines.append("")
-        lines.append("Write a friendly, informative 3-4 sentence summary. Start with a greeting. Mention the most notable aspect of the trip.")
-
-        return lines.joined(separator: "\n")
+        Write a 3-4 sentence post-trip briefing covering:
+        1. Efficiency (kWh/100km) vs the driver's average (\(baselineStr) kWh/100km)
+        2. Regen score estimate (how much energy was recovered)
+        3. Cost estimate: kWh used × typical local electricity tariff vs equivalent petrol cost\(countryStr), in local currency
+        4. One personalized efficiency tip based on this trip
+        Be concise, friendly, and specific to THIS trip's data.
+        """
     }
 
     // MARK: - Digest Prompt
@@ -278,7 +263,41 @@ final class AiService {
     }
 
     // MARK: - Prompt helpers
-
+    
+    private func buildTripJson(trip: TripEntity, samples: [SampleEntity]) -> String {
+        var lines = [String]()
+        lines.append("Distance: \(String(format: "%.1f", trip.distanceKm)) km")
+        lines.append("Energy used: \(String(format: "%.1f", trip.energyUsedKwh)) kWh")
+        if let consumption = trip.avgConsumptionKwhPer100km {
+            lines.append("Avg consumption: \(String(format: "%.1f", consumption)) kWh/100km")
+        }
+        lines.append("Start SOC: \(String(format: "%.0f", trip.startSoc))%")
+        if let endSoc = trip.endSoc {
+            lines.append("End SOC: \(String(format: "%.0f", endSoc))%")
+        }
+        if !samples.isEmpty {
+            let validTemps = samples.compactMap({ $0.ambientTempC }).filter({ $0 > -20 })
+            if !validTemps.isEmpty {
+                let avgTemp = validTemps.reduce(0, +) / Float(validTemps.count)
+                lines.append("Ambient temp: \(String(format: "%.0f", avgTemp))°C")
+            }
+        }
+        lines.append("Duration: \(durationString(from: trip))")
+        return lines.joined(separator: "\n")
+    }
+    
+    private func buildRecentTripsSummary(recentTrips: [TripEntity]) -> String {
+        recentTrips
+            .filter { $0.endTime != nil }
+            .sorted { $0.startTime > $1.startTime }
+            .prefix(10)
+            .map { t in
+                let endSoc = t.endSoc.map { "\(String(format: "%.0f", $0))" } ?? "?"
+                return "Distance: \(String(format: "%.1f", t.distanceKm)) km, \(String(format: "%.1f", t.energyUsedKwh)) kWh, \(String(format: "%.0f", t.startSoc))% -> \(endSoc)% SOC"
+            }
+            .joined(separator: "\n")
+    }
+    
     private func durationString(from trip: TripEntity) -> String {
         guard let end = trip.endTime else { return "In progress" }
         let minutes = Int(end.timeIntervalSince(trip.startTime) / 60)
