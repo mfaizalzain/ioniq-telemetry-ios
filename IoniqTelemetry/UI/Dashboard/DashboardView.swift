@@ -78,7 +78,6 @@ struct DashboardView: View {
 
                 // AI-powered cards — shown only when telemetry data is available
                 if viewModel.hasData {
-                    ChargingInsightCard(viewModel: viewModel)
                     BatteryHealthReportView(viewModel: viewModel)
                 }
             }

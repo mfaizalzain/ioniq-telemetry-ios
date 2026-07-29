@@ -50,7 +50,6 @@
 		DA711EE94721F86CDFC4F3D2 /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1025A4ECE56E6140DA4895E4 /* Speech.framework */; };
 		DDBA760A7159403F6F7ED913 /* MapKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F928199730EF5D5C4706F89A /* MapKit.framework */; };
 		DE5B89219B64A8133FF439A2 /* CoreUI in Frameworks */ = {isa = PBXBuildFile; productRef = B5D04FA331DABD94427A1A3F /* CoreUI */; };
-		E4DA0060E0D04B9A1FDD9A98 /* ChargingInsightCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = D492FB9CF28D43B8E8D600F5 /* ChargingInsightCard.swift */; };
 		F3B564D252CFF1EA0DF1F0D1 /* AiAndRoutingSections.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133D14427B0062FE116986F1 /* AiAndRoutingSections.swift */; };
 		F5358B51092E6DF7F0F23662 /* TripsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7CF9643A43B2EB650FBB1C /* TripsView.swift */; };
 		F8682992E3B4E8CF5CBAA411 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 39E4C656FFEE54E2D359DFD6 /* AVFoundation.framework */; };
@@ -111,7 +110,6 @@
 		CFDF516A468A77CCD6985D3A /* DataSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSection.swift; sourceTree = "<group>"; };
 		D0B90C783C3ACAF0CB846BA4 /* IoniqTelemetry-CarPlay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "IoniqTelemetry-CarPlay.entitlements"; sourceTree = "<group>"; };
 		D0F20D65CD1E45F443D1A915 /* ConnectedCarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectedCarService.swift; sourceTree = "<group>"; };
-		D492FB9CF28D43B8E8D600F5 /* ChargingInsightCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChargingInsightCard.swift; sourceTree = "<group>"; };
 		D76ACB924B36FF8C171B52B1 /* AlertNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertNotifier.swift; sourceTree = "<group>"; };
 		DB74CB948B1F7C8C5CAC6D43 /* IoniqTelemetry.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IoniqTelemetry.entitlements; sourceTree = "<group>"; };
 		DDCE0A05C9CDA1B45C3F7580 /* AiAssistantChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiAssistantChatView.swift; sourceTree = "<group>"; };
@@ -241,7 +239,6 @@
 				DDCE0A05C9CDA1B45C3F7580 /* AiAssistantChatView.swift */,
 				3DAFDDF866DA9EAF02A85E40 /* AIDigestSection.swift */,
 				B24E658A0630C85D5EADB297 /* BatteryHealthReportView.swift */,
-				D492FB9CF28D43B8E8D600F5 /* ChargingInsightCard.swift */,
 				9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */,
 				47AD48321C5F8754904DC3A3 /* DashboardViewModel.swift */,
 			);
@@ -484,7 +481,6 @@
 				BABC7C03FA75D309033AE7FC /* CarPlayCoordinator.swift in Sources */,
 				69F5F70B3E2F96A762AA0C92 /* CarPlayPointOfInterest.swift in Sources */,
 				38618D9EAA1DD709A42A9D35 /* CarPlaySceneDelegate.swift in Sources */,
-				E4DA0060E0D04B9A1FDD9A98 /* ChargingInsightCard.swift in Sources */,
 				1592D3CA6415713CFB3D725E /* ConnectedCarService.swift in Sources */,
 				679881A44DC2201BC2416EB3 /* DashboardView.swift in Sources */,
 				713585F39A0A3E6CD1C7C39A /* DashboardViewModel.swift in Sources */,
