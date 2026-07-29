@@ -73,6 +73,14 @@ final class DashboardViewModel {
         return power > 0
     }
 
+    /// True when the vehicle is actively DC fast-charging, which gates the charge
+    /// curve card on the dashboard.
+    var isDcCharging: Bool {
+        telemetry.isCharging
+            && telemetry.chargeType == .dc
+            && (telemetry.powerKw.map { abs($0) > 0 } ?? false)
+    }
+
     var hasData: Bool { connectionState == .connected }
 
     /// True once any real sample has landed. Separates "never connected, every tile
