@@ -13,6 +13,7 @@ public final class TripEntity {
     public var avgConsumptionKwhPer100km: Float?
     public var ambientTempAvgC: Float?
     public var note: String?
+    public var aiBriefing: String?
 
     public init(
         id: String,

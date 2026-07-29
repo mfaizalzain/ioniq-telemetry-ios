@@ -6,6 +6,7 @@ import SwiftUI
 /// AI-generated post-trip briefing card, shown on the trip detail screen.
 /// Requires Pro entitlement and an AI API key stored in user preferences.
 /// Matches Android's PostTripBriefingCard: no auto-fetch, user taps Generate.
+/// Briefing is persisted on the trip entity so it survives navigation.
 struct PostTripBriefingView: View {
     let trip: TripEntity
     let recentTrips: [TripEntity]
@@ -16,7 +17,7 @@ struct PostTripBriefingView: View {
     let aiFeaturesEnabled: Bool
     let efficiencyBaseline: Double?
 
-    @State private var briefing: String?
+    @Environment(\.modelContext) private var modelContext
     @State private var isLoading = false
     @State private var errorMessage: String?
 
@@ -46,7 +47,7 @@ struct PostTripBriefingView: View {
                     featuresDisabledMessage
                 } else if aiKey == nil || aiKey?.isEmpty == true {
                     noKeyMessage
-                } else if let briefing {
+                } else if let briefing = trip.aiBriefing {
                     Text(briefing)
                         .font(.subheadline)
                         .foregroundStyle(.primary)
@@ -94,11 +95,11 @@ struct PostTripBriefingView: View {
 
     @MainActor
     private func loadBriefing() async {
-        guard isPro, aiFeaturesEnabled, let apiKey = aiKey, !apiKey.isEmpty, briefing == nil, !isLoading else { return }
+        guard isPro, aiFeaturesEnabled, let apiKey = aiKey, !apiKey.isEmpty, trip.aiBriefing == nil, !isLoading else { return }
         isLoading = true
         errorMessage = nil
         do {
-            briefing = try await aiService.generatePostTripBriefing(
+            let text = try await aiService.generatePostTripBriefing(
                 trip: trip,
                 recentTrips: recentTrips,
                 telemetrySamples: samples,
@@ -106,6 +107,8 @@ struct PostTripBriefingView: View {
                 apiKey: apiKey,
                 aiProvider: aiProvider
             )
+            trip.aiBriefing = text
+            try modelContext.save()
         } catch {
             errorMessage = error.localizedDescription
         }
