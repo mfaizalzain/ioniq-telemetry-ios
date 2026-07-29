@@ -221,7 +221,7 @@ final class AiService {
             return aConsumption > bConsumption
         }
 
-        let periodLabel = period.label.lowercased()
+        let periodLabel = period == .weekly ? "week" : "month"
         var statsLines = [
             "Trips: \(tripCount)",
             "Total distance: \(String(format: "%.1f", totalDistance)) km",
@@ -237,15 +237,6 @@ final class AiService {
             let h = Int(totalDurationMinutes) / 60
             let m = Int(totalDurationMinutes) % 60
             statsLines.append("Total driving time: \(h > 0 ? "\(h)h " : "")\(m)m")
-        }
-
-        // Cost saved vs petrol
-        let costPerKwh = 0.12
-        let totalCost = Double(totalEnergy) * costPerKwh
-        let petrolCost = Double(totalDistance) / 100.0 * 8.0 * 1.50
-        let saved = petrolCost - totalCost
-        if saved > 0 {
-            statsLines.append("Cost saved vs petrol: $\(String(format: "%.2f", saved))")
         }
 
         // Best day

@@ -31,8 +31,9 @@ struct AIDigestSection: View {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         expanded.toggle()
                     }
-                    // Auto-fetch on first expand
-                    if expanded && digestText == nil && errorMessage == nil && !isLoading
+                    // Auto-fetch on first expand or when period changed
+                    if expanded && (digestText == nil || selectedPeriod != lastFetchedPeriod)
+                        && !isLoading
                         && isPro && aiFeaturesEnabled && aiKey?.isEmpty == false && !trips.isEmpty {
                         Task { await loadDigest() }
                     }
@@ -53,9 +54,22 @@ struct AIDigestSection: View {
                 .buttonStyle(.plain)
 
                 if expanded {
-                    // Period picker (only when usable)
+                    // Period picker + refresh button
                     if isPro && aiFeaturesEnabled && aiKey?.isEmpty == false {
-                        periodPicker
+                        HStack(spacing: 8) {
+                            periodPicker
+                            Spacer()
+                            if digestText != nil {
+                                Button {
+                                    Task { await loadDigest() }
+                                } label: {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(Color.appAccent)
+                            }
+                        }
                     }
 
                     if !isPro {
@@ -96,6 +110,11 @@ struct AIDigestSection: View {
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
+        .onChange(of: selectedPeriod) { _, newPeriod in
+            if expanded && newPeriod != lastFetchedPeriod {
+                Task { await loadDigest() }
+            }
+        }
     }
 
     @MainActor
@@ -104,6 +123,7 @@ struct AIDigestSection: View {
         isLoading = true
         errorMessage = nil
         digestText = nil
+        lastFetchedPeriod = selectedPeriod
 
         let filteredTrips = trips.filter { trip in
             let age = Date().timeIntervalSince(trip.startTime)
