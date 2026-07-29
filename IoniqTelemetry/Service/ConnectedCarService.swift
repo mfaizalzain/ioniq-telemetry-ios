@@ -348,6 +348,10 @@ final class ConnectedCarService {
         guard services.isPro, prefs.chargerOccupancyAlerts,
               let key = prefs.googleMapsApiKey, !key.isEmpty else { return }
 
+        // Only check occupancy when actively navigating — the plan may be a saved
+        // trip being reviewed.
+        guard (services.activePlan as? ActivePlanHolderImpl)?.currentIsNavigating ?? false else { return }
+
         Task { [weak self] in
             guard let self else { return }
             guard let alert = await self.occupancyMonitor.check(

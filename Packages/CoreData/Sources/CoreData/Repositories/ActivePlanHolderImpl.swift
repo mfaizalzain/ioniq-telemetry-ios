@@ -16,15 +16,20 @@ public final class ActivePlanHolderImpl: ActivePlanHolder, @unchecked Sendable {
     private let _pendingReroute = CurrentValueSubject<TripPlan?, Never>(nil)
     private var pendingReroutePoints: [LatLon] = []
     private let lock = NSLock()
+    private let _isNavigating = CurrentValueSubject<Bool, Never>(false)
 
     public var activePlan: AnyPublisher<TripPlan?, Never> { _activePlan.eraseToAnyPublisher() }
     public var routePoints: AnyPublisher<[LatLon], Never> { _routePoints.eraseToAnyPublisher() }
     public var replanAdvice: AnyPublisher<String?, Never> { _replanAdvice.eraseToAnyPublisher() }
     public var pendingReroute: AnyPublisher<TripPlan?, Never> { _pendingReroute.eraseToAnyPublisher() }
+    public var isNavigating: AnyPublisher<Bool, Never> { _isNavigating.eraseToAnyPublisher() }
 
     /// Current values for callers that need a snapshot rather than a subscription.
     public var currentPlan: TripPlan? { _activePlan.value }
     public var currentRoutePoints: [LatLon] { _routePoints.value }
+    /// Synchronous access to the navigating flag for ConnectedCarService's
+    /// telemetry loop, which runs on @MainActor and needs a snapshot.
+    public var currentIsNavigating: Bool { _isNavigating.value }
 
     public init() {}
 
@@ -45,11 +50,16 @@ public final class ActivePlanHolderImpl: ActivePlanHolder, @unchecked Sendable {
         _routePoints.value = []
         _replanAdvice.value = nil
         _pendingReroute.value = nil
+        _isNavigating.value = false
         lock.withLock { pendingReroutePoints = [] }
     }
 
     public func setReplanAdvice(_ message: String?) {
         _replanAdvice.value = message
+    }
+
+    public func setIsNavigating(_ value: Bool) {
+        _isNavigating.value = value
     }
 
     public func setPendingReroute(_ plan: TripPlan, points: [LatLon]) {

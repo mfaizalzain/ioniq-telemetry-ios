@@ -25,7 +25,7 @@ struct PlanView: View {
                         RouteBuilderCard(viewModel: viewModel, showSaveTrip: $showSaveTrip)
 
                         if let plan = viewModel.plan {
-                            ItineraryTimeline(plan: plan, viewModel: viewModel, showSaveTrip: $showSaveTrip)
+                            ItineraryTimeline(plan: plan, viewModel: viewModel, showSaveTrip: $showSaveTrip, onNavigate: { services.activePlan.setIsNavigating(true) })
                             ChargersAlongRouteSection(viewModel: viewModel)
                         }
 
@@ -588,6 +588,7 @@ private struct ItineraryTimeline: View {
     let plan: TripPlan
     let viewModel: PlanViewModel
     @Binding var showSaveTrip: Bool
+    let onNavigate: () -> Void
 
     var body: some View {
         GroupBox {
@@ -614,6 +615,7 @@ private struct ItineraryTimeline: View {
                     }
                     if let plan = viewModel.plan {
                         Button {
+                            onNavigate()
                             MapsNavigation.navigateTrip(plan)
                         } label: {
                             Label("Navigate", systemImage: "arrow.triangle.turn.up.right.circle.fill")
@@ -800,15 +802,35 @@ private struct TimelineRow: View {
 
 private struct SavedTripsSection: View {
     let viewModel: PlanViewModel
+    @State private var savedTripsExpanded = false
+
+    private var tripCount: Int { viewModel.savedTrips.count }
+    private static let maxCollapsed = 3
 
     var body: some View {
         if !viewModel.savedTrips.isEmpty {
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("SAVED TRIPS")
-                        .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { savedTripsExpanded.toggle() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("SAVED TRIPS (\(tripCount))")
+                                .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .rotationEffect(.degrees(savedTripsExpanded ? 180 : 0))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
 
-                    ForEach(viewModel.savedTrips) { trip in
+                    let trips = savedTripsExpanded
+                        ? viewModel.savedTrips
+                        : Array(viewModel.savedTrips.prefix(Self.maxCollapsed))
+
+                    ForEach(trips) { trip in
                         Button {
                             viewModel.loadTrip(trip)
                         } label: {
@@ -840,6 +862,22 @@ private struct SavedTripsSection: View {
                             }
                         }
                         Divider()
+                    }
+
+                    // Show all / Show less footer
+                    if tripCount > Self.maxCollapsed {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { savedTripsExpanded.toggle() }
+                        } label: {
+                            HStack {
+                                Spacer()
+                                Text(savedTripsExpanded ? "Show less" : "Show all \(tripCount)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding(14)

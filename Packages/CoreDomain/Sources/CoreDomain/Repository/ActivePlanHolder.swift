@@ -18,6 +18,11 @@ public protocol ActivePlanHolder: Sendable {
     /// plan — [commitPendingReroute] promotes it.
     var pendingReroute: AnyPublisher<TripPlan?, Never> { get }
 
+    /// True while the driver is actively navigating a plan (has tapped "Navigate").
+    /// Resets to false on [clearPlan]. Occupancy alerts are gated behind this flag
+    /// so they don't poll Google Places when the user is just reviewing a saved plan.
+    var isNavigating: AnyPublisher<Bool, Never> { get }
+
     /// Set the active trip plan. Clears any prior replan advice.
     func setPlan(_ plan: TripPlan?)
 
@@ -29,6 +34,10 @@ public protocol ActivePlanHolder: Sendable {
 
     /// Set replan advice message.
     func setReplanAdvice(_ message: String?)
+
+    /// Called when the user taps "Navigate" so occupancy alerts only fire during
+    /// an active drive, not when reviewing a saved plan.
+    func setIsNavigating(_ value: Bool)
 
     /// Set a pending re-route plan with its route points.
     func setPendingReroute(_ plan: TripPlan, points: [LatLon])
