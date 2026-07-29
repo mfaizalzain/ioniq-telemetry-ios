@@ -21,20 +21,6 @@ struct PlanView: View {
 
                         RouteBuilderCard(viewModel: viewModel, showSaveTrip: $showSaveTrip)
 
-                        // AiPlanCard — conversational AI planning, gated behind Pro + key + feature toggle
-                        if viewModel.isPro && viewModel.hasKey && viewModel.aiFeaturesEnabled {
-                            AiPlanCardView(
-                                viewModel: viewModel,
-                                aiKey: viewModel.aiKey,
-                                aiProvider: viewModel.aiProvider,
-                                isBusy: viewModel.nlBusy,
-                                showError: viewModel.nlError,
-                                showInterpretation: viewModel.nlInterpretation,
-                                onInputChange: { viewModel.setNlInput($0) },
-                                onPlan: { Task { await viewModel.planFromNaturalLanguage() } }
-                            )
-                        }
-
                         if let plan = viewModel.plan {
                             ItineraryTimeline(plan: plan, viewModel: viewModel, showSaveTrip: $showSaveTrip, onNavigate: { services.activePlan.setIsNavigating(true) })
                             ChargersAlongRouteSection(viewModel: viewModel)
