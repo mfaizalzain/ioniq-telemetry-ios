@@ -47,11 +47,17 @@ struct RoutingSection: View {
             }
 
             // — Charger occupancy alerts —
+            let hasGoogleKey = !(viewModel.preferences.googleMapsApiKey ?? "").isEmpty
             if viewModel.isPro {
                 Toggle("Charger occupancy alerts", isOn: Binding(
-                    get: { viewModel.preferences.chargerOccupancyAlerts },
-                    set: { viewModel.setChargerOccupancyAlerts($0) }
+                    get: { viewModel.preferences.chargerOccupancyAlerts && hasGoogleKey },
+                    set: { newValue in
+                        if hasGoogleKey {
+                            viewModel.setChargerOccupancyAlerts(newValue)
+                        }
+                    }
                 ))
+                .disabled(!hasGoogleKey)
             } else {
                 Button {
                     showPaywall = true
@@ -148,6 +154,7 @@ struct GoogleKeyField: View {
             || viewModel.preferences.googlePoiSearch
             || viewModel.preferences.chargerOccupancyAlerts
             || viewModel.preferences.chargerSource == .googlePlaces
+            || viewModel.isPro
     }
 
     var body: some View {

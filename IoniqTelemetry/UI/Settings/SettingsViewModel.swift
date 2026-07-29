@@ -139,10 +139,22 @@ final class SettingsViewModel {
 
     func setUnitSystem(_ value: UnitSystem) { update { $0.unitSystem = value } }
     func setThemeMode(_ value: ThemeMode) { update { $0.themeMode = value } }
-    func setGoogleMapsKey(_ value: String) { update { $0.googleMapsApiKey = value.isEmpty ? nil : value } }
+    func setGoogleMapsKey(_ value: String) {
+        let key = value.isEmpty ? nil : value
+        update { prefs in
+            prefs.googleMapsApiKey = key
+            if key == nil || key?.isEmpty == true {
+                prefs.chargerOccupancyAlerts = false
+            }
+        }
+    }
     func setOrsKey(_ value: String) { update { $0.orsApiKey = value.isEmpty ? nil : value } }
     func setRoutingProvider(_ value: RoutingProvider) { update { $0.routingProvider = value } }
-    func setChargerOccupancyAlerts(_ value: Bool) { update { $0.chargerOccupancyAlerts = value } }
+    func setChargerOccupancyAlerts(_ value: Bool) {
+        let hasKey = !(preferences.googleMapsApiKey ?? "").isEmpty
+        guard hasKey || !value else { return }
+        update { $0.chargerOccupancyAlerts = value }
+    }
     func setGooglePoiSearch(_ value: Bool) { update { $0.googlePoiSearch = value } }
 
     /// Switching source invalidates the cache: rows from the old provider would
