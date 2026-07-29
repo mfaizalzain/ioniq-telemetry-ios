@@ -265,20 +265,8 @@ private struct AiSection: View {
                     set: { viewModel.setAiFeaturesEnabled($0) }
                 )) {
                     VStack(alignment: .leading, spacing: 1) {
-                        Text("Enable AI Features")
-                        Text("Turn off to keep your API key saved but stop sending telemetry")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Toggle(isOn: Binding(
-                    get: { viewModel.preferences.aiCoachingEnabled },
-                    set: { viewModel.setAiCoachingEnabled($0) }
-                )) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("AI Coaching")
-                        Text("Charging insights, battery reports & aiAssistant")
+                        Text("AI Features")
+                        Text("Disable to stop sending data to the AI provider")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
