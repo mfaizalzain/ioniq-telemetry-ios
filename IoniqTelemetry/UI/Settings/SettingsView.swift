@@ -240,7 +240,7 @@ private struct AiSection: View {
                             .foregroundStyle(Color.appAccent)
                     } label: {
                         VStack(alignment: .leading, spacing: 1) {
-                            Label("Gemini AI Features", systemImage: "brain.head.profile")
+                            Label("Gemini AI Features", systemImage: "cpu")
                             Text("Charging Intelligence, Battery Reports & AI AiAssistant")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
