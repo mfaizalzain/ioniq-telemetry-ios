@@ -49,7 +49,7 @@ final class PlanViewModel {
 
     // MARK: - Parameters
 
-    private(set) var departureSoc: Float = 80
+    private(set) var departureSoc: Float = 100
     var arrivalReserve: Float = 20
     /// How far off the line a charger may sit and still be considered.
     private(set) var corridorRadiusKm: Float = 5
