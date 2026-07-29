@@ -42,7 +42,6 @@ struct SettingsView: View {
             VehicleSection(viewModel: viewModel, showVehiclePicker: $showVehiclePicker)
             AdapterSection(viewModel: viewModel, showAdapterPicker: $showAdapterPicker)
             RoutingSection(viewModel: viewModel, showPaywall: $showPaywall)
-            AiSection(viewModel: viewModel, showPaywall: $showPaywall)
             DataSection(viewModel: viewModel)
             DisplaySection(viewModel: viewModel)
             ProSection(viewModel: viewModel, showPaywall: $showPaywall)

@@ -139,8 +139,6 @@ final class SettingsViewModel {
 
     func setUnitSystem(_ value: UnitSystem) { update { $0.unitSystem = value } }
     func setThemeMode(_ value: ThemeMode) { update { $0.themeMode = value } }
-    func setGeminiKey(_ value: String) { update { $0.geminiApiKey = value.isEmpty ? nil : value } }
-    func setAiCoaching(_ value: Bool) { update { $0.aiCoachingEnabled = value } }
     func setGoogleMapsKey(_ value: String) { update { $0.googleMapsApiKey = value.isEmpty ? nil : value } }
     func setOrsKey(_ value: String) { update { $0.orsApiKey = value.isEmpty ? nil : value } }
     func setRoutingProvider(_ value: RoutingProvider) { update { $0.routingProvider = value } }

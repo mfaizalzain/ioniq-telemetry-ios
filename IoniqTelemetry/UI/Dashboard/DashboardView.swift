@@ -6,8 +6,6 @@ struct DashboardView: View {
     @Environment(AppServices.self) private var services
     @Binding var selectedTab: AppTab
     @State private var viewModel: DashboardViewModel?
-    @State private var showCopilot = false
-
     var body: some View {
         NavigationStack {
             Group {
@@ -35,20 +33,6 @@ struct DashboardView: View {
                         ConnectionBadge(state: ConnectionState(viewModel.connectionState), style: .plain)
                     }
                 }
-                if viewModel?.canUseCopilot == true {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showCopilot = true
-                        } label: {
-                            Image(systemName: "sparkles")
-                        }
-                        .tint(Color.appAccent)
-                        .accessibilityLabel("AI Assistant")
-                    }
-                }
-            }
-            .sheet(isPresented: $showCopilot) {
-                CopilotView()
             }
         }
         .task {

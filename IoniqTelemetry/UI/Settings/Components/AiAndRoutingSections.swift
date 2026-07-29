@@ -3,63 +3,6 @@ import CoreOBD
 import CoreUI
 import SwiftUI
 
-// MARK: - AI
-
-struct AiSection: View {
-    let viewModel: SettingsViewModel
-    @Binding var showPaywall: Bool
-
-    var body: some View {
-        Section {
-            if !viewModel.isPro {
-                Button {
-                    showPaywall = true
-                } label: {
-                    Label("Unlock AI Features with Pro", systemImage: "lock.fill")
-                }
-                .tint(Color.appAccent)
-            }
-
-            SecretField(
-                placeholder: "Gemini API key",
-                initialValue: viewModel.preferences.geminiApiKey ?? "",
-                onCommit: { viewModel.setGeminiKey($0) },
-                helpTitle: KeyHelp.geminiTitle,
-                helpURL: KeyHelp.gemini
-            )
-            .disabled(!viewModel.isPro)
-
-            Toggle("Enable AI", isOn: Binding(
-                get: { viewModel.preferences.aiCoachingEnabled },
-                set: { viewModel.setAiCoaching($0) }
-            ))
-            .disabled(!viewModel.isPro)
-        } header: {
-            AiSectionHeader(isPro: viewModel.isPro)
-        } footer: {
-            Text("Explains diagnostics, thermal limits and energy use in plain language while you drive.\n\nThe key is free: sign in at Google AI Studio, choose \u{201C}Create API key\u{201D}, and paste it above. Requests are billed to your account, not ours.")
-        }
-    }
-}
-
-private struct AiSectionHeader: View {
-    let isPro: Bool
-
-    var body: some View {
-        HStack {
-            Text("AI Assistant")
-            if !isPro {
-                Text("PRO")
-                    .font(.caption2.weight(.bold))
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.appAccent.opacity(0.2), in: Capsule())
-                    .foregroundStyle(Color.appAccent)
-            }
-        }
-    }
-}
-
 // MARK: - Routing
 
 struct RoutingSection: View {
@@ -383,9 +326,6 @@ struct SecretField: View {
 // MARK: - Key sources
 
 enum KeyHelp {
-    static let geminiTitle = "Get a free key at Google AI Studio"
-    static let gemini = URL(string: "https://aistudio.google.com/apikey")!
-
     static let orsTitle = "Sign up at openrouteservice.org"
     static let ors = URL(string: "https://openrouteservice.org/dev/#/signup")!
 

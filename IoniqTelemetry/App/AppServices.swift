@@ -26,7 +26,6 @@ final class AppServices {
     let preferences: PreferencesRepositoryImpl
     let entitlement: EntitlementRepositoryImpl
     let telemetry: TelemetryRepositoryImpl
-    let gemini: GeminiRepositoryImpl
     let tripLog: TripLogRepository
     let chargers: ChargerRepository
     let savedTrips: SavedTripRepository
@@ -66,7 +65,6 @@ final class AppServices {
         preferences = PreferencesRepositoryImpl()
         entitlement = EntitlementRepositoryImpl()
         telemetry = TelemetryRepositoryImpl()
-        gemini = GeminiRepositoryImpl()
         tripLog = TripLogRepository(
             modelContext: modelContext,
             entitlement: entitlement,

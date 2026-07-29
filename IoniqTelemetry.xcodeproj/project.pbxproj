@@ -23,7 +23,6 @@
 		488D648D249927D9FC127D94 /* TripDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D3784E71C842EED4005A96 /* TripDetailView.swift */; };
 		4D000C0C958F411F7D6A3FF4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 71E75764760802E4E8D492C3 /* Assets.xcassets */; };
 		58FF896F28601DACFC7E543E /* VehicleLocationProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 27EDF8359710AED96EF1DC16 /* VehicleLocationProvider.swift */; };
-		5E4FEF21B4719E29D022AD31 /* CopilotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF1CB89F2E357CB529065A64 /* CopilotView.swift */; };
 		602315C0596033975E43E07F /* CoreBluetooth.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E895DF443FCEEE5C5E060871 /* CoreBluetooth.framework */; };
 		64437CD9A71B3719571633A9 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 67165E3C3B428C078A95ED99 /* LaunchScreen.storyboard */; };
 		65E8F435BBCCED2E88B9C46C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3F6099A4448EEBE22D1F18A1 /* StoreKit.framework */; };
@@ -41,7 +40,6 @@
 		B1A4DA9B674AAAF6B40425DD /* IoniqTelemetryApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 734AFC3926EFA5634B2080D6 /* IoniqTelemetryApp.swift */; };
 		B2FF332CEFAD88246DC5B1C1 /* PaywallViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C8ADDBDBC5A342476500F5 /* PaywallViewModel.swift */; };
 		BABC7C03FA75D309033AE7FC /* CarPlayCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE9272FAB694E0E7A2E71E6 /* CarPlayCoordinator.swift */; };
-		C70DACC2EE93D18555F72C60 /* CopilotViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6343C9F5E46B88A76EC642D4 /* CopilotViewModel.swift */; };
 		C806C545266A393FF6046E31 /* CoreData in Frameworks */ = {isa = PBXBuildFile; productRef = CE94BDBFAE6356B793FDC1B5 /* CoreData */; };
 		CD14EF3A45BD2BABB770F360 /* TripsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DA8DC491CA28199554CE44 /* TripsViewModel.swift */; };
 		DA711EE94721F86CDFC4F3D2 /* Speech.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1025A4ECE56E6140DA4895E4 /* Speech.framework */; };
@@ -79,7 +77,6 @@
 		54C12EF4A0F03A94394B3443 /* SwiftData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData.framework; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
 		5CA626BD167720CB91E5DA00 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		5CD51D249AA7A6761D98B76D /* CarPlay.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CarPlay.framework; path = System/Library/Frameworks/CarPlay.framework; sourceTree = SDKROOT; };
-		6343C9F5E46B88A76EC642D4 /* CopilotViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotViewModel.swift; sourceTree = "<group>"; };
 		67165E3C3B428C078A95ED99 /* LaunchScreen.storyboard */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; path = LaunchScreen.storyboard; sourceTree = "<group>"; };
 		6F4CB406BD5FDC8C8BFD3789 /* CoreData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreData; path = Packages/CoreData; sourceTree = SOURCE_ROOT; };
 		71E75764760802E4E8D492C3 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -106,7 +103,6 @@
 		D0F20D65CD1E45F443D1A915 /* ConnectedCarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConnectedCarService.swift; sourceTree = "<group>"; };
 		D76ACB924B36FF8C171B52B1 /* AlertNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlertNotifier.swift; sourceTree = "<group>"; };
 		DB74CB948B1F7C8C5CAC6D43 /* IoniqTelemetry.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IoniqTelemetry.entitlements; sourceTree = "<group>"; };
-		DF1CB89F2E357CB529065A64 /* CopilotView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopilotView.swift; sourceTree = "<group>"; };
 		E00DDEEE5BD92E6BA7A37535 /* DisplaySection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisplaySection.swift; sourceTree = "<group>"; };
 		E478B08AFC2545C89E60B30C /* AppServices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppServices.swift; sourceTree = "<group>"; };
 		E87216F0D499E20E17EFB892 /* CoreRouting */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreRouting; path = Packages/CoreRouting; sourceTree = SOURCE_ROOT; };
@@ -170,9 +166,7 @@
 		4676B546C4BF7CBCF04113D1 /* Components */ = {
 			isa = PBXGroup;
 			children = (
-				DF1CB89F2E357CB529065A64 /* CopilotView.swift */,
-				6343C9F5E46B88A76EC642D4 /* CopilotViewModel.swift */,
-			);
+					);
 			path = Components;
 			sourceTree = "<group>";
 		};
@@ -469,8 +463,6 @@
 				69F5F70B3E2F96A762AA0C92 /* CarPlayPointOfInterest.swift in Sources */,
 				38618D9EAA1DD709A42A9D35 /* CarPlaySceneDelegate.swift in Sources */,
 				1592D3CA6415713CFB3D725E /* ConnectedCarService.swift in Sources */,
-				5E4FEF21B4719E29D022AD31 /* CopilotView.swift in Sources */,
-				C70DACC2EE93D18555F72C60 /* CopilotViewModel.swift in Sources */,
 				679881A44DC2201BC2416EB3 /* DashboardView.swift in Sources */,
 				713585F39A0A3E6CD1C7C39A /* DashboardViewModel.swift in Sources */,
 				3C30C239DD74918E41A5034F /* DataSection.swift in Sources */,

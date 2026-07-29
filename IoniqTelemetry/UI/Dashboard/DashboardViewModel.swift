@@ -14,10 +14,6 @@ final class DashboardViewModel {
     private(set) var unitSystem: UnitSystem = .metric
     private(set) var thermalTip: String?
 
-    /// The AI button only appears when Pro, a key, and the toggle all line up —
-    /// same gate as the Android build.
-    private(set) var canUseCopilot = false
-
     private let thermalAdvisor = ThermalAdvisor()
     private var cancellables = Set<AnyCancellable>()
 
@@ -37,15 +33,11 @@ final class DashboardViewModel {
             .store(in: &cancellables)
 
         services.preferences.preferences
-            .combineLatest(services.entitlement.isPro)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] prefs, isPro in
+            .sink { [weak self] prefs in
                 guard let self else { return }
                 self.vehicleName = Ioniq5Constants.vehicleNameFor(prefs.activeProfileId)
                 self.unitSystem = prefs.unitSystem
-                self.canUseCopilot = isPro
-                    && prefs.aiCoachingEnabled
-                    && !(prefs.geminiApiKey ?? "").isEmpty
             }
             .store(in: &cancellables)
     }
