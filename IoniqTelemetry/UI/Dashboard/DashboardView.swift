@@ -345,13 +345,16 @@ struct TirePressureVisualizerCard: View {
 
     private func tireSquare(_ label: String, _ kpa: Float?, _ tempC: Float?) -> some View {
         let isLow = (kpa ?? .greatestFiniteMagnitude) < Self.lowPressureKpa
+        let psi = kpa.map { Int($0 * 0.145038) }
         return VStack(spacing: 2) {
             Text(label)
                 .font(.ioniqCaption.weight(.bold))
-            Text(viewModel.tirePressure(kpa))
+            // Primary: PSI (always shown, matching Android)
+            Text(psi.map { "\($0) PSI" } ?? "—")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(isLow ? Color.appRed : Color.appOnSurface)
-            Text(viewModel.tirePressureUnit)
+            // Secondary: kPa (muted, below PSI — matching Android)
+            Text(formattedKpa(kpa))
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
             Text(viewModel.temperature(tempC))
@@ -367,8 +370,13 @@ struct TirePressureVisualizerCard: View {
         .accessibilityValue(
             kpa == nil
                 ? "No data"
-                : "\(viewModel.tirePressure(kpa)) \(viewModel.tirePressureUnit)\(isLow ? ", low" : "")"
+                : "\(psi.map(String.init) ?? "—") PSI, \(viewModel.tirePressure(kpa)) kPa\(isLow ? ", low" : "")"
         )
+    }
+
+    private func formattedKpa(_ kpa: Float?) -> String {
+        guard let kpa else { return "—" }
+        return "\(Int(kpa)) kPa"
     }
 }
 
