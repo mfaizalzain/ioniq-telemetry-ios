@@ -205,6 +205,10 @@ private struct AiSection: View {
     let viewModel: SettingsViewModel
     @Binding var showPaywall: Bool
 
+    @State private var isTestingKey = false
+    @State private var keyTestResult: String?
+    @State private var keyTestSuccess: Bool = false
+
     var body: some View {
         Section {
             if viewModel.isPro {
@@ -234,6 +238,26 @@ private struct AiSection: View {
                         helpTitle: "Get a key at DeepSeek Platform",
                         helpURL: URL(string: "https://platform.deepseek.com/api_keys")
                     )
+                }
+
+                Button {
+                    Task { await testKey() }
+                } label: {
+                    HStack {
+                        if isTestingKey {
+                            ProgressView().controlSize(.small)
+                            Text("Verifying Key…")
+                        } else {
+                            Label("Test Key Connection", systemImage: "checkmark.shield")
+                        }
+                    }
+                }
+                .disabled(isTestingKey || currentApiKey.isEmpty)
+
+                if let keyTestResult {
+                    Label(keyTestResult, systemImage: keyTestSuccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(keyTestSuccess ? Color.appGreen : Color.appRed)
                 }
 
                 Toggle(isOn: Binding(
@@ -300,5 +324,31 @@ private struct AiSection: View {
                 Text("Charging Intelligence, Battery Health Reports and the AI AiAssistant with vehicle context are Pro features that need an API key.")
             }
         }
+    }
+
+    private var currentApiKey: String {
+        switch viewModel.preferences.aiProvider {
+        case .gemini: return viewModel.preferences.geminiApiKey ?? ""
+        case .deepseek: return viewModel.preferences.deepseekApiKey ?? ""
+        }
+    }
+
+    @MainActor
+    private func testKey() async {
+        let key = currentApiKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty else { return }
+        isTestingKey = true
+        keyTestResult = nil
+        
+        do {
+            let aiService = AiService()
+            let isOk = try await aiService.validateApiKey(key, provider: viewModel.preferences.aiProvider)
+            keyTestSuccess = isOk
+            keyTestResult = isOk ? "API key validated successfully!" : "Invalid API key provided."
+        } catch {
+            keyTestSuccess = false
+            keyTestResult = "Key validation failed: \(error.localizedDescription)"
+        }
+        isTestingKey = false
     }
 }

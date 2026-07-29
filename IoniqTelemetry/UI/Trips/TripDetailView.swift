@@ -14,12 +14,23 @@ struct TripDetailView: View {
     @State private var samples: [SampleEntity] = []
     @State private var note: String = ""
     @State private var isEditingNote = false
+    @State private var selectedTimestamp: Date? = nil
 
     private var routePoints: [CLLocationCoordinate2D] {
         samples.compactMap { sample in
             guard let lat = sample.lat, let lon = sample.lon else { return nil }
             return CLLocationCoordinate2D(latitude: lat, longitude: lon)
         }
+    }
+
+    private var selectedSample: SampleEntity? {
+        guard let selectedTimestamp else { return nil }
+        return samples.min(by: { abs($0.timestamp.timeIntervalSince(selectedTimestamp)) < abs($1.timestamp.timeIntervalSince(selectedTimestamp)) })
+    }
+
+    private var scrubberCoordinate: CLLocationCoordinate2D? {
+        guard let sample = selectedSample, let lat = sample.lat, let lon = sample.lon else { return nil }
+        return CLLocationCoordinate2D(latitude: lat, longitude: lon)
     }
 
     var body: some View {
@@ -42,9 +53,9 @@ struct TripDetailView: View {
                     .frame(height: 180)
                 } else {
                     DriveAnalyticsCard(analytics: analyzeDrive(samples: samples))
-                    TraceChart(title: "STATE OF CHARGE", unit: "%", samples: samples) { $0.soc }
-                    TraceChart(title: "SPEED", unit: "km/h", samples: samples) { $0.speedKph }
-                    TraceChart(title: "POWER", unit: "kW", samples: samples) { $0.powerKw }
+                    TraceChart(title: "STATE OF CHARGE", unit: "%", samples: samples, selectedTimestamp: $selectedTimestamp) { $0.soc }
+                    TraceChart(title: "SPEED", unit: "km/h", samples: samples, selectedTimestamp: $selectedTimestamp) { $0.speedKph }
+                    TraceChart(title: "POWER", unit: "kW", samples: samples, selectedTimestamp: $selectedTimestamp) { $0.powerKw }
                 }
 
                 noteCard
@@ -96,6 +107,10 @@ struct TripDetailView: View {
             if let end = routePoints.last {
                 Marker("End", systemImage: "flag.checkered", coordinate: end)
                     .tint(Color.appAccent)
+            }
+            if let scrubber = scrubberCoordinate {
+                Marker("Position", systemImage: "car.circle.fill", coordinate: scrubber)
+                    .tint(Color.appAmber)
             }
         }
         .frame(height: 240)
@@ -227,6 +242,7 @@ private struct TraceChart: View {
     let title: String
     let unit: String
     let samples: [SampleEntity]
+    @Binding var selectedTimestamp: Date?
     let value: (SampleEntity) -> Float?
 
     private var points: [(date: Date, value: Double)] {
@@ -236,13 +252,26 @@ private struct TraceChart: View {
         }
     }
 
+    private var currentScrubberValue: Double? {
+        guard let selectedTimestamp, let sample = samples.min(by: { abs($0.timestamp.timeIntervalSince(selectedTimestamp)) < abs($1.timestamp.timeIntervalSince(selectedTimestamp)) }), let raw = value(sample) else { return nil }
+        return Double(raw)
+    }
+
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                Text("\(title) (\(unit))")
-                    .font(.ioniqCaption)
-                    .foregroundStyle(.secondary)
-                    .ioniqStatLabel()
+                HStack {
+                    Text("\(title) (\(unit))")
+                        .font(.ioniqCaption)
+                        .foregroundStyle(.secondary)
+                        .ioniqStatLabel()
+                    Spacer()
+                    if let currentScrubberValue {
+                        Text(String(format: "%.1f \(unit)", currentScrubberValue))
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(Color.appAccent)
+                    }
+                }
 
                 if points.isEmpty {
                     Text("Not recorded")
@@ -254,7 +283,14 @@ private struct TraceChart: View {
                         LineMark(x: .value("Time", point.date), y: .value(title, point.value))
                             .foregroundStyle(Color.appAccent)
                             .interpolationMethod(.monotone)
+
+                        if let selectedTimestamp {
+                            RuleMark(x: .value("Selected", selectedTimestamp))
+                                .foregroundStyle(Color.appAmber)
+                                .lineStyle(StrokeStyle(lineWidth: 1.5, dash: [4, 4]))
+                        }
                     }
+                    .chartXSelection(value: $selectedTimestamp)
                     .chartYAxis { AxisMarks(position: .leading) }
                     .frame(height: 120)
                 }

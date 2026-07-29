@@ -141,6 +141,15 @@ final class AiService {
         return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
     }
 
+    // MARK: - Validation
+
+    /// Validates an API key by sending a lightweight query to the specified provider.
+    func validateApiKey(_ apiKey: String, provider: AiProvider) async throws -> Bool {
+        guard !apiKey.isEmpty else { throw AiError.missingApiKey }
+        let res = try await sendPrompt(provider: provider, apiKey: apiKey, prompt: "Reply with OK.")
+        return !res.isEmpty
+    }
+
     // MARK: - Post-Trip Briefing Prompt
 
     private func buildPostTripBriefingPrompt(

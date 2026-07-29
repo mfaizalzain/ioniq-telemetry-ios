@@ -150,74 +150,98 @@ struct BatteryHeroCard: View {
     private var socPercent: Float? { viewModel.socPercent }
     private var fillFraction: Float { min(max((socPercent ?? 0) / 100, 0), 1) }
     private var fillColor: Color {
-     guard let soc = socPercent else { return .blue }
-     if soc > 50 { return Color(red: 0.15, green: 0.39, blue: 0.92) }
-     if soc > 20 { return Color.appAmber }
-     return Color.appRed
- }
+        guard let soc = socPercent else { return .blue }
+        if soc > 50 { return Color(red: 0.15, green: 0.39, blue: 0.92) }
+        if soc > 20 { return Color.appAmber }
+        return Color.appRed
+    }
 
- var body: some View {
-     GroupBox {
-         ZStack(alignment: .bottomLeading) {
-             // Fill level overlay — width = SOC percentage, bottom-anchored
-             Rectangle()
-                 .fill(fillColor.opacity(0.20))
-                 .frame(width: CGFloat(fillFraction) * (UIScreen.main.bounds.width - 64))
-                 .animation(.easeOut(duration: 0.8), value: fillFraction)
+    private var estimatedRangeKm: Int? {
+        guard let soc = socPercent else { return nil }
+        // E-GMP 77.4 kWh pack baseline (~420 km WLTP @ 100%)
+        return Int(Double(soc) * 4.2)
+    }
 
-             VStack(spacing: 10) {
-                HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
-                        .font(.system(size: 48, weight: .bold))
-                        .tracking(-1.5)
-                    Text("%")
-                        .font(.system(size: 24, weight: .medium))
-                }
-                .foregroundStyle(Color.appOnSurface)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("State of charge")
-                .accessibilityValue(socPercent.map { "\(Int($0.rounded())) percent" } ?? "No data")
+    var body: some View {
+        GroupBox {
+            GeometryReader { geo in
+                ZStack(alignment: .bottomLeading) {
+                    // Fill level overlay — width = SOC percentage, bottom-anchored
+                    Rectangle()
+                        .fill(fillColor.opacity(0.18))
+                        .frame(width: max(geo.size.width * CGFloat(fillFraction), 0))
+                        .animation(.easeOut(duration: 0.8), value: fillFraction)
 
-                if viewModel.telemetry.isCharging {
-                    ChargingChip(viewModel: viewModel)
-                }
-
-                // Collapsible thermal tip integrated inside the hero card
-                if let tip = viewModel.thermalTip {
-                    Button {
-                        showThermalTip.toggle()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: "thermometer.medium")
-                                .foregroundStyle(Color.appAmber)
-                            Text("Thermal")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(Color.appAmber)
-                            Image(systemName: showThermalTip ? "chevron.up" : "chevron.down")
-                                .font(.caption2)
-                                .foregroundStyle(.tertiary)
+                    VStack(spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 1) {
+                            Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
+                                .font(.system(size: 52, weight: .bold))
+                                .tracking(-1.5)
+                            Text("%")
+                                .font(.system(size: 26, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            if let range = estimatedRangeKm {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "bolt.car.fill")
+                                        .font(.caption2)
+                                    Text("Est. \(range) km")
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 5)
+                                .background(fillColor.opacity(0.15))
+                                .foregroundStyle(fillColor)
+                                .clipShape(Capsule())
+                            }
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Color.appAmber.opacity(0.12))
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
+                        .foregroundStyle(Color.appOnSurface)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("State of charge")
+                        .accessibilityValue(socPercent.map { "\(Int($0.rounded())) percent" } ?? "No data")
 
-                    if showThermalTip {
-                        Text(tip)
-                            .font(.ioniqBody)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.appSurfaceVariant.opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        if viewModel.telemetry.isCharging {
+                            ChargingChip(viewModel: viewModel)
+                        }
+
+                        // Collapsible thermal tip integrated inside the hero card
+                        if let tip = viewModel.thermalTip {
+                            Button {
+                                showThermalTip.toggle()
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "thermometer.medium")
+                                        .foregroundStyle(Color.appAmber)
+                                    Text("Thermal")
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(Color.appAmber)
+                                    Image(systemName: showThermalTip ? "chevron.up" : "chevron.down")
+                                        .font(.caption2)
+                                        .foregroundStyle(.tertiary)
+                                }
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.appAmber.opacity(0.12))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+
+                            if showThermalTip {
+                                Text(tip)
+                                    .font(.ioniqBody)
+                                    .foregroundStyle(.secondary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(Color.appSurfaceVariant.opacity(0.5))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                            }
+                        }
                     }
+                    .padding(16)
                 }
             }
-            }
-            .padding(20)
+            .frame(minHeight: 110)
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
@@ -689,15 +713,29 @@ struct TirePressureVisualizerCard: View {
 
     private func tireSquare(_ label: String, _ kpa: Float?, _ tempC: Float?) -> some View {
         let isLow = (kpa ?? .greatestFiniteMagnitude) < Self.lowPressureKpa
+        let isWarning = (kpa ?? .greatestFiniteMagnitude) < (Self.lowPressureKpa + 15)
         let psi = kpa.map { Int($0 * 0.145038) }
+        
+        let statusColor: Color = {
+            if kpa == nil { return .secondary }
+            if isLow { return Color.appRed }
+            if isWarning { return Color.appAmber }
+            return Color.appGreen
+        }()
+
         return VStack(spacing: 2) {
-            Text(label)
-                .font(.ioniqCaption.weight(.bold))
-            // Primary: PSI (always shown, matching Android)
+            HStack(spacing: 3) {
+                Text(label)
+                    .font(.ioniqCaption.weight(.bold))
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 6, height: 6)
+            }
+            // Primary: PSI
             Text(psi.map { "\($0) PSI" } ?? "—")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(isLow ? Color.appRed : Color.appOnSurface)
-            // Secondary: kPa (muted, below PSI — matching Android)
+            // Secondary: kPa
             Text(formattedKpa(kpa))
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
@@ -705,10 +743,14 @@ struct TirePressureVisualizerCard: View {
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
         }
-        .frame(minWidth: 70)
+        .frame(minWidth: 72)
         .padding(8)
-        .background(Color.appSurfaceVariant.opacity(0.6))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(statusColor.opacity(0.10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(statusColor.opacity(0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label) tire")
         .accessibilityValue(

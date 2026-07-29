@@ -582,6 +582,14 @@ private struct ChargeStopRow: View {
     let stop: ChargeStop
     let viewModel: PlanViewModel
 
+    private var speedBadgeText: String? {
+        let kw = stop.charger.maxPowerKw
+        if kw >= 250 { return "\(Int(kw)) kW Ultra-Fast" }
+        if kw >= 100 { return "\(Int(kw)) kW Fast" }
+        if kw > 0 { return "\(Int(kw)) kW DC" }
+        return nil
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
@@ -592,8 +600,18 @@ private struct ChargeStopRow: View {
                     .background(Color.appAccent.opacity(0.15), in: Circle())
                 Rectangle().fill(Color.appOutline).frame(width: 2).frame(minHeight: 24)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(stop.charger.name).font(.subheadline.weight(.medium))
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(stop.charger.name).font(.subheadline.weight(.medium))
+                    if let badge = speedBadgeText {
+                        Text(badge)
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.appGreen.opacity(0.18), in: Capsule())
+                            .foregroundStyle(Color.appGreen)
+                    }
+                }
                 Text(detail).font(.caption).foregroundStyle(.secondary)
             }
             .padding(.bottom, 12)
@@ -624,7 +642,6 @@ private struct ChargeStopRow: View {
             String(format: "%.0f%% → %.0f%%", stop.arrivalSoc, stop.departureSoc),
             "\(stop.chargeMinutes) min"
         ]
-        if stop.charger.maxPowerKw > 0 { parts.append(String(format: "%.0f kW", stop.charger.maxPowerKw)) }
         if let price = stop.charger.pricePerKwh { parts.append(String(format: "%.2f/kWh", price)) }
         return parts.joined(separator: " · ")
     }
