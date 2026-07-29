@@ -149,8 +149,8 @@ struct BatteryHeroCard: View {
     private var socPercent: Float? { viewModel.socPercent }
     private var fillFraction: Float { min(max((socPercent ?? 0) / 100, 0), 1) }
     private var fillColor: Color {
-        guard let soc = socPercent else { return .blue }
-        if soc > 50 { return Color(red: 0.15, green: 0.39, blue: 0.92) }
+        guard let soc = socPercent else { return .appGreen }
+        if soc > 50 { return Color.appGreen }
         if soc > 20 { return Color.appAmber }
         return Color.appRed
     }
@@ -179,6 +179,13 @@ struct BatteryHeroCard: View {
                             Text("%")
                                 .font(.system(size: 26, weight: .medium))
                                 .foregroundStyle(.secondary)
+                            // BMS raw SOC — only when it differs from displayed SOC
+                            if let bms = viewModel.telemetry.socBms, let display = socPercent, abs(bms - display) > 0.4 {
+                                Text("BMS \(String(format: "%.1f", bms))%")
+                                    .font(.system(size: 11, weight: .regular))
+                                    .foregroundStyle(.tertiary)
+                                    .padding(.leading, 4)
+                            }
                             Spacer()
                             if let range = estimatedRangeKm {
                                 HStack(spacing: 4) {

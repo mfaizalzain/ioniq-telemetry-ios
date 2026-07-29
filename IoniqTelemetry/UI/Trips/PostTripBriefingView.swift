@@ -40,12 +40,12 @@ struct PostTripBriefingView: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                // Header with provider badge matching Android
-                HStack {
-                    Label("AI TRIP BRIEFING", systemImage: "wand.and.stars")
-                        .font(.ioniqCaption)
-                        .foregroundStyle(.secondary)
-                        .ioniqStatLabel()
+                // Header with sparkles + provider badge
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.appAccent)
+                    Text("AI Trip Briefing")
+                        .font(.subheadline.weight(.semibold))
                     Spacer()
                     Text(aiProvider.label.uppercased())
                         .font(.caption2.weight(.bold))
@@ -54,6 +54,7 @@ struct PostTripBriefingView: View {
                         .background(Color.appAccent.opacity(0.15), in: Capsule())
                         .foregroundStyle(Color.appAccent)
                 }
+                .foregroundStyle(Color.appOnSurface)
 
                 if !isPro {
                     lockMessage

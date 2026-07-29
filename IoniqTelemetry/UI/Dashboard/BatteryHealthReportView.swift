@@ -29,19 +29,24 @@ struct BatteryHealthReportView: View {
                         Task { await generateReport() }
                     }
                 } label: {
-                    HStack {
-                        Image(systemName: "heart.text.clipboard")
-                            .font(.caption)
-                        Text("BATTERY HEALTH REPORT")
-                            .font(.ioniqCaption.weight(.medium))
-                            .ioniqStatLabel()
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(Color.appAccent)
+                        Text("AI Battery")
+                            .font(.subheadline.weight(.semibold))
+                        Text(services.userPreferences.aiProvider.label.uppercased())
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.appAccent.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.appAccent)
                         Spacer()
                         Image(systemName: "chevron.down")
                             .rotationEffect(.degrees(expanded ? 180 : 0))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.appOnSurface)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

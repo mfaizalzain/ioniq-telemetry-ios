@@ -38,16 +38,22 @@ struct AIDigestSection: View {
                         Task { await loadDigest() }
                     }
                 } label: {
-                    HStack {
-                        Label("AI DIGEST", systemImage: "calendar.badge.clock")
-                            .font(.ioniqCaption)
-                            .foregroundStyle(.secondary)
-                            .ioniqStatLabel()
+                    HStack(spacing: 8) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(Color.appAccent)
+                        Text("AI Digest")
+                            .font(.subheadline.weight(.semibold))
+                        Text(aiProvider.label.uppercased())
+                            .font(.caption2.weight(.bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.appAccent.opacity(0.15), in: Capsule())
+                            .foregroundStyle(Color.appAccent)
                         Spacer()
                         Image(systemName: "chevron.down")
                             .rotationEffect(.degrees(expanded ? 180 : 0))
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     .contentShape(Rectangle())
                 }

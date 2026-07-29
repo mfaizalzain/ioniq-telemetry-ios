@@ -24,12 +24,17 @@ struct AiAssistantChatView: View {
         GroupBox {
             VStack(spacing: 0) {
                 // Header
-                HStack {
-                    Image(systemName: "brain.head.profile")
-                        .font(.caption)
-                    Text("AI COPILOT")
-                        .font(.ioniqCaption.weight(.medium))
-                        .ioniqStatLabel()
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.appAccent)
+                    Text("AI Copilot")
+                        .font(.subheadline.weight(.semibold))
+                    Text(services.userPreferences.aiProvider.label.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.appAccent.opacity(0.15), in: Capsule())
+                        .foregroundStyle(Color.appAccent)
                     Spacer()
                     if !messages.isEmpty {
                         Button("Clear") {
@@ -40,7 +45,7 @@ struct AiAssistantChatView: View {
                         .foregroundStyle(.secondary)
                     }
                 }
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.appOnSurface)
                 .padding(.horizontal, 14)
                 .padding(.top, 14)
 
