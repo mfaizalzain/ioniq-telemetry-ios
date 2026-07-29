@@ -13,6 +13,7 @@ final class AiService {
     private let session: URLSession
     private let baseURLGemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
     private let baseURLDeepSeek = "https://api.deepseek.com/v1/chat/completions"
+    private let deepseekModel = "deepseek-v4-flash"
 
     init() {
         let config = URLSessionConfiguration.ephemeral
@@ -390,7 +391,7 @@ final class AiService {
         messages.append(["role": "user", "content": userMessage])
 
         let body: [String: Any] = [
-            "model": "deepseek-chat",
+            "model": "\(deepseekModel)",
             "messages": messages,
             "max_tokens": 1024,
             "temperature": 0.3
