@@ -4,126 +4,70 @@ import SwiftUI
 
 /// A card/sheet view that displays an AI-generated battery health report including
 /// SOH history, voltage balance trends, and charge speed degradation analysis.
+/// Collapsed by default; user taps to expand and fetch. Result cached for the session.
 struct BatteryHealthReportView: View {
     @Environment(AppServices.self) private var services
     let viewModel: DashboardViewModel
 
+    @State private var expanded = false
     @State private var report: String?
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var showSheet = false
 
     private let aiService = AiService()
 
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 10) {
-                // Header
-                HStack {
-                    Image(systemName: "heart.text.clipboard")
-                        .font(.caption)
-                    Text("BATTERY HEALTH REPORT")
-                        .font(.ioniqCaption.weight(.medium))
-                        .ioniqStatLabel()
-                    Spacer()
-
-                    if !isLoading {
-                        Button {
-                            showSheet = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text("View Report")
-                                    .font(.caption.weight(.medium))
-                                Image(systemName: "chevron.right")
-                                    .font(.caption2)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(Color.appAccent)
-                        .disabled(!canUseAi)
+                // Header — tap to expand/collapse
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        expanded.toggle()
                     }
-                }
-                .foregroundStyle(.secondary)
-
-                // Current SOH display
-                if let soh = viewModel.telemetry.soh {
-                    HStack(spacing: 8) {
-                        Text("Current SOH")
+                    // Auto-fetch on first expand
+                    if expanded && report == nil && errorMessage == nil && canUseAi {
+                        Task { await generateReport() }
+                    }
+                } label: {
+                    HStack {
+                        Image(systemName: "heart.text.clipboard")
                             .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(String(format: "%.0f%%", soh))
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(Color.appGreen)
+                        Text("BATTERY HEALTH REPORT")
+                            .font(.ioniqCaption.weight(.medium))
+                            .ioniqStatLabel()
+                        Spacer()
+                        Image(systemName: "chevron.down")
+                            .rotationEffect(.degrees(expanded ? 180 : 0))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
                     }
+                    .foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
 
-                // Quick stats summary
-                if let delta = viewModel.telemetry.cellVoltDelta {
-                    VStack(alignment: .leading, spacing: 4) {
-                        statsRow("Cell Delta", value: String(format: "%.0f mV", delta * 1000),
-                                 color: delta > 0.03 ? Color.appAmber : Color.appGreen)
-                    }
-                }
-
-                // Status text
-                if !canUseAi {
-                    Label("Full AI battery health report available with Pro + API key.",
-                          systemImage: "sparkles")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Tap \"View Report\" for a detailed AI analysis of battery degradation trends and recommendations.")
-                        .font(.caption)
-                        .foregroundStyle(.tertiary)
-                }
-            }
-            .padding(14)
-        }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
-        .sheet(isPresented: $showSheet) {
-            reportSheet
-        }
-    }
-
-    // MARK: - Sheet Content
-
-    private var reportSheet: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Current SOH big display
+                if expanded {
+                    // Current SOH display
                     if let soh = viewModel.telemetry.soh {
-                        VStack(spacing: 4) {
-                            Text("STATE OF HEALTH")
-                                .font(.ioniqCaption.weight(.medium))
+                        HStack(spacing: 8) {
+                            Text("Current SOH")
+                                .font(.caption)
                                 .foregroundStyle(.secondary)
                             Text(String(format: "%.0f%%", soh))
-                                .font(.system(size: 48, weight: .bold))
+                                .font(.title3.weight(.bold))
                                 .foregroundStyle(Color.appGreen)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
                     }
 
-                    // Stats grid
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        if let delta = viewModel.telemetry.cellVoltDelta {
-                            statTile("Cell Delta", "\(String(format: "%.0f", delta * 1000)) mV",
-                                     delta > 0.03 ? Color.appAmber : Color.appGreen)
-                        }
-                        if let soh = viewModel.telemetry.soh {
-                            statTile("BMS SOH", String(format: "%.0f%%", soh), Color.appGreen)
-                        }
-                        if let packTemp = viewModel.packTempC {
-                            statTile("Pack Temp", "\(packTemp)°C",
-                                     packTemp > 45 ? Color.appAmber : Color.appGreen)
+                    // Quick stats summary
+                    if let delta = viewModel.telemetry.cellVoltDelta {
+                        VStack(alignment: .leading, spacing: 4) {
+                            statsRow("Cell Delta", value: String(format: "%.0f mV", delta * 1000),
+                                     color: delta > 0.03 ? Color.appAmber : Color.appGreen)
                         }
                     }
 
-                    Divider()
-
-                    // AI report content
+                    // AI content
                     if isLoading {
                         HStack(spacing: 8) {
                             ProgressView()
@@ -131,8 +75,6 @@ struct BatteryHealthReportView: View {
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
                     } else if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                             .font(.subheadline)
@@ -141,9 +83,14 @@ struct BatteryHealthReportView: View {
                         Text(report)
                             .font(.ioniqBody)
                             .foregroundStyle(.primary)
+                    } else if !canUseAi {
+                        Label("Full AI battery health report available with Pro + API key.",
+                              systemImage: "sparkles")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     } else {
-                        Text("Tap generate to produce a detailed battery health analysis.")
-                            .font(.subheadline)
+                        Text("Tap \"Generate\" for a detailed AI analysis of battery degradation trends and recommendations.")
+                            .font(.caption)
                             .foregroundStyle(.tertiary)
                         Button("Generate Report") {
                             Task { await generateReport() }
@@ -153,30 +100,11 @@ struct BatteryHealthReportView: View {
                         .frame(maxWidth: .infinity)
                     }
                 }
-                .padding()
             }
-            .background(Color.appBackground)
-            .navigationTitle("Battery Health")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { showSheet = false }
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    if report != nil && !isLoading {
-                        Button("Regenerate") {
-                            Task { await generateReport() }
-                        }
-                        .font(.caption)
-                    }
-                }
-            }
+            .padding(14)
         }
-        .task {
-            if report == nil && errorMessage == nil {
-                await generateReport()
-            }
-        }
+        .padding(.horizontal)
+        .backgroundStyle(.ultraThinMaterial)
     }
 
     private var canUseAi: Bool {
@@ -243,19 +171,5 @@ struct BatteryHealthReportView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(color)
         }
-    }
-
-    private func statTile(_ label: String, _ value: String, _ color: Color) -> some View {
-        VStack(spacing: 4) {
-            Text(label)
-                .font(.ioniqCaption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(color)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(10)
-        .background(Color.appSurfaceVariant.opacity(0.5), in: RoundedRectangle(cornerRadius: 10))
     }
 }

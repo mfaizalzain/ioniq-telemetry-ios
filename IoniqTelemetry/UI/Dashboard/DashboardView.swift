@@ -80,7 +80,6 @@ struct DashboardView: View {
                 if viewModel.hasData {
                     ChargingInsightCard(viewModel: viewModel)
                     BatteryHealthReportView(viewModel: viewModel)
-                    AiAssistantChatView(viewModel: viewModel)
                 }
             }
             .padding(.vertical)
