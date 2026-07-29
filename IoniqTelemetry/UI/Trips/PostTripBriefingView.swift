@@ -18,10 +18,24 @@ struct PostTripBriefingView: View {
     let efficiencyBaseline: Double?
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(AppServices.self) private var services
     @State private var isLoading = false
     @State private var errorMessage: String?
 
     private let aiService = AiService()
+
+    private var vehicleName: String {
+        Ioniq5Constants.vehicleNameFor(services.preferences.currentPreferences.activeProfileId)
+    }
+    private var usableBatteryKwh: Double {
+        Double(Ioniq5Constants.usableKwhForProfile(
+            services.preferences.currentPreferences.activeProfileId,
+            customKwh: services.preferences.currentPreferences.customUsableBatteryKwh
+        ))
+    }
+    private var countryCode: String? {
+        Locale.current.region?.identifier
+    }
 
     var body: some View {
         GroupBox {
@@ -104,8 +118,11 @@ struct PostTripBriefingView: View {
                 recentTrips: recentTrips,
                 telemetrySamples: samples,
                 efficiencyBaseline: efficiencyBaseline,
+                vehicleName: vehicleName,
+                usableBatteryKwh: usableBatteryKwh,
                 apiKey: apiKey,
-                aiProvider: aiProvider
+                aiProvider: aiProvider,
+                countryCode: countryCode
             )
             trip.aiBriefing = text
             try modelContext.save()

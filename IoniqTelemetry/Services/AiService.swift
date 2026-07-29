@@ -37,6 +37,8 @@ final class AiService {
         recentTrips: [TripEntity],
         telemetrySamples: [SampleEntity],
         efficiencyBaseline: Double?,
+        vehicleName: String,
+        usableBatteryKwh: Double,
         apiKey: String,
         aiProvider: AiProvider = .gemini,
         countryCode: String? = nil
@@ -48,6 +50,8 @@ final class AiService {
             recentTrips: recentTrips,
             telemetrySamples: telemetrySamples,
             efficiencyBaseline: efficiencyBaseline,
+            vehicleName: vehicleName,
+            usableBatteryKwh: usableBatteryKwh,
             countryCode: countryCode
         )
         return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
@@ -161,17 +165,17 @@ final class AiService {
         recentTrips: [TripEntity],
         telemetrySamples: [SampleEntity],
         efficiencyBaseline: Double?,
+        vehicleName: String,
+        usableBatteryKwh: Double,
         countryCode: String?
     ) -> String {
-        let vehicleName = "Ioniq 5"
-        let usableKwh = 77.4
         let tripJson = buildTripJson(trip: trip, samples: telemetrySamples)
         let recentSummary = buildRecentTripsSummary(recentTrips: recentTrips)
         let baselineStr = efficiencyBaseline.map { String(format: "%.1f", $0) } ?? "unknown"
         let countryStr = countryCode.map { " for \($0)" } ?? ""
 
         return """
-        You are an EV efficiency coach for a \(vehicleName) (\(String(format: "%.0f", usableKwh)) kWh battery).
+        You are an EV efficiency coach for a \(vehicleName) (\(String(format: "%.0f", usableBatteryKwh)) kWh battery).
 
         This trip data (JSON):
         \(tripJson)
