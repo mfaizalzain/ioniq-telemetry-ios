@@ -9,14 +9,15 @@ public struct DriveAnalytics: Sendable, Equatable {
     public let hasData: Bool
 
     public var regenRating: String {
-        switch true {
-        case !hasData: return "No data"
-        case regenSharePercent >= 25: return "Excellent"
-        case regenSharePercent >= 15: return "Good"
-        case regenSharePercent >= 7: return "Fair"
+        if !hasData { return "No data" }
+        switch regenSharePercent {
+        case 35... : return "Excellent"
+        case 25..<35: return "Good"
+        case 15..<25: return "Fair"
         default: return "Low"
         }
     }
+
 
     public init(
         grossConsumedKwh: Double,
