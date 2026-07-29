@@ -85,6 +85,90 @@ final class PlanViewModel {
     private(set) var isOffline = false
     private(set) var isPro = false
 
+    // MARK: - AI Natural Language Planning
+
+    /// Natural language input text for the AI planning card.
+    var nlInput: String = ""
+    /// True while the AI is interpreting the NL request.
+    private(set) var nlBusy = false
+    /// The AI's interpreted plan text, shown in an expandable banner.
+    private(set) var nlInterpretation: String?
+    /// Error message from AI planning.
+    private(set) var nlError: String?
+
+    /// True when the selected AI provider has a usable key.
+    var hasKey: Bool { preferences.aiKey.map { !$0.isEmpty } ?? false }
+
+    /// The API key for the selected AI provider.
+    var aiKey: String? { preferences.aiKey }
+
+    /// The selected AI provider (Gemini or DeepSeek).
+    var aiProvider: AiProvider { preferences.aiProvider }
+
+    /// Master toggle for all AI-powered features.
+    var aiFeaturesEnabled: Bool { preferences.aiFeaturesEnabled }
+
+    /// Updates the NL input and clears any previous result/error.
+    func setNlInput(_ text: String) {
+        nlInput = text
+        nlError = nil
+        nlInterpretation = nil
+    }
+
+    /// Sends the natural language input to the selected AI provider and
+    /// stores the interpretation. Uses the same `AiService` pattern as
+    /// `AiAssistantChatView`.
+    func planFromNaturalLanguage() async {
+        let trimmed = nlInput.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        guard let apiKey = preferences.aiKey, !apiKey.isEmpty else {
+            nlError = "AI API key is not configured. Add one in Settings."
+            return
+        }
+
+        nlBusy = true
+        nlError = nil
+        nlInterpretation = nil
+        defer { nlBusy = false }
+
+        let location = await locationProvider.currentLocation()
+        let locationContext: String
+        if let loc = location {
+            locationContext = String(
+                format: "Current location: lat %.4f, lon %.4f",
+                loc.lat, loc.lon
+            )
+        } else {
+            locationContext = "Current location: unknown"
+        }
+
+        let prompt = """
+        You are an EV trip planning assistant. The user wants to plan a route using \
+        natural language. Convert their request into a structured trip plan.
+
+        \(locationContext)
+
+        User request: \(trimmed)
+
+        If the user asks about nearby charging, respond with "NEARBY_CHARGERS" as the intent.
+        If they specify a destination, extract the destination name and any waypoints.
+        Keep your response concise (2-3 sentences) and focused on what the user asked.
+        """
+
+        let aiService = AiService()
+        do {
+            let response = try await aiService.askCopilotWithContext(
+                query: prompt,
+                telemetryContext: locationContext,
+                apiKey: apiKey,
+                aiProvider: preferences.aiProvider
+            )
+            nlInterpretation = response
+        } catch {
+            nlError = error.localizedDescription
+        }
+    }
+
     private let services: AppServices
     private let solver = TripSolver()
     private let locationProvider = LocationProvider()

@@ -15,6 +15,7 @@
 		174595709A407F6AB393DC79 /* BackgroundTasks.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = C099E3944C24DCE57842106B /* BackgroundTasks.framework */; };
 		19040C47B7B85C6DB8AF88EE /* PlanViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2778BB8F33F074543D1B90F2 /* PlanViewModel.swift */; };
 		24C8D39662D6A39F7ACFB79F /* CoreDomain in Frameworks */ = {isa = PBXBuildFile; productRef = 8BB3F88CBE4887CACB9E40B8 /* CoreDomain */; };
+		28BA3FFEDA088A595B6A73DC /* AiPlanCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90BA5AE40092BB4B0EF264E9 /* AiPlanCardView.swift */; };
 		29993D664074FA2464D98DB2 /* VehiclePickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89B30D3916F39057886D6B58 /* VehiclePickerSheet.swift */; };
 		2B0F7DBB540A6AC24475378A /* SwiftData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54C12EF4A0F03A94394B3443 /* SwiftData.framework */; };
 		3729A76F447A55EA00F35DAE /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5CD51D249AA7A6761D98B76D /* CarPlay.framework */; };
@@ -94,6 +95,7 @@
 		8172C23BE112C6BFD8D27007 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		88D3784E71C842EED4005A96 /* TripDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripDetailView.swift; sourceTree = "<group>"; };
 		89B30D3916F39057886D6B58 /* VehiclePickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehiclePickerSheet.swift; sourceTree = "<group>"; };
+		90BA5AE40092BB4B0EF264E9 /* AiPlanCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiPlanCardView.swift; sourceTree = "<group>"; };
 		9A602CFDC8597B98B79771BF /* CarPlayPointOfInterest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayPointOfInterest.swift; sourceTree = "<group>"; };
 		9AD72D2698920511CEDD113A /* AiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AiService.swift; sourceTree = "<group>"; };
 		9E81703FF6D9ABDDBA38FDCD /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
@@ -310,6 +312,7 @@
 		D6B352999AF9493821D40901 /* Plan */ = {
 			isa = PBXGroup;
 			children = (
+				90BA5AE40092BB4B0EF264E9 /* AiPlanCardView.swift */,
 				B92C9548673D78AA607E3859 /* PlanView.swift */,
 				2778BB8F33F074543D1B90F2 /* PlanViewModel.swift */,
 			);
@@ -476,6 +479,7 @@
 				F991904E691DCA5B7CA8D426 /* AdapterPickerSheet.swift in Sources */,
 				F3B564D252CFF1EA0DF1F0D1 /* AiAndRoutingSections.swift in Sources */,
 				01111CB25591DB0C9A00AD24 /* AiAssistantChatView.swift in Sources */,
+				28BA3FFEDA088A595B6A73DC /* AiPlanCardView.swift in Sources */,
 				7AADF0191EBB6A1FCF4F1329 /* AiService.swift in Sources */,
 				7174DAD475B5F29FFCBFF102 /* AlertNotifier.swift in Sources */,
 				95F25117F336829F31773888 /* AppRootView.swift in Sources */,
