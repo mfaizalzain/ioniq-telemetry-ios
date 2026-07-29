@@ -79,6 +79,63 @@ public final class BackupRepository: @unchecked Sendable {
         return fileURL
     }
 
+    /// Returns auto-backup files sorted newest-first.
+    /// Files are in the auto-backup directory (Documents/autobackup/).
+    public static func listAutoBackups(directory: URL) -> [AutoBackupFile] {
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: .skipsHiddenFiles
+        ) else { return [] }
+
+        return contents
+            .filter { $0.lastPathComponent.hasPrefix("ioniq-telemetry-auto-") && $0.pathExtension == "json" }
+            .compactMap { url -> AutoBackupFile? in
+                guard let attrs = try? fm.attributesOfItem(atPath: url.path) else { return nil }
+                let name = url.lastPathComponent
+                    .replacingOccurrences(of: "ioniq-telemetry-auto-", with: "")
+                    .replacingOccurrences(of: ".json", with: "")
+                return AutoBackupFile(
+                    name: name,
+                    url: url,
+                    sizeBytes: (attrs[.size] as? Int64).flatMap(Int.init) ?? 0,
+                    lastModified: (attrs[.modificationDate] as? Date) ?? .distantPast
+                )
+            }
+            .sorted { $0.lastModified > $1.lastModified }
+    }
+
+    /// Copies an auto-backup file identified by its stamp name to the given URL.
+    /// - Parameters:
+    ///   - stamp: The timestamp portion of the auto-backup filename (e.g. "20250115-143022").
+    ///   - destination: Where to write the copy (e.g. a temporary file for sharing).
+    /// - Returns: `true` if the file was found and copied successfully.
+    public static func exportAutoBackupFile(stamp: String, from directory: URL, to destination: URL) -> Bool {
+        let source = directory.appendingPathComponent("ioniq-telemetry-auto-\(stamp).json")
+        guard FileManager.default.fileExists(atPath: source.path) else { return false }
+        do {
+            try FileManager.default.copyItem(at: source, to: destination)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// A discovered auto-backup file on disk.
+    public struct AutoBackupFile: Sendable, Identifiable {
+        /// The timestamp portion of the filename (e.g. "20250115-143022").
+        public let name: String
+        /// The full file URL.
+        public let url: URL
+        /// File size in bytes.
+        public let sizeBytes: Int
+        /// When the file was last modified (the backup timestamp).
+        public let lastModified: Date
+
+        public var id: String { name }
+    }
+
     public static func suggestedFilename(now: Date = Date()) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd-HHmm"

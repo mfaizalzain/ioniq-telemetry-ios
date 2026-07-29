@@ -199,6 +199,25 @@ final class SettingsViewModel {
 
     // MARK: - Auto Backup
 
+    /// Lists existing auto-backup files sorted newest-first.
+    func listAutoBackups() -> [BackupRepository.AutoBackupFile] {
+        BackupRepository.listAutoBackups(directory: AppServices.autoBackupDirectory())
+    }
+
+    /// Copies an auto-backup file identified by its stamp to a temp URL for sharing.
+    func exportAutoBackupFile(stamp: String) -> URL? {
+        let tempURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ioniq-telemetry-auto-\(stamp).json")
+        // Remove any stale file at that path first
+        try? FileManager.default.removeItem(at: tempURL)
+        guard BackupRepository.exportAutoBackupFile(
+            stamp: stamp,
+            from: AppServices.autoBackupDirectory(),
+            to: tempURL
+        ) else { return nil }
+        return tempURL
+    }
+
     func setAutoBackupEnabled(_ enabled: Bool) {
         update { $0.autoBackupEnabled = enabled }
         AppServices.shared.scheduleOrCancelAutoBackup()
