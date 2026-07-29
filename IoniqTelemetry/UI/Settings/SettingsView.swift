@@ -240,7 +240,7 @@ private struct AiSection: View {
                             .foregroundStyle(Color.appAccent)
                     } label: {
                         VStack(alignment: .leading, spacing: 1) {
-                            Label("Gemini AI Features", systemImage: "cpu")
+                            Label("Gemini AI Features", systemImage: "cpu.fill")
                             Text("Charging Intelligence, Battery Reports & AI AiAssistant")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
@@ -253,9 +253,9 @@ private struct AiSection: View {
             Text("AI & Intelligence")
         } footer: {
             if viewModel.isPro && (viewModel.preferences.geminiApiKey ?? "").isEmpty {
-                Text("Add a Gemini API key to enable AI-powered features. Your own key means requests land on your free quota, not a shared pool.")
+                Text("Add a Gemini API key to enable AI-powered features. Your own key means requests land on your free quota, not a shared pool. Your trip data, battery stats, and vehicle telemetry are sent to Google Gemini to generate responses.")
             } else if viewModel.isPro {
-                Text("AI features use your Gemini API key. Battery Health Reports, Charging Insights, and the AI AiAssistant all draw from the same key.")
+                Text("AI features use your Gemini API key. Battery Health Reports, Charging Insights, and the AI AiAssistant all draw from the same key. Your trip data and vehicle telemetry are sent to Google Gemini to generate responses.")
             } else {
                 Text("Charging Intelligence, Battery Health Reports and the AI AiAssistant with vehicle context are Pro features that need a Gemini API key.")
             }
