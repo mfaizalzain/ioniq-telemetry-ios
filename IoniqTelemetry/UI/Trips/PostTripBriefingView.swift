@@ -5,6 +5,7 @@ import SwiftUI
 
 /// AI-generated post-trip briefing card, shown on the trip detail screen.
 /// Requires Pro entitlement and an AI API key stored in user preferences.
+/// Matches Android's PostTripBriefingCard: no auto-fetch, user taps Generate.
 struct PostTripBriefingView: View {
     let trip: TripEntity
     let recentTrips: [TripEntity]
@@ -24,11 +25,20 @@ struct PostTripBriefingView: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 8) {
-                // Header
-                Label("AI TRIP BRIEFING", systemImage: "wand.and.stars")
-                    .font(.ioniqCaption)
-                    .foregroundStyle(.secondary)
-                    .ioniqStatLabel()
+                // Header with provider badge matching Android
+                HStack {
+                    Label("AI TRIP BRIEFING", systemImage: "wand.and.stars")
+                        .font(.ioniqCaption)
+                        .foregroundStyle(.secondary)
+                        .ioniqStatLabel()
+                    Spacer()
+                    Text(aiProvider.label.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.appAccent.opacity(0.15), in: Capsule())
+                        .foregroundStyle(Color.appAccent)
+                }
 
                 if !isPro {
                     lockMessage
@@ -57,15 +67,29 @@ struct PostTripBriefingView: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
+                } else {
+                    // Generate button — matching Android: user decides when
+                    Button {
+                        Task { await loadBriefing() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "sparkles")
+                                .font(.caption)
+                            Text("Generate trip briefing")
+                                .font(.subheadline)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.appAccent)
+                    .foregroundStyle(Color.appOnAccent)
                 }
             }
             .padding(12)
         }
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
-        .task {
-            await loadBriefing()
-        }
     }
 
     @MainActor
