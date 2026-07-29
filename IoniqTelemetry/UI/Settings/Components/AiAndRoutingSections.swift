@@ -21,10 +21,11 @@ struct RoutingSection: View {
                 Text("Google Maps").tag(RoutingProvider.googleMaps)
             }
 
-            if viewModel.preferences.routingProvider != .appleMaps {
+            if viewModel.preferences.routingProvider == .openRouteService {
                 RoutingKeyField(viewModel: viewModel)
                 GooglePoiSearchToggle(viewModel: viewModel)
-                GoogleKeyField(viewModel: viewModel)
+            } else if viewModel.preferences.routingProvider == .googleMaps {
+                RoutingKeyField(viewModel: viewModel)
             }
 
             // — Charger data source —
@@ -36,10 +37,6 @@ struct RoutingSection: View {
                 Text("Open Charge Map").tag(ChargerSource.openChargeMap)
                 Text("Apple Maps").tag(ChargerSource.appleMaps)
                 Text("Google Places").tag(ChargerSource.googlePlaces)
-            }
-
-            if viewModel.preferences.chargerSource == .googlePlaces {
-                GoogleKeyField(viewModel: viewModel)
             }
 
             if viewModel.placesApiCalls > 0 {
@@ -75,6 +72,8 @@ struct RoutingSection: View {
                 }
                 .tint(.primary)
             }
+
+            GoogleKeyField(viewModel: viewModel)
         } header: {
             Text("Routing")
         } footer: {

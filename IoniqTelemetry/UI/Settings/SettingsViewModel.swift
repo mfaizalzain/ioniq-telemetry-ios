@@ -177,7 +177,7 @@ final class SettingsViewModel {
     var occupancyBlockedReason: String? {
         if !isPro { return "Charger occupancy alerts are part of Pro." }
         if (preferences.googleMapsApiKey ?? "").isEmpty {
-            return "Add a Google Places API key below to check live availability."
+            return "A Google Maps / Places API key is required for live charger occupancy alerts."
         }
         return nil
     }
