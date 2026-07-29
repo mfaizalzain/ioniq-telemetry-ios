@@ -152,9 +152,9 @@ struct BatteryHeroCard: View {
                     // puts the 140° gap centred at the bottom.
                     Circle()
                         .trim(from: 0, to: Self.sweepFraction)
-                        .stroke(Color.appOutline, style: StrokeStyle(lineWidth: 12, lineCap: .round))
+                        .stroke(Color.appOutline, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                         .rotationEffect(.degrees(Self.startAngle))
-                        .frame(width: 120, height: 120)
+                        .frame(width: 100, height: 100)
 
                     Circle()
                         .trim(from: 0, to: Self.sweepFraction * CGFloat(fillFraction))
@@ -165,10 +165,10 @@ struct BatteryHeroCard: View {
                                 startAngle: .degrees(Self.startAngle),
                                 endAngle: .degrees(Self.startAngle + 220)
                             ),
-                            style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                            style: StrokeStyle(lineWidth: 10, lineCap: .round)
                         )
                         .rotationEffect(.degrees(Self.startAngle))
-                        .frame(width: 120, height: 120)
+                        .frame(width: 100, height: 100)
                         .animation(.easeOut(duration: 0.4), value: fillFraction)
 
                     HStack(alignment: .firstTextBaseline, spacing: 1) {

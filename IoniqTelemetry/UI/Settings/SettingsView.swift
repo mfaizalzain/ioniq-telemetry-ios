@@ -41,14 +41,10 @@ struct SettingsView: View {
         List {
             VehicleSection(viewModel: viewModel, showVehiclePicker: $showVehiclePicker)
             AdapterSection(viewModel: viewModel, showAdapterPicker: $showAdapterPicker)
-            RoutingSection(viewModel: viewModel)
-            ChargerSourceSection(viewModel: viewModel)
-            ChargerAvailabilitySection(viewModel: viewModel, showPaywall: $showPaywall)
+            RoutingSection(viewModel: viewModel, showPaywall: $showPaywall)
             AiSection(viewModel: viewModel, showPaywall: $showPaywall)
-            BackupSection(viewModel: viewModel)
-            AutoBackupSection(viewModel: viewModel)
-            UnitsSection(viewModel: viewModel)
-            AppearanceSection(viewModel: viewModel)
+            DataSection(viewModel: viewModel)
+            DisplaySection(viewModel: viewModel)
             ProSection(viewModel: viewModel, showPaywall: $showPaywall)
             AboutSection()
         }
@@ -93,42 +89,7 @@ private struct VehicleSection: View {
     }
 }
 
-// MARK: - Units / Appearance / Pro
-
-private struct UnitsSection: View {
-    let viewModel: SettingsViewModel
-
-    var body: some View {
-        Section("Units") {
-            Picker("Units", selection: Binding(
-                get: { viewModel.preferences.unitSystem },
-                set: { viewModel.setUnitSystem($0) }
-            )) {
-                Text("Metric").tag(UnitSystem.metric)
-                Text("Imperial").tag(UnitSystem.imperial)
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-}
-
-private struct AppearanceSection: View {
-    let viewModel: SettingsViewModel
-
-    var body: some View {
-        Section("Appearance") {
-            Picker("Theme", selection: Binding(
-                get: { viewModel.preferences.themeMode },
-                set: { viewModel.setThemeMode($0) }
-            )) {
-                Text("System").tag(ThemeMode.system)
-                Text("Light").tag(ThemeMode.light)
-                Text("Dark").tag(ThemeMode.dark)
-            }
-            .pickerStyle(.segmented)
-        }
-    }
-}
+// MARK: - Pro
 
 private struct ProSection: View {
     let viewModel: SettingsViewModel
