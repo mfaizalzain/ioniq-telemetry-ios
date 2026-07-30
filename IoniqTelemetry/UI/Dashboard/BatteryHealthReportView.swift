@@ -106,8 +106,7 @@ struct BatteryHealthReportView: View {
                 }
             }
             .padding(14)
-        }
-        .cardStyle(.secondary)
+            .cardStyle(.secondary)
     }
 
     private var canUseAi: Bool {

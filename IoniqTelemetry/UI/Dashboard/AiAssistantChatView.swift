@@ -146,9 +146,9 @@ struct AiAssistantChatView: View {
                 }
                 .padding(10)
             }
-        }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
+            .padding(.horizontal)
+            .background(Color.appSurface)
+            .clipShape(RoundedRectangle(cornerRadius: .cornerMedium))
         .sheet(isPresented: $showPaywall) {
             PaywallView()
         }

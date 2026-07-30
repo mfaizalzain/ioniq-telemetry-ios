@@ -219,6 +219,7 @@ struct BatteryHeroCard: View {
         .cardStyle(.hero)
     }
 }
+}
 
 private struct ChargingChip: View {
     let viewModel: DashboardViewModel

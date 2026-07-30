@@ -112,8 +112,7 @@ struct AIDigestSection: View {
                 }
             }
             .padding(12)
-        }
-        .cardStyle(.secondary)
+            .cardStyle(.secondary)
         .onChange(of: selectedPeriod) { _, newPeriod in
             if expanded && newPeriod != lastFetchedPeriod {
                 Task { await loadDigest() }
