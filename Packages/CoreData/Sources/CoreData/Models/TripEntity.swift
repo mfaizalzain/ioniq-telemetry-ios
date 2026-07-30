@@ -25,7 +25,8 @@ public final class TripEntity {
         energyUsedKwh: Float = 0,
         avgConsumptionKwhPer100km: Float? = nil,
         ambientTempAvgC: Float? = nil,
-        note: String? = nil
+        note: String? = nil,
+        aiBriefing: String? = nil
     ) {
         self.id = id
         self.startTime = startTime
@@ -37,5 +38,6 @@ public final class TripEntity {
         self.avgConsumptionKwhPer100km = avgConsumptionKwhPer100km
         self.ambientTempAvgC = ambientTempAvgC
         self.note = note
+        self.aiBriefing = aiBriefing
     }
 }

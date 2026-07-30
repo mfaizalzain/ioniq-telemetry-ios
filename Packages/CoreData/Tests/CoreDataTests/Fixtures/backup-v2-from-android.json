@@ -1,0 +1,96 @@
+{
+  "formatVersion": 2,
+  "exportedAt": 1785385294982,
+  "trips": [
+    {
+      "id": "android-trip-1",
+      "startTime": 1753840000000,
+      "endTime": 1753843600000,
+      "startSoc": 72.0,
+      "endSoc": 45.5,
+      "distanceKm": 128.5,
+      "energyUsedKwh": 21.1,
+      "avgConsumptionKwhPer100km": 16.4,
+      "ambientTempAvgC": 29.5,
+      "note": "Written by Android",
+      "aiBriefing": "Android briefing"
+    }
+  ],
+  "samples": [
+    {
+      "id": 1,
+      "tripId": "android-trip-1",
+      "timestamp": 1753840000000,
+      "soc": 71.5,
+      "powerKw": 18.5,
+      "speedKph": 62.0,
+      "lat": 3.139,
+      "lon": 101.6869,
+      "elevationM": 42.5,
+      "ambientTempC": 30.0,
+      "packTempC": 27.5
+    }
+  ],
+  "chargeSessions": [
+    {
+      "id": "android-session-1",
+      "startTime": 1753846200000,
+      "endTime": 1753848000000,
+      "startSoc": 25.0,
+      "endSoc": 80.0,
+      "energyAddedKwh": 42.5,
+      "peakPowerKw": 178.0,
+      "avgPowerKw": 95.5,
+      "chargeType": "DC",
+      "packTempStartC": 24.5,
+      "chargerId": "ocm-1"
+    }
+  ],
+  "savedPlans": [
+    {
+      "id": "android-plan-1",
+      "name": "KL to Penang",
+      "planJson": "{}",
+      "createdAt": 1753600000000
+    }
+  ],
+  "savedPlaces": [
+    {
+      "id": "android-place-1",
+      "name": "Home",
+      "category": "CUSTOM",
+      "lat": 3.1478,
+      "lon": 101.6953,
+      "createdAt": 1753500000000
+    }
+  ],
+  "settings": {
+    "unitSystem": "IMPERIAL",
+    "connectorTypes": [
+      "CCS2",
+      "TYPE2"
+    ],
+    "reserveSocPercent": 10.0,
+    "targetArrivalSocPercent": 20.0,
+    "payloadMassKg": 100.0,
+    "activeProfileId": "ioniq5_2022_77kwh",
+    "priceWeight": 0.0,
+    "themeMode": "DARK",
+    "dynamicColor": true,
+    "estimatedSohTimestamp": 0,
+    "routingProvider": "OPEN_ROUTE_SERVICE",
+    "chargerOccupancyAlerts": false,
+    "googlePoiSearch": false,
+    "geminiApiKey": "gemini-from-android",
+    "aiCoachingEnabled": true,
+    "autoBackupEnabled": false,
+    "autoBackupFrequency": "WEEKLY",
+    "autoBackupLastRunAt": 1753790000000,
+    "customUsableBatteryKwh": 74.5,
+    "customVehicleName": "My Ioniq",
+    "chargerSource": "OPEN_CHARGE_MAP",
+    "aiFeaturesEnabled": true,
+    "aiProvider": "DEEPSEEK",
+    "deepseekApiKey": "deepseek-from-android"
+  }
+}

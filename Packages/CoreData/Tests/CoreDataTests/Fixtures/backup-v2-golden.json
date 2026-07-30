@@ -1,0 +1,98 @@
+{
+  "chargeSessions": [
+    {
+      "avgPowerKw": 95.5,
+      "chargeType": "DC",
+      "chargerId": "ocm-12345",
+      "endSoc": 80,
+      "endTime": 1753848000000,
+      "energyAddedKwh": 42.5,
+      "id": "session-1",
+      "packTempStartC": 24.5,
+      "peakPowerKw": 178,
+      "startSoc": 25,
+      "startTime": 1753846200000
+    }
+  ],
+  "exportedAt": 1753851600000,
+  "formatVersion": 2,
+  "samples": [
+    {
+      "ambientTempC": 30,
+      "elevationM": 42.5,
+      "lat": 3.139,
+      "lon": 101.6869,
+      "packTempC": 27.5,
+      "powerKw": 18.5,
+      "soc": 71.5,
+      "speedKph": 62,
+      "timestamp": 1753840000000,
+      "tripId": "trip-1"
+    }
+  ],
+  "savedPlaces": [
+    {
+      "category": "CUSTOM",
+      "createdAt": 1753500000000,
+      "id": "place-1",
+      "lat": 3.1478,
+      "lon": 101.6953,
+      "name": "Home"
+    }
+  ],
+  "savedPlans": [
+    {
+      "createdAt": 1753600000000,
+      "id": "plan-1",
+      "name": "KL to Penang",
+      "planJson": "{\"legs\":[]}"
+    }
+  ],
+  "settings": {
+    "activeProfileId": "ioniq5_2022_77kwh",
+    "aiCoachingEnabled": true,
+    "aiFeaturesEnabled": true,
+    "aiProvider": "DEEPSEEK",
+    "autoBackupEnabled": true,
+    "autoBackupFrequency": "WEEKLY",
+    "autoBackupLastRunAt": 1753790000000,
+    "chargerOccupancyAlerts": true,
+    "chargerSource": "OPEN_CHARGE_MAP",
+    "connectorTypes": ["CCS2", "TYPE2"],
+    "customUsableBatteryKwh": 74.5,
+    "customVehicleName": "My Ioniq",
+    "deepseekApiKey": "ds-key-abc",
+    "dynamicColor": false,
+    "estimatedSohPercent": 98.5,
+    "estimatedSohTimestamp": 1753700000000,
+    "geminiApiKey": "gemini-key-abc",
+    "googleMapsApiKey": "gmaps-key-abc",
+    "googlePoiSearch": true,
+    "lastObdDeviceAddress": "AA:BB:CC:DD:EE:FF",
+    "lastObdDeviceName": "OBDII",
+    "lastObdTransportType": "BLE",
+    "orsApiKey": "ors-key-abc",
+    "payloadMassKg": 80,
+    "priceWeight": 0.45,
+    "reserveSocPercent": 15,
+    "routingProvider": "OPEN_ROUTE_SERVICE",
+    "targetArrivalSocPercent": 25,
+    "themeMode": "DARK",
+    "unitSystem": "IMPERIAL"
+  },
+  "trips": [
+    {
+      "aiBriefing": "Smooth run, regen did most of the work downhill.",
+      "ambientTempAvgC": 29.5,
+      "avgConsumptionKwhPer100km": 16.4,
+      "distanceKm": 128.5,
+      "endSoc": 45.5,
+      "endTime": 1753843600000,
+      "energyUsedKwh": 21.1,
+      "id": "trip-1",
+      "note": "Trip to the office",
+      "startSoc": 72,
+      "startTime": 1753840000000
+    }
+  ]
+}

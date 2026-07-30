@@ -75,12 +75,14 @@ struct BackupRepositoryTests {
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
 
         #expect(json != nil)
-        #expect(json?["version"] as? Int == BackupRepository.formatVersion)
-        #expect(json?["exportedAt"] is String) // ISO 8601 date string
+        // Format 2 keys, shared with Android: `formatVersion`, epoch-millis dates
+        // and `savedPlans`. See BackupFormatV2Tests.
+        #expect(json?["formatVersion"] as? Int == BackupRepository.formatVersion)
+        #expect(json?["exportedAt"] is NSNumber) // epoch milliseconds
         #expect(json?["trips"] is [Any])
         #expect(json?["samples"] is [Any])
         #expect(json?["chargeSessions"] is [Any])
-        #expect(json?["savedTrips"] is [Any])
+        #expect(json?["savedPlans"] is [Any])
         #expect(json?["savedPlaces"] is [Any])
     }
 
@@ -164,7 +166,7 @@ struct BackupRepositoryTests {
         let data = try Data(contentsOf: fileURL)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         #expect(json != nil)
-        #expect(json?["version"] as? Int == BackupRepository.formatVersion)
+        #expect(json?["formatVersion"] as? Int == BackupRepository.formatVersion)
     }
 
     // MARK: - 4. Pruning
@@ -248,7 +250,7 @@ struct BackupRepositoryTests {
         #expect(settings?["autoBackupFrequency"] as? String == "DAILY")
     }
 
-    @Test("export includes lastAutoBackupDate when set")
+    @Test("export includes the last auto-backup time as epoch millis")
     func exportIncludesLastAutoBackupDate() throws {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         var prefs = UserPreferences()
@@ -261,7 +263,9 @@ struct BackupRepositoryTests {
         let settings = json?["settings"] as? [String: Any]
 
         #expect(settings?["autoBackupEnabled"] as? Bool == true)
-        #expect(settings?["lastAutoBackupDate"] as? TimeInterval == 1_700_000_000)
+        // Format 2 spells this as Android does, in millis rather than seconds.
+        #expect(settings?["autoBackupLastRunAt"] as? Int64 == 1_700_000_000_000)
+        #expect(settings?["lastAutoBackupDate"] == nil, "the format 1 key must not be written")
     }
 
     @Test("restoring auto-backup settings applies them via PreferencesRepository.update")

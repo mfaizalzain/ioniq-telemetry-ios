@@ -18,7 +18,11 @@ let package = Package(
         ),
         .testTarget(
             name: "CoreDataTests",
-            dependencies: ["CoreData"]
+            dependencies: ["CoreData"],
+            // The golden backup fixture is byte-identical to the copy in the Android
+            // repo's core-data test resources; both suites decode it so the shared
+            // format cannot drift on one platform without a test failing.
+            resources: [.copy("Fixtures")]
         )
     ]
 )

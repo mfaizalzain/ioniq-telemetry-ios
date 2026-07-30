@@ -4,58 +4,68 @@ import CoreUI
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Backup export/import and auto-backup controls merged into one "Data" section.
+/// Backup and restore, as two verbs rather than five entry points.
 ///
-/// Export goes through the system share sheet and import through the document
-/// picker, so the file lands wherever the user keeps their own data (Files,
-/// iCloud Drive, AirDrop) rather than somewhere the app chose.
+/// A backup lives *in* the app: "Back up now" writes one, and the Backups list is
+/// the single place to send one out (Share) or bring one back (Restore). Only a
+/// file that isn't in that list needs the document picker, so it is the one that
+/// says "Import".
 ///
-/// Tapping "Export Backup" shows a dialog listing existing auto-backup files
-/// (matching the Android flow) so the user can re-export a previous auto-backup
-/// or create a fresh one.
+/// The previous shape had "Export Backup", "Create new" and "Back Up Now" for
+/// writing and "Restore from Backup" and "Restore auto backup" for reading, with
+/// two near-identical file-list dialogs behind them — and "Create new" produced a
+/// file that never appeared in the list it was shown inside.
 struct DataSection: View {
     let viewModel: SettingsViewModel
 
-    @State private var exportedFile: ExportedFile?
+    @State private var showBackupList = false
     @State private var isImporting = false
+    @State private var backupCount = 0
+
+    @State private var isWorking = false
     @State private var message: String?
     @State private var isError = false
-    @State private var isWorking = false
 
-    // Export dialog
-    @State private var showExportDialog = false
-
-    // Auto-backup state
-    @State private var autoBackupIsWorking = false
-    @State private var autoBackupMessage: String?
-    @State private var autoBackupIsError = false
+    /// Sharing and restoring are raised from the list sheet's `onDismiss`: starting
+    /// a presentation while another is still dismissing gets dropped by SwiftUI,
+    /// which is what made sharing need two taps.
+    @State private var pendingAction: PendingAction?
+    @State private var exportedFile: ExportedFile?
+    @State private var restoreCandidate: RestoreCandidate?
 
     var body: some View {
         Section {
-            // — Export / Import —
             Button {
-                showExportDialog = true
+                Task { await backUpNow() }
             } label: {
-                Label("Export Backup", systemImage: "square.and.arrow.up")
+                if isWorking {
+                    HStack(spacing: 8) {
+                        ProgressView().scaleEffect(0.8)
+                        Text("Backing up…")
+                    }
+                } else {
+                    Label("Back up now", systemImage: "externaldrive")
+                }
             }
             .disabled(isWorking)
-            .sheet(item: $exportedFile, onDismiss: { exportedFile = nil }) { file in
-                ShareSheet(items: [file.url])
+
+            Button {
+                showBackupList = true
+            } label: {
+                HStack {
+                    Label("Backups", systemImage: "clock.arrow.circlepath")
+                    Spacer()
+                    Text(backupCount == 0 ? "None" : "\(backupCount)")
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Button {
                 isImporting = true
             } label: {
-                Label("Restore from Backup", systemImage: "square.and.arrow.down")
+                Label("Import from file…", systemImage: "folder")
             }
             .disabled(isWorking)
-            .fileImporter(
-                isPresented: $isImporting,
-                allowedContentTypes: [.json],
-                allowsMultipleSelection: false
-            ) { result in
-                Task { await importBackup(result) }
-            }
 
             if let message {
                 Label(message, systemImage: isError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
@@ -66,19 +76,15 @@ struct DataSection: View {
             // — Auto Backup —
             Toggle(isOn: Binding(
                 get: { viewModel.preferences.autoBackupEnabled },
-                set: { newValue in
-                    viewModel.setAutoBackupEnabled(newValue)
-                }
+                set: { viewModel.setAutoBackupEnabled($0) }
             )) {
-                Label("Auto Backup", systemImage: "clock.arrow.circlepath")
+                Label("Auto Backup", systemImage: "clock")
             }
 
             if viewModel.preferences.autoBackupEnabled {
                 Picker("Frequency", selection: Binding(
                     get: { viewModel.preferences.autoBackupFrequency },
-                    set: { newValue in
-                        viewModel.setAutoBackupFrequency(newValue)
-                    }
+                    set: { viewModel.setAutoBackupFrequency($0) }
                 )) {
                     ForEach(AutoBackupFrequency.allCases, id: \.self) { freq in
                         Text(freq.label).tag(freq)
@@ -86,128 +92,165 @@ struct DataSection: View {
                 }
 
                 HStack {
-                    Label("Last backup", systemImage: "clock")
+                    Text("Last backup")
                     Spacer()
                     Text(lastBackupLabel)
                         .foregroundStyle(.secondary)
-                }
-
-                Button {
-                    Task { await performBackupNow() }
-                } label: {
-                    if autoBackupIsWorking {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Backing up…")
-                        }
-                    } else {
-                        Label("Back Up Now", systemImage: "square.and.arrow.up")
-                    }
-                }
-                .disabled(autoBackupIsWorking)
-
-                if let autoBackupMessage {
-                    Label(autoBackupMessage, systemImage: autoBackupIsError ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundStyle(autoBackupIsError ? Color.appRed : Color.appGreen)
                 }
             }
         } header: {
             Text("Data")
         } footer: {
-            Text("Includes trips, charge sessions, saved routes and settings. Your API keys are in the file, so keep it somewhere private.\n\nAuto-backups are saved to the app's Documents folder and are accessible via Finder or Files. Old backups are automatically pruned, keeping the last 5.")
+            Text("A backup holds trips, charge sessions, saved routes and settings. Your API keys are in the file, so keep it somewhere private.\n\nBackups are saved inside the app and are also reachable from Files. The newest 5 are kept.")
         }
-        // ── Export dialog: list auto-backups or create new ──
-        .sheet(isPresented: $showExportDialog) {
-            ExportDialogView(viewModel: viewModel) { url in
-                exportedFile = ExportedFile(url: url)
+        .task {
+            backupCount = viewModel.listAutoBackups().count
+        }
+        .sheet(isPresented: $showBackupList, onDismiss: consumePendingAction) {
+            BackupListView(viewModel: viewModel) { action in
+                pendingAction = action
             }
+        }
+        .sheet(item: $exportedFile) { file in
+            ShareSheet(items: [file.url])
+        }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            prepareImport(result)
+        }
+        // One confirmation for both paths — a restore replaces settings either way.
+        .alert("Restore this backup?", isPresented: Binding(
+            get: { restoreCandidate != nil },
+            set: { if !$0 { restoreCandidate = nil } }
+        ), presenting: restoreCandidate) { candidate in
+            Button("Restore") {
+                Task { await restore(candidate) }
+            }
+            Button("Cancel", role: .cancel) { restoreCandidate = nil }
+        } message: { _ in
+            Text("Trips and saved items with the same id are overwritten, anything else is kept, and your settings are replaced. Pro status is unaffected.")
         }
     }
 
-    // MARK: - Backup export / import
+    // MARK: - Actions
 
-    private func exportBackup() async {
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            let url = try await viewModel.exportBackup()
-            message = nil
+    private func consumePendingAction() {
+        guard let action = pendingAction else { return }
+        pendingAction = nil
+        switch action {
+        case .share(let url):
             exportedFile = ExportedFile(url: url)
-        } catch {
-            isError = true
-            message = error.localizedDescription
+        case .restore(let url, let label):
+            restoreCandidate = RestoreCandidate(url: url, label: label, isTemporary: false)
         }
     }
 
-    private func importBackup(_ result: Result<[URL], any Error>) async {
+    private func backUpNow() async {
         isWorking = true
+        message = nil
         defer { isWorking = false }
-        do {
-            guard let url = try result.get().first else { return }
-            guard url.startAccessingSecurityScopedResource() else {
-                throw BackupUIError.noAccess
-            }
-            defer { url.stopAccessingSecurityScopedResource() }
-
-            let summary = try await viewModel.restoreBackup(from: url)
-            isError = false
-            message = "Restored "
-                + [
-                    count(summary.trips, "trip"),
-                    count(summary.chargeSessions, "charge session"),
-                    count(summary.savedTrips, "saved route"),
-                    count(summary.savedPlaces, "saved place"),
-                ].joined(separator: ", ") + "."
-        } catch {
-            isError = true
-            message = error.localizedDescription
-        }
-    }
-
-    // MARK: - Auto backup
-
-    private var lastBackupLabel: String {
-        if let date = viewModel.preferences.lastAutoBackupDate {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .abbreviated
-            return formatter.localizedString(for: date, relativeTo: Date())
-        }
-        return "Never"
-    }
-
-    private func performBackupNow() async {
-        autoBackupIsWorking = true
-        autoBackupMessage = nil
-        defer { autoBackupIsWorking = false }
         do {
             try await viewModel.performAutoBackup()
-            autoBackupIsError = false
-            autoBackupMessage = "Backup complete."
+            backupCount = viewModel.listAutoBackups().count
+            isError = false
+            message = "Backup saved."
         } catch {
-            autoBackupIsError = true
-            autoBackupMessage = error.localizedDescription
+            isError = true
+            message = error.localizedDescription
         }
+    }
+
+    /// Copies the picked file into the container before asking for confirmation: the
+    /// security-scoped URL is only valid inside this callback, so a copy is what
+    /// survives long enough for the user to answer.
+    private func prepareImport(_ result: Result<[URL], any Error>) {
+        do {
+            guard let url = try result.get().first else { return }
+            guard url.startAccessingSecurityScopedResource() else { throw BackupUIError.noAccess }
+            defer { url.stopAccessingSecurityScopedResource() }
+
+            let copy = FileManager.default.temporaryDirectory
+                .appendingPathComponent("import-\(UUID().uuidString).json")
+            try FileManager.default.copyItem(at: url, to: copy)
+            restoreCandidate = RestoreCandidate(
+                url: copy,
+                label: url.lastPathComponent,
+                isTemporary: true
+            )
+        } catch {
+            isError = true
+            message = error.localizedDescription
+        }
+    }
+
+    private func restore(_ candidate: RestoreCandidate) async {
+        isWorking = true
+        message = nil
+        defer {
+            isWorking = false
+            if candidate.isTemporary { try? FileManager.default.removeItem(at: candidate.url) }
+            restoreCandidate = nil
+        }
+        do {
+            let summary = try await viewModel.restoreBackup(from: candidate.url)
+            backupCount = viewModel.listAutoBackups().count
+            isError = false
+            message = Self.summaryText(summary)
+        } catch {
+            isError = true
+            message = error.localizedDescription
+        }
+    }
+
+    /// Reports everything the file carried, including settings and samples — the
+    /// old message counted four tables and stayed silent about the rest.
+    private static func summaryText(_ summary: BackupRepository.ImportSummary) -> String {
+        // Only what the file actually carried — naming every empty table made the
+        // message long and told the user nothing.
+        var parts: [String] = []
+        if summary.trips > 0 { parts.append(count(summary.trips, "trip")) }
+        if summary.chargeSessions > 0 { parts.append(count(summary.chargeSessions, "charge session")) }
+        if summary.savedTrips > 0 { parts.append(count(summary.savedTrips, "saved route")) }
+        if summary.savedPlaces > 0 { parts.append(count(summary.savedPlaces, "saved place")) }
+
+        guard !parts.isEmpty else {
+            return summary.settingsRestored
+                ? "Settings restored. The backup held no records."
+                : "That backup was empty."
+        }
+        var text = "Restored " + parts.joined(separator: ", ")
+        text += summary.settingsRestored ? ", and your settings." : "."
+        return text
+    }
+
+    private var lastBackupLabel: String {
+        guard let date = viewModel.preferences.lastAutoBackupDate else { return "Never" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: date, relativeTo: Date())
     }
 }
 
-// MARK: - Export Dialog (matches Android UI flow)
+// MARK: - Backup list
 
-/// A sheet that lists existing auto-backup files so the user can re-export one,
-/// or create a fresh backup to share externally.
-private struct ExportDialogView: View {
+/// The one place backups are listed. Each row can go out (Share) or come back
+/// (Restore); the parent performs whichever was asked for once this sheet closes.
+private struct BackupListView: View {
     let viewModel: SettingsViewModel
-    let onExport: (URL) -> Void
+    let onAction: (PendingAction) -> Void
 
-    @State private var autoBackups: [BackupRepository.AutoBackupFile] = []
+    @State private var backups: [BackupRepository.AutoBackupFile] = []
     @State private var isLoading = true
-    @State private var isCreating = false
+    @State private var errorText: String?
     @Environment(\.dismiss) private var dismiss
 
     private static let dateFormatter: DateFormatter = {
         let f = DateFormatter()
-        f.dateFormat = "MMM d, yyyy HH:mm"
+        f.dateStyle = .medium
+        f.timeStyle = .short
         return f
     }()
 
@@ -215,99 +258,100 @@ private struct ExportDialogView: View {
         NavigationStack {
             Group {
                 if isLoading {
-                    ProgressView("Loading…")
-                } else if autoBackups.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "tray")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.tertiary)
-                        Text("No auto backups found.")
-                            .foregroundStyle(.secondary)
-                        Text("Tap \"Create new\" to make one.")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                    .padding(.vertical, 40)
+                    ProgressView()
+                } else if backups.isEmpty {
+                    ContentUnavailableView(
+                        "No backups yet",
+                        systemImage: "tray",
+                        description: Text("Tap “Back up now” to make one.")
+                    )
                 } else {
                     List {
                         Section {
-                            ForEach(autoBackups) { backup in
-                                Button {
-                                    shareAutoBackup(backup)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(backup.name)
-                                                .font(.body.weight(.medium))
-                                                .foregroundStyle(.primary)
-                                            Text(Self.dateFormatter.string(from: backup.lastModified))
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
-                                        Spacer()
-                                        Text(formatBytes(backup.sizeBytes))
-                                            .font(.caption)
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
+                            ForEach(backups) { backup in
+                                row(backup)
                             }
-                        } header: {
-                            Text("Auto backups found")
+                        } footer: {
+                            Text("Restoring merges a backup into your current data and replaces your settings.")
                         }
                     }
                 }
             }
-            .navigationTitle("Export Backup")
+            .navigationTitle("Backups")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
                 }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        createNewBackup()
-                    } label: {
-                        if isCreating {
-                            ProgressView().scaleEffect(0.8)
-                        } else {
-                            Text("Create new")
-                        }
-                    }
-                    .disabled(isCreating)
-                }
+            }
+            .alert("Couldn't read that backup", isPresented: Binding(
+                get: { errorText != nil },
+                set: { if !$0 { errorText = nil } }
+            )) {
+                Button("OK") { errorText = nil }
+            } message: {
+                Text(errorText ?? "")
             }
         }
         .task {
-            autoBackups = viewModel.listAutoBackups()
+            backups = viewModel.listAutoBackups()
             isLoading = false
         }
     }
 
-    /// Creates a fresh backup and shares it immediately.
-    private func createNewBackup() {
-        isCreating = true
-        Task {
-            do {
-                let url = try await viewModel.exportBackup()
-                isCreating = false
-                dismiss()
-                onExport(url)
-            } catch {
-                isCreating = false
+    private func row(_ backup: BackupRepository.AutoBackupFile) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(Self.dateFormatter.string(from: backup.lastModified))
+                    .font(.body)
+                Text(formatBytes(backup.sizeBytes))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-        }
-    }
+            Spacer()
+            Button {
+                guard let url = viewModel.exportAutoBackupFile(stamp: backup.name) else {
+                    errorText = "That backup file could not be read."
+                    return
+                }
+                onAction(.share(url))
+                dismiss()
+            } label: {
+                Label("Share", systemImage: "square.and.arrow.up")
+                    .labelStyle(.iconOnly)
+            }
+            .buttonStyle(.borderless)
+            .tint(Color.appAccent)
 
-    /// Copies an existing auto-backup to a temp location and shares it.
-    private func shareAutoBackup(_ backup: BackupRepository.AutoBackupFile) {
-        guard let url = viewModel.exportAutoBackupFile(stamp: backup.name) else { return }
-        dismiss()
-        onExport(url)
+            Button("Restore") {
+                onAction(.restore(
+                    url: backup.url,
+                    label: Self.dateFormatter.string(from: backup.lastModified)
+                ))
+                dismiss()
+            }
+            .buttonStyle(.borderless)
+            .font(.callout.weight(.medium))
+            .tint(Color.appAccent)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 
-private func count(_ value: Int, _ noun: String) -> String {
-    "\(value) \(noun)\(value == 1 ? "" : "s")"
+// MARK: - Supporting types
+
+/// What the list asked for, performed after it has finished dismissing.
+private enum PendingAction {
+    case share(URL)
+    case restore(url: URL, label: String)
+}
+
+private struct RestoreCandidate: Identifiable {
+    let url: URL
+    let label: String
+    /// True for a copy of an imported file, which is deleted once restored.
+    let isTemporary: Bool
+    var id: String { url.absoluteString }
 }
 
 /// Identity is the URL, so a re-export of the same path still re-presents.
@@ -329,6 +373,10 @@ private struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
+}
+
+private func count(_ value: Int, _ noun: String) -> String {
+    "\(value) \(noun)\(value == 1 ? "" : "s")"
 }
 
 private func formatBytes(_ bytes: Int) -> String {

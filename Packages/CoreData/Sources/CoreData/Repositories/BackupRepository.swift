@@ -7,10 +7,17 @@ import SwiftData
 /// The format is versioned and decoded field-by-field with defaults, so a backup
 /// taken by an older build still restores after the schema moves on — a backup
 /// that only restores into the exact build that wrote it is not a backup.
+///
+/// Format 2 is shared with the Android build so a file moves between platforms.
+/// Format 1 was not: iOS wrote `version`, ISO 8601 dates and `savedTrips` while
+/// Android wrote `formatVersion`, epoch millis and `savedPlans`, so each side
+/// silently mangled or rejected the other's file. Version 2 settles on Android's
+/// spelling — millis are unambiguous and are what its database already stores —
+/// and the readers below still accept every format 1 file from either platform.
 public final class BackupRepository: @unchecked Sendable {
 
     /// Bump when a change can't be absorbed by the tolerant decoding below.
-    public static let formatVersion = 1
+    public static let formatVersion = 2
 
     private let modelContext: ModelContext
     private let preferences: PreferencesRepository
@@ -24,20 +31,21 @@ public final class BackupRepository: @unchecked Sendable {
 
     public func export(preferences prefs: UserPreferences) throws -> Data {
         let backup = Backup(
-            version: Self.formatVersion,
+            formatVersion: Self.formatVersion,
             exportedAt: Date(),
             settings: BackupSettings(prefs),
             trips: try modelContext.fetch(FetchDescriptor<TripEntity>()).map(BackupTrip.init),
             samples: try modelContext.fetch(FetchDescriptor<SampleEntity>()).map(BackupSample.init),
             chargeSessions: try modelContext.fetch(FetchDescriptor<ChargeSessionEntity>())
                 .map(BackupChargeSession.init),
-            savedTrips: try modelContext.fetch(FetchDescriptor<SavedTripEntity>()).map(BackupSavedTrip.init),
+            savedPlans: try modelContext.fetch(FetchDescriptor<SavedTripEntity>()).map(BackupSavedPlan.init),
             savedPlaces: try modelContext.fetch(FetchDescriptor<SavedPlaceEntity>()).map(BackupSavedPlace.init)
         )
 
+        // No date strategy: `WireDate` encodes epoch millis itself, so the shared
+        // format does not depend on a coder-wide setting.
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
         return try encoder.encode(backup)
     }
 
@@ -160,8 +168,9 @@ public final class BackupRepository: @unchecked Sendable {
     /// same file is idempotent rather than producing duplicates.
     @discardableResult
     public func restore(from data: Data) async throws -> ImportSummary {
+        // No date strategy: `WireDate` accepts both epoch millis (format 2) and the
+        // ISO 8601 strings iOS wrote for format 1.
         let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         let backup: Backup
         do {
             backup = try decoder.decode(Backup.self, from: data)
@@ -169,8 +178,8 @@ public final class BackupRepository: @unchecked Sendable {
             throw BackupError.unreadable(error)
         }
 
-        guard backup.version <= Self.formatVersion else {
-            throw BackupError.tooNew(backup.version)
+        guard backup.formatVersion <= Self.formatVersion else {
+            throw BackupError.tooNew(backup.formatVersion)
         }
 
         // `id` is a unique attribute on each of these, so inserting a row that is
@@ -181,7 +190,7 @@ public final class BackupRepository: @unchecked Sendable {
         for session in backup.chargeSessions {
             modelContext.insert(session.entity)
         }
-        for saved in backup.savedTrips {
+        for saved in backup.savedPlans {
             modelContext.insert(saved.entity)
         }
         for place in backup.savedPlaces {
@@ -216,7 +225,7 @@ public final class BackupRepository: @unchecked Sendable {
             trips: backup.trips.count,
             samples: backup.samples.count,
             chargeSessions: backup.chargeSessions.count,
-            savedTrips: backup.savedTrips.count,
+            savedTrips: backup.savedPlans.count,
             savedPlaces: backup.savedPlaces.count,
             settingsRestored: settingsRestored
         )
@@ -241,47 +250,122 @@ public enum BackupError: LocalizedError {
 
 // MARK: - Wire format
 
+/// A timestamp on the wire.
+///
+/// Written as epoch milliseconds, which is what Android's database stores and what
+/// format 2 standardises on. Read as either milliseconds or the ISO 8601 string
+/// that iOS's format 1 produced, so no existing backup becomes unreadable — and so
+/// an Android format 1 file, whose dates were already millis, reads too.
+struct WireDate: Codable, Equatable, Sendable {
+    let date: Date
+
+    init(_ date: Date) { self.date = date }
+
+    /// Built on demand rather than shared: only legacy format 1 files reach the
+    /// string branch, and a shared formatter would be mutable global state.
+    private static func parseISO8601(_ text: String) -> Date? {
+        let plain = ISO8601DateFormatter()
+        if let date = plain.date(from: text) { return date }
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return fractional.date(from: text)
+    }
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+
+        if let millis = try? container.decode(Int64.self) {
+            date = Date(timeIntervalSince1970: Double(millis) / 1000)
+            return
+        }
+        // A double covers millis that arrived with a decimal point.
+        if let millis = try? container.decode(Double.self) {
+            date = Date(timeIntervalSince1970: millis / 1000)
+            return
+        }
+
+        let text = try container.decode(String.self)
+        guard let parsed = Self.parseISO8601(text) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Expected epoch milliseconds or an ISO 8601 date, got \"\(text)\"."
+            )
+        }
+        date = parsed
+    }
+
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(Int64((date.timeIntervalSince1970 * 1000).rounded()))
+    }
+}
+
 private struct Backup: Codable {
-    let version: Int
-    let exportedAt: Date
+    let formatVersion: Int
+    let exportedAt: WireDate
     let settings: BackupSettings?
     let trips: [BackupTrip]
     let samples: [BackupSample]
     let chargeSessions: [BackupChargeSession]
-    let savedTrips: [BackupSavedTrip]
+    let savedPlans: [BackupSavedPlan]
     let savedPlaces: [BackupSavedPlace]
+
+    enum CodingKeys: String, CodingKey {
+        case formatVersion, exportedAt, settings, trips, samples, chargeSessions
+        case savedPlans, savedPlaces
+        /// Format 1 spellings, read but never written.
+        case version, savedTrips
+    }
 
     // Every collection defaults to empty: a backup from a build that predates a
     // table must still restore the tables it does have.
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 1
-        exportedAt = try c.decodeIfPresent(Date.self, forKey: .exportedAt) ?? Date()
+        formatVersion = try c.decodeIfPresent(Int.self, forKey: .formatVersion)
+            ?? c.decodeIfPresent(Int.self, forKey: .version)
+            ?? 1
+        exportedAt = try c.decodeIfPresent(WireDate.self, forKey: .exportedAt) ?? WireDate(Date())
         settings = try c.decodeIfPresent(BackupSettings.self, forKey: .settings)
         trips = try c.decodeIfPresent([BackupTrip].self, forKey: .trips) ?? []
         samples = try c.decodeIfPresent([BackupSample].self, forKey: .samples) ?? []
         chargeSessions = try c.decodeIfPresent([BackupChargeSession].self, forKey: .chargeSessions) ?? []
-        savedTrips = try c.decodeIfPresent([BackupSavedTrip].self, forKey: .savedTrips) ?? []
+        // iOS format 1 called these `savedTrips`; the shared format uses Android's
+        // `savedPlans`, which matches the `planJson` they actually carry.
+        savedPlans = try c.decodeIfPresent([BackupSavedPlan].self, forKey: .savedPlans)
+            ?? c.decodeIfPresent([BackupSavedPlan].self, forKey: .savedTrips)
+            ?? []
         savedPlaces = try c.decodeIfPresent([BackupSavedPlace].self, forKey: .savedPlaces) ?? []
     }
 
+    func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(formatVersion, forKey: .formatVersion)
+        try c.encode(exportedAt, forKey: .exportedAt)
+        try c.encodeIfPresent(settings, forKey: .settings)
+        try c.encode(trips, forKey: .trips)
+        try c.encode(samples, forKey: .samples)
+        try c.encode(chargeSessions, forKey: .chargeSessions)
+        try c.encode(savedPlans, forKey: .savedPlans)
+        try c.encode(savedPlaces, forKey: .savedPlaces)
+    }
+
     init(
-        version: Int,
+        formatVersion: Int,
         exportedAt: Date,
         settings: BackupSettings?,
         trips: [BackupTrip],
         samples: [BackupSample],
         chargeSessions: [BackupChargeSession],
-        savedTrips: [BackupSavedTrip],
+        savedPlans: [BackupSavedPlan],
         savedPlaces: [BackupSavedPlace]
     ) {
-        self.version = version
-        self.exportedAt = exportedAt
+        self.formatVersion = formatVersion
+        self.exportedAt = WireDate(exportedAt)
         self.settings = settings
         self.trips = trips
         self.samples = samples
         self.chargeSessions = chargeSessions
-        self.savedTrips = savedTrips
+        self.savedPlans = savedPlans
         self.savedPlaces = savedPlaces
     }
 }
@@ -312,7 +396,19 @@ private struct BackupSettings: Codable {
     var estimatedSohTimestamp: Int64?
     var autoBackupEnabled: Bool?
     var autoBackupFrequency: String?
+    /// Epoch milliseconds, spelled as Android spells it. Format 1 on iOS wrote
+    /// `lastAutoBackupDate` in epoch *seconds*; that key is still read below.
+    var autoBackupLastRunAt: Int64?
     var lastAutoBackupDate: TimeInterval?
+    // ── Added in format 2: previously dropped by one platform or the other. ──
+    var deepseekApiKey: String?
+    var aiProvider: String?
+    var openChargeMapApiKey: String?
+    var connectorTypes: [String]?
+    var dynamicColor: Bool?
+    var lastObdDeviceAddress: String?
+    var lastObdDeviceName: String?
+    var lastObdTransportType: String?
 
     init(_ prefs: UserPreferences) {
         activeProfileId = prefs.activeProfileId
@@ -337,7 +433,17 @@ private struct BackupSettings: Codable {
         estimatedSohTimestamp = prefs.estimatedSohTimestamp
         autoBackupEnabled = prefs.autoBackupEnabled
         autoBackupFrequency = prefs.autoBackupFrequency.rawValue
-        lastAutoBackupDate = prefs.lastAutoBackupDate?.timeIntervalSince1970
+        autoBackupLastRunAt = prefs.lastAutoBackupDate
+            .map { Int64(($0.timeIntervalSince1970 * 1000).rounded()) }
+        lastAutoBackupDate = nil
+        deepseekApiKey = prefs.deepseekApiKey
+        aiProvider = prefs.aiProvider.rawValue
+        openChargeMapApiKey = prefs.openChargeMapApiKey
+        connectorTypes = prefs.connectorTypes.map(\.rawValue).sorted()
+        dynamicColor = prefs.dynamicColor
+        lastObdDeviceAddress = prefs.lastObdDeviceAddress
+        lastObdDeviceName = prefs.lastObdDeviceName
+        lastObdTransportType = prefs.lastObdTransportType
     }
 
     /// Absent fields keep whatever is currently set rather than resetting to
@@ -372,15 +478,33 @@ private struct BackupSettings: Codable {
         if let autoBackupFrequency, let val = AutoBackupFrequency(rawValue: autoBackupFrequency) {
             next.autoBackupFrequency = val
         }
-        if let lastAutoBackupDate { next.lastAutoBackupDate = Date(timeIntervalSince1970: lastAutoBackupDate) }
+        if let autoBackupLastRunAt {
+            next.lastAutoBackupDate = Date(timeIntervalSince1970: Double(autoBackupLastRunAt) / 1000)
+        } else if let lastAutoBackupDate {
+            // Format 1 (iOS): seconds, not millis.
+            next.lastAutoBackupDate = Date(timeIntervalSince1970: lastAutoBackupDate)
+        }
+        next.deepseekApiKey = deepseekApiKey ?? current.deepseekApiKey
+        if let aiProvider, let value = AiProvider(rawValue: aiProvider) { next.aiProvider = value }
+        next.openChargeMapApiKey = openChargeMapApiKey ?? current.openChargeMapApiKey
+        if let connectorTypes {
+            let parsed = Set(connectorTypes.compactMap(ConnectorType.init(rawValue:)))
+            // An empty or wholly unrecognised list keeps the current filter rather
+            // than leaving the user with no connectors selected at all.
+            if !parsed.isEmpty { next.connectorTypes = parsed }
+        }
+        if let dynamicColor { next.dynamicColor = dynamicColor }
+        next.lastObdDeviceAddress = lastObdDeviceAddress ?? current.lastObdDeviceAddress
+        next.lastObdDeviceName = lastObdDeviceName ?? current.lastObdDeviceName
+        next.lastObdTransportType = lastObdTransportType ?? current.lastObdTransportType
         return next
     }
 }
 
 private struct BackupTrip: Codable {
     let id: String
-    let startTime: Date
-    let endTime: Date?
+    let startTime: WireDate
+    let endTime: WireDate?
     let startSoc: Float
     let endSoc: Float?
     let distanceKm: Float
@@ -388,11 +512,14 @@ private struct BackupTrip: Codable {
     let avgConsumptionKwhPer100km: Float?
     let ambientTempAvgC: Float?
     let note: String?
+    /// Was missing from format 1 on iOS, so exporting dropped the briefing and
+    /// restoring overwrote the row with a nil one. Android carried it all along.
+    let aiBriefing: String?
 
     init(_ e: TripEntity) {
         id = e.id
-        startTime = e.startTime
-        endTime = e.endTime
+        startTime = WireDate(e.startTime)
+        endTime = e.endTime.map(WireDate.init)
         startSoc = e.startSoc
         endSoc = e.endSoc
         distanceKm = e.distanceKm
@@ -400,22 +527,24 @@ private struct BackupTrip: Codable {
         avgConsumptionKwhPer100km = e.avgConsumptionKwhPer100km
         ambientTempAvgC = e.ambientTempAvgC
         note = e.note
+        aiBriefing = e.aiBriefing
     }
 
     var entity: TripEntity {
         TripEntity(
-            id: id, startTime: startTime, endTime: endTime,
+            id: id, startTime: startTime.date, endTime: endTime?.date,
             startSoc: startSoc, endSoc: endSoc,
             distanceKm: distanceKm, energyUsedKwh: energyUsedKwh,
             avgConsumptionKwhPer100km: avgConsumptionKwhPer100km,
-            ambientTempAvgC: ambientTempAvgC, note: note
+            ambientTempAvgC: ambientTempAvgC, note: note,
+            aiBriefing: aiBriefing
         )
     }
 }
 
 private struct BackupSample: Codable {
     let tripId: String
-    let timestamp: Date
+    let timestamp: WireDate
     let soc: Float?
     let powerKw: Float?
     let speedKph: Float?
@@ -427,7 +556,7 @@ private struct BackupSample: Codable {
 
     init(_ e: SampleEntity) {
         tripId = e.tripId
-        timestamp = e.timestamp
+        timestamp = WireDate(e.timestamp)
         soc = e.soc
         powerKw = e.powerKw
         speedKph = e.speedKph
@@ -440,7 +569,7 @@ private struct BackupSample: Codable {
 
     var entity: SampleEntity {
         SampleEntity(
-            tripId: tripId, timestamp: timestamp, soc: soc, powerKw: powerKw,
+            tripId: tripId, timestamp: timestamp.date, soc: soc, powerKw: powerKw,
             speedKph: speedKph, lat: lat, lon: lon, elevationM: elevationM,
             ambientTempC: ambientTempC, packTempC: packTempC
         )
@@ -449,8 +578,8 @@ private struct BackupSample: Codable {
 
 private struct BackupChargeSession: Codable {
     let id: String
-    let startTime: Date
-    let endTime: Date?
+    let startTime: WireDate
+    let endTime: WireDate?
     let startSoc: Float
     let endSoc: Float?
     let energyAddedKwh: Float
@@ -462,8 +591,8 @@ private struct BackupChargeSession: Codable {
 
     init(_ e: ChargeSessionEntity) {
         id = e.id
-        startTime = e.startTime
-        endTime = e.endTime
+        startTime = WireDate(e.startTime)
+        endTime = e.endTime.map(WireDate.init)
         startSoc = e.startSoc
         endSoc = e.endSoc
         energyAddedKwh = e.energyAddedKwh
@@ -476,7 +605,7 @@ private struct BackupChargeSession: Codable {
 
     var entity: ChargeSessionEntity {
         ChargeSessionEntity(
-            id: id, startTime: startTime, endTime: endTime,
+            id: id, startTime: startTime.date, endTime: endTime?.date,
             startSoc: startSoc, endSoc: endSoc,
             energyAddedKwh: energyAddedKwh, peakPowerKw: peakPowerKw,
             avgPowerKw: avgPowerKw, chargeType: chargeType,
@@ -485,21 +614,23 @@ private struct BackupChargeSession: Codable {
     }
 }
 
-private struct BackupSavedTrip: Codable {
+/// Named for the shared wire format (`savedPlans`); the local entity is still
+/// `SavedTripEntity`. Both sides carry the same `planJson`.
+private struct BackupSavedPlan: Codable {
     let id: String
     let name: String
     let planJson: String
-    let createdAt: Date
+    let createdAt: WireDate
 
     init(_ e: SavedTripEntity) {
         id = e.id
         name = e.name
         planJson = e.planJson
-        createdAt = e.createdAt
+        createdAt = WireDate(e.createdAt)
     }
 
     var entity: SavedTripEntity {
-        SavedTripEntity(id: id, name: name, planJson: planJson, createdAt: createdAt)
+        SavedTripEntity(id: id, name: name, planJson: planJson, createdAt: createdAt.date)
     }
 }
 
@@ -509,7 +640,7 @@ private struct BackupSavedPlace: Codable {
     let category: String
     let lat: Double
     let lon: Double
-    let createdAt: Date
+    let createdAt: WireDate
 
     init(_ e: SavedPlaceEntity) {
         id = e.id
@@ -517,10 +648,10 @@ private struct BackupSavedPlace: Codable {
         category = e.category
         lat = e.lat
         lon = e.lon
-        createdAt = e.createdAt
+        createdAt = WireDate(e.createdAt)
     }
 
     var entity: SavedPlaceEntity {
-        SavedPlaceEntity(id: id, name: name, category: category, lat: lat, lon: lon, createdAt: createdAt)
+        SavedPlaceEntity(id: id, name: name, category: category, lat: lat, lon: lon, createdAt: createdAt.date)
     }
 }
