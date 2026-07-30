@@ -34,6 +34,7 @@ final class ConnectedCarService {
     private let driveMonitor = DriveMonitor()
     private let parkedEvaluator = ParkedStateEvaluator()
     private let replanMonitor = LiveReplanMonitor()
+    private let routeReplanner = RouteReplanner()
     private var occupancyMonitor: OccupancyAlertMonitor!
     private var chargeAlerts: ChargeAlertMonitor!
     private var tirePressure: TirePressureMonitor!
@@ -326,8 +327,7 @@ final class ConnectedCarService {
     /// (always), plus charger occupancy ahead (Pro, and only with a Places key —
     /// those calls bill the user).
     private func checkPlanProgress(_ telemetry: VehicleTelemetry, fix: Fix?) {
-        let plan = services.activePlan.currentPlan
-        guard plan != nil else { return }
+        guard let plan = services.activePlan.currentPlan else { return }
 
         let position = fix.map { LatLon(lat: $0.lat, lon: $0.lon) }
         let routePoints = services.activePlan.currentRoutePoints
@@ -361,12 +361,116 @@ final class ConnectedCarService {
                 speedKph: telemetry.speedKph ?? 0,
                 apiKey: key
             ) else { return }
-            await self.notifier.post(
-                .chargerOccupancy,
-                title: "\(alert.stopName) looks full",
-                body: "All \(alert.statusedStations) chargers with live status are in use, about \(alert.etaMinutes) min ahead."
+            await self.handleOccupancyAlert(
+                alert, plan: plan, routePoints: routePoints,
+                position: position, telemetry: telemetry
             )
         }
+    }
+
+    /// Called once the driver accepts a re-route, so the next stop on the new plan
+    /// can be checked immediately instead of waiting out the recheck interval.
+    func onRerouteCommitted() {
+        occupancyMonitor.reset()
+        replanMonitor.reset()
+    }
+
+    /// Turns an occupancy alert into the most useful thing we can say, in the same
+    /// three cases Android distinguishes: an alternative is reachable (offer it),
+    /// range can be assessed and nothing is reachable (say so), or we cannot tell.
+    private func handleOccupancyAlert(
+        _ alert: OccupancyAlertMonitor.Alert,
+        plan: TripPlan,
+        routePoints: [LatLon],
+        position: LatLon?,
+        telemetry: VehicleTelemetry
+    ) async {
+        let liveSoc = telemetry.socDisplay ?? telemetry.socBms
+        let busy = "All \(alert.statusedStations) chargers with live status near "
+            + "\(alert.stopName) are busy — about \(alert.etaMinutes) min ahead."
+
+        // Needs a fix, a live SOC and a route to say anything about reachability.
+        guard let position, let liveSoc, routePoints.count >= 2 else {
+            await notifier.post(
+                .chargerOccupancy,
+                title: "Chargers ahead are occupied",
+                body: "\(busy) Consider an alternative stop."
+            )
+            return
+        }
+
+        if let reroute = await computeReroute(
+            plan: plan, routePoints: routePoints, position: position,
+            liveSoc: liveSoc, occupiedChargerId: alert.occupiedChargerId,
+            telemetry: telemetry
+        ) {
+            // Park the alternative first: the notification action commits it, so it
+            // has to be waiting before the alert can be tapped.
+            services.activePlan.setPendingReroute(reroute.plan, points: reroute.remainingRoute)
+            let altText = reroute.plan.stops.first.map {
+                "Re-route to \($0.charger.name) (arrive ~\(Int($0.arrivalSoc))%)."
+            } ?? "An alternative charger is reachable on your current charge."
+            await notifier.post(
+                .chargerOccupancy,
+                title: "Chargers ahead are occupied",
+                body: "\(busy) \(altText)",
+                categoryIdentifier: AlertNotifier.occupancyRerouteCategory
+            )
+        } else {
+            await notifier.post(
+                .chargerOccupancy,
+                title: "Chargers ahead are occupied",
+                body: "\(busy) No charger is reachable on your current charge; "
+                    + "reduce speed to extend range."
+            )
+        }
+    }
+
+    /// Re-solves the remaining route from here, on the current charge, excluding the
+    /// stop that is full. Mirrors Android's `computeReroute`.
+    private func computeReroute(
+        plan: TripPlan,
+        routePoints: [LatLon],
+        position: LatLon,
+        liveSoc: Float,
+        occupiedChargerId: String,
+        telemetry: VehicleTelemetry
+    ) async -> Rerouted? {
+        let prefs = services.userPreferences
+        let nearestIdx = RouteGeo.nearestIndex(position: position, points: routePoints)
+        let remaining = Array(routePoints[nearestIdx...])
+        guard remaining.count >= 2 else { return nil }
+
+        guard let candidates = try? await services.chargers.chargersAlongRoute(
+            routePoints: remaining, corridorKm: 5
+        ) else { return nil }
+
+        let usable = candidates.filter { charger in
+            charger.connectors.contains { prefs.connectorTypes.contains($0.type) }
+        }
+        guard !usable.isEmpty else { return nil }
+
+        let packTemp = telemetry.moduleTempsC.max().map(Float.init) ?? 25
+        let params = SolverParams(
+            usableKwh: Double(Ioniq5Constants.usableKwhForProfile(
+                prefs.activeProfileId, customKwh: prefs.customUsableBatteryKwh
+            )),
+            startSocPercent: liveSoc,
+            reserveSocPercent: prefs.reserveSocPercent,
+            arrivalReservePercent: prefs.targetArrivalSocPercent,
+            packTempC: packTemp,
+            priceWeight: prefs.priceWeight
+        )
+
+        return routeReplanner.reroute(
+            currentPosition: position,
+            liveSocPercent: liveSoc,
+            plan: plan,
+            routePoints: routePoints,
+            candidateChargers: usable,
+            occupiedChargerId: occupiedChargerId,
+            paramsTemplate: params
+        )
     }
 
     private func updateParkedState(decision: DriveDecision, frame: DriveFrame) {

@@ -6,6 +6,7 @@ import CoreRouting
 import Foundation
 import SwiftData
 import BackgroundTasks
+import UserNotifications
 
 /// Composition root. Owns every repository and the OBD stack, and joins the OBD
 /// telemetry stream to the shared telemetry repository and the trip log.
@@ -58,6 +59,9 @@ final class AppServices {
 
     private var cancellables = Set<AnyCancellable>()
     private var loadedProfileId: String?
+
+    /// Retained because `UNUserNotificationCenter.delegate` is a weak reference.
+    private var notificationHandler: NotificationActionHandler?
 
     // MARK: - Init
 
@@ -112,6 +116,7 @@ final class AppServices {
         bindPreferences()
         bindEntitlement()
         bindObdStream()
+        bindNotificationActions()
 
         // Re-derived from StoreKit, not read back from the cached flag — a refund or
         // a purchase made on another device lands here rather than waiting for the
@@ -132,6 +137,20 @@ final class AppServices {
         await autoConnectLastAdapter()
 
         registerAutoBackupTask()
+    }
+
+    /// Registers the alert action buttons and the delegate that handles them. The
+    /// "Re-route" button commits the alternative the occupancy check parked.
+    private func bindNotificationActions() {
+        let handler = NotificationActionHandler { [weak self] in
+            guard let self else { return }
+            if self.activePlan.commitPendingReroute() != nil {
+                self.connectedCar.onRerouteCommitted()
+            }
+        }
+        notificationHandler = handler
+        UNUserNotificationCenter.current().delegate = handler
+        AlertNotifier.registerCategories()
     }
 
     private func bindPreferences() {

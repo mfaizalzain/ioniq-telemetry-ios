@@ -19,9 +19,37 @@ final class AlertNotifier {
         var requestIdentifier: String { "alert.\(rawValue)" }
     }
 
+    /// Buttons the user can tap on a delivered alert.
+    enum Action: String {
+        case commitReroute
+    }
+
+    /// Category carrying the "Re-route" button. Kept separate from
+    /// `chargerOccupancy` so the button only appears when an alternative is actually
+    /// waiting — an action that does nothing is worse than no action.
+    static let occupancyRerouteCategory = "chargerOccupancy.reroute"
+
     private var didRequestAuthorization = false
 
-    func post(_ category: Category, title: String, body: String) async {
+    /// Registers the action buttons. Call once at startup, before any alert can be
+    /// delivered: a category the system has not seen yet shows no buttons.
+    static func registerCategories() {
+        let reroute = UNNotificationAction(
+            identifier: Action.commitReroute.rawValue,
+            title: "Re-route",
+            options: [.foreground]
+        )
+        UNUserNotificationCenter.current().setNotificationCategories([
+            UNNotificationCategory(
+                identifier: Self.occupancyRerouteCategory,
+                actions: [reroute],
+                intentIdentifiers: [],
+                options: []
+            )
+        ])
+    }
+
+    func post(_ category: Category, title: String, body: String, categoryIdentifier: String? = nil) async {
         guard await ensureAuthorized() else { return }
 
         let content = UNMutableNotificationContent()
@@ -30,6 +58,7 @@ final class AlertNotifier {
         content.sound = .default
         content.interruptionLevel = .timeSensitive
         content.threadIdentifier = category.rawValue
+        if let categoryIdentifier { content.categoryIdentifier = categoryIdentifier }
 
         let request = UNNotificationRequest(
             identifier: category.requestIdentifier,
