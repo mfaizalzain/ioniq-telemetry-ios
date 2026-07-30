@@ -12,6 +12,8 @@ final class DashboardViewModel {
     private(set) var telemetry = VehicleTelemetry()
     private(set) var connectionState: ObdConnectionState = .disconnected
     private(set) var vehicleName: String
+    private(set) var activeProfileId: String
+    private(set) var customUsableBatteryKwh: Float?
     private(set) var unitSystem: UnitSystem = .metric
     private(set) var thermalTip: String?
     private(set) var isPro = false
@@ -30,6 +32,8 @@ final class DashboardViewModel {
         // Set initial vehicle name from current preferences
         let initialPrefs = services.preferences.currentPreferences
         self.vehicleName = Ioniq5Constants.vehicleNameFor(initialPrefs.activeProfileId)
+        self.activeProfileId = initialPrefs.activeProfileId
+        self.customUsableBatteryKwh = initialPrefs.customUsableBatteryKwh
         self.unitSystem = initialPrefs.unitSystem
         self.aiKey = initialPrefs.aiKey
         self.aiProvider = initialPrefs.aiProvider
@@ -53,6 +57,8 @@ final class DashboardViewModel {
             .sink { [weak self] prefs in
                 guard let self else { return }
                 self.vehicleName = Ioniq5Constants.vehicleNameFor(prefs.activeProfileId)
+                self.activeProfileId = prefs.activeProfileId
+                self.customUsableBatteryKwh = prefs.customUsableBatteryKwh
                 self.unitSystem = prefs.unitSystem
                 self.aiKey = prefs.aiKey
                 self.aiProvider = prefs.aiProvider
@@ -95,6 +101,58 @@ final class DashboardViewModel {
         telemetry.isCharging
             && telemetry.chargeType == .dc
             && (telemetry.powerKw.map { abs($0) > 0 } ?? false)
+    }
+
+    // MARK: - Range
+
+    /// The driver's own consumption over the last 30 days, or nil until they have
+    /// logged enough distance for the average to mean anything. Trips shorter than
+    /// a cold-start HVAC cycle would otherwise dominate it.
+    /// Mirrors Android's `measuredEfficiency` in `DashboardScreen.kt`.
+    var measuredConsumptionKwhPer100km: Float? {
+        let cutoff = Date().addingTimeInterval(-measuredConsumptionWindow)
+        let recent = recentTrips.filter { $0.startTime >= cutoff && $0.endTime != nil }
+        let km = recent.reduce(Float(0)) { $0 + $1.distanceKm }
+        guard km >= minMeasuredKm else { return nil }
+        let kwh = recent.reduce(Float(0)) { $0 + $1.energyUsedKwh }
+        return kwh > 0 ? kwh / km * 100 : nil
+    }
+
+    /// Remaining range for the *selected* vehicle profile at the driver's own
+    /// measured consumption. Nil while SOC is unknown — the hero card shows
+    /// nothing rather than a placeholder distance.
+    var rangeEstimate: RangeEstimate? {
+        estimateRange(
+            socPercent: socPercent,
+            usableKwh: Ioniq5Constants.usableKwhForProfile(
+                activeProfileId,
+                customKwh: customUsableBatteryKwh
+            ),
+            measuredKwhPer100km: measuredConsumptionKwhPer100km
+        )
+    }
+
+    /// Range for the hero card pill, in the active unit system. A figure derived
+    /// from a default consumption number is marked `(est.)` rather than passed off
+    /// as a reading — the distinction Android draws with `RangeSource`.
+    var rangeText: String? {
+        guard let estimate = rangeEstimate else { return nil }
+        let distance = distanceRounded(estimate.distanceKm)
+        switch estimate.source {
+        case .measured: return distance
+        case .nominal: return "\(distance) (est.)"
+        }
+    }
+
+    /// Spoken form of `rangeText`, which reads the source out rather than
+    /// abbreviating it.
+    var rangeAccessibilityText: String? {
+        guard let estimate = rangeEstimate else { return nil }
+        let distance = distanceRounded(estimate.distanceKm)
+        switch estimate.source {
+        case .measured: return "\(distance) range, from your recent driving"
+        case .nominal: return "\(distance) range, estimated"
+        }
     }
 
     var hasData: Bool { connectionState == .connected }
@@ -165,6 +223,16 @@ extension DashboardViewModel {
     }
 
     var distanceUnit: String { unitSystem == .imperial ? "mi" : "km" }
+
+    /// Whole-unit distance, for figures where a decimal implies precision the
+    /// number does not have (range estimates). Mirrors Android's
+    /// `formatDistanceRounded`.
+    func distanceRounded(_ km: Float?) -> String {
+        guard let km else { return "—" }
+        return unitSystem == .imperial
+            ? String(format: "%.0f mi", km * 0.621371)
+            : String(format: "%.0f km", km)
+    }
 
     /// kWh/100km → mi/kWh when imperial.
     func efficiency(_ kwhPer100km: Float?) -> String {

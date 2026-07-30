@@ -159,66 +159,102 @@ struct BatteryHeroCard: View {
         return Color.appRed
     }
 
-    private var estimatedRangeKm: Int? {
-        guard let soc = socPercent else { return nil }
-        // E-GMP 77.4 kWh pack baseline (~420 km WLTP @ 100%)
-        return Int(Double(soc) * 4.2)
+
+    /// SOC percentage, plus the raw BMS figure when it disagrees with the display.
+    private var socReadout: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 1) {
+            Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
+                .font(.system(size: 52, weight: .bold))
+                .tracking(-1.5)
+            Text("%")
+                .font(.system(size: 26, weight: .medium))
+                .foregroundStyle(.secondary)
+            // BMS raw SOC — only when it differs from displayed SOC
+            if let bms = viewModel.telemetry.socBms, let display = socPercent, abs(bms - display) > 0.4 {
+                Text("BMS \(String(format: "%.1f", bms))%")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundStyle(.tertiary)
+                    .padding(.leading, 4)
+            }
+        }
+    }
+
+    /// Estimated remaining range. Single line by contract — the pill is a capsule,
+    /// and a wrapped capsule reads as a blob rather than a badge.
+    @ViewBuilder
+    private var rangePill: some View {
+        if let range = viewModel.rangeText {
+            HStack(spacing: 4) {
+                Image(systemName: "bolt.car.fill")
+                    .font(.caption2)
+                    .imageScale(.small)
+                Text(range)
+                    .font(.caption.weight(.semibold))
+            }
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(fillColor.opacity(0.15))
+            .foregroundStyle(fillColor)
+            .clipShape(Capsule())
+        }
+    }
+
+    private var accessibilityValueText: String {
+        guard let soc = socPercent else { return "No data" }
+        var value = "\(Int(soc.rounded())) percent"
+        if let range = viewModel.rangeAccessibilityText { value += ", \(range)" }
+        return value
     }
 
     var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .bottomLeading) {
-            // Fill level overlay — width = SOC percentage, bottom-anchored
-            Rectangle()
-                .fill(fillColor.opacity(0.18))
-                .frame(width: max(geo.size.width * CGFloat(fillFraction), 0))
-                .animation(.easeOut(duration: 0.8), value: fillFraction)
-
-            VStack(spacing: 10) {
+        VStack(spacing: 10) {
+            // The range pill shares the readout's line only while both genuinely
+            // fit. A longer string or an accessibility text size used to squeeze it
+            // into a three-line blob overlapping its own icon, so the fallback
+            // stacks it under the readout instead of compressing either one.
+            ViewThatFits(in: .horizontal) {
                 HStack(alignment: .firstTextBaseline, spacing: 1) {
-                    Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
-                        .font(.system(size: 52, weight: .bold))
-                        .tracking(-1.5)
-                    Text("%")
-                        .font(.system(size: 26, weight: .medium))
-                        .foregroundStyle(.secondary)
-                    // BMS raw SOC — only when it differs from displayed SOC
-                    if let bms = viewModel.telemetry.socBms, let display = socPercent, abs(bms - display) > 0.4 {
-                        Text("BMS \(String(format: "%.1f", bms))%")
-                            .font(.system(size: 11, weight: .regular))
-                            .foregroundStyle(.tertiary)
-                            .padding(.leading, 4)
-                    }
-                    Spacer()
-                    if let range = estimatedRangeKm {
-                        HStack(spacing: 4) {
-                            Image(systemName: "bolt.car.fill")
-                                .font(.caption2)
-                            Text("Est. \(range) km")
-                                .font(.caption.weight(.semibold))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(fillColor.opacity(0.15))
-                        .foregroundStyle(fillColor)
-                        .clipShape(Capsule())
-                    }
+                    socReadout
+                    Spacer(minLength: 8)
+                    rangePill
                 }
-                .foregroundStyle(Color.appOnSurface)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("State of charge")
-                .accessibilityValue(socPercent.map { "\(Int($0.rounded())) percent" } ?? "No data")
-
-                if viewModel.telemetry.isCharging {
-                    ChargingChip(viewModel: viewModel)
+                VStack(alignment: .leading, spacing: 8) {
+                    socReadout
+                    rangePill
                 }
             }
-            .padding(16)
+            .foregroundStyle(Color.appOnSurface)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("State of charge")
+            .accessibilityValue(accessibilityValueText)
+
+            if viewModel.telemetry.isCharging {
+                ChargingChip(viewModel: viewModel)
+            }
         }
-        .frame(minHeight: 110)
+        // maxWidth belongs out here, not on either `ViewThatFits` branch: inside, a
+        // greedy child always reports that it fits and the fallback never triggers.
+        // Without it the stacked branch hugs its content and the card narrows.
+        .frame(maxWidth: .infinity, minHeight: 78, alignment: .topLeading)
+        // SOC fill — width tracks SOC, drawn behind the readout. A GeometryReader
+        // wrapping the card would have no intrinsic height and collapse it, so the
+        // measurement happens in the background layer, which inherits the card's
+        // own size instead of dictating it. The negative inset lets the fill bleed
+        // under `cardStyle`'s content padding to the card edge, where the card's
+        // own clip shape trims it.
+        .background {
+            GeometryReader { geo in
+                Rectangle()
+                    .fill(fillColor.opacity(0.18))
+                    .frame(width: geo.size.width * CGFloat(fillFraction))
+                    .animation(.easeOut(duration: 0.8), value: fillFraction)
+            }
+            .padding(-CardLevel.hero.contentInset)
+        }
         .cardStyle(.hero)
     }
-}
 }
 
 private struct ChargingChip: View {
@@ -284,7 +320,6 @@ private struct ThermalTipCard: View {
                     .padding(.vertical, 4)
             }
         }
-        .padding(14)
         .cardStyle(.secondary)
     }
 }
@@ -459,7 +494,7 @@ private struct ChargeCurveCard: View {
             // Header
             HStack {
                 Image(systemName: "bolt.batteryblock.fill")
-                    .font(.caption)
+                    .font(.ioniqCaption)
                 Text("DC CHARGE CURVE")
                     .font(.ioniqCaption.weight(.medium))
                     .ioniqStatLabel()
@@ -500,7 +535,7 @@ private struct ChargeCurveCard: View {
                 for kw in stride(from: 0, through: 250, by: 50) {
                     let y = chartRect.maxY - (CGFloat(kw) / CGFloat(Self.maxPower)) * chartRect.height
                     context.draw(
-                        Text("\\(kw)").font(labelFont).foregroundStyle(labelColor),
+                        Text("\(kw)").font(labelFont).foregroundStyle(labelColor),
                         at: CGPoint(x: chartRect.minX - 4, y: y),
                         anchor: .trailing
                     )
@@ -511,7 +546,7 @@ private struct ChargeCurveCard: View {
                     let socF = CGFloat(soc)
                     let x = chartRect.minX + (socF - CGFloat(Self.minSoc)) / CGFloat(Self.maxSoc - Self.minSoc) * chartRect.width
                     context.draw(
-                        Text("\\(soc)%").font(labelFont).foregroundStyle(labelColor),
+                        Text("\(soc)%").font(labelFont).foregroundStyle(labelColor),
                         at: CGPoint(x: x, y: chartRect.maxY + 4),
                         anchor: .top
                     )
@@ -571,7 +606,6 @@ private struct ChargeCurveCard: View {
             .frame(height: 140)
             .accessibilityLabel("DC charge curve graph")
         }
-        .padding(16)
         .cardStyle(.primary)
     }
 
@@ -605,7 +639,7 @@ struct MetricTilesGrid: View {
             // Header
             HStack {
                 Image(systemName: "chart.bar.fill")
-                    .font(.caption)
+                    .font(.ioniqCaption)
                 Text("LIVE METRICS")
                     .font(.ioniqCaption.weight(.medium))
                     .ioniqStatLabel()
@@ -690,6 +724,7 @@ struct TirePressureVisualizerCard: View {
         VStack(spacing: 12) {
             HStack {
                 Image(systemName: "tire")
+                    .font(.ioniqCaption)
                 Text("TIRE PRESSURE")
                     .font(.ioniqCaption.weight(.medium))
                     .ioniqStatLabel()

@@ -185,6 +185,16 @@ public enum CardLevel {
     case primary
     /// Secondary content — AI cards, digest. Recessed, lighter material.
     case secondary
+
+    /// Inset between the card's edge and its content. Owned by the modifier
+    /// rather than each call site: when this was every card's own `.padding()`,
+    /// two cards lost theirs in a refactor and rendered flush to the border.
+    public var contentInset: CGFloat {
+        switch self {
+        case .hero, .primary: return 16
+        case .secondary: return 14
+        }
+    }
 }
 
 public extension View {
@@ -198,6 +208,7 @@ private struct CardStyleModifier: ViewModifier {
     let level: CardLevel
     
     func body(content: Content) -> some View {
+        let content = content.padding(level.contentInset)
         switch level {
         case .hero:
             content

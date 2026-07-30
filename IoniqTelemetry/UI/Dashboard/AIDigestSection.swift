@@ -111,7 +111,6 @@ struct AIDigestSection: View {
                     }
                 }
             }
-            .padding(12)
             .cardStyle(.secondary)
         .onChange(of: selectedPeriod) { _, newPeriod in
             if expanded && newPeriod != lastFetchedPeriod {

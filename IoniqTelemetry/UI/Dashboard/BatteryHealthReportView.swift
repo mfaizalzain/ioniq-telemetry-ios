@@ -105,7 +105,6 @@ struct BatteryHealthReportView: View {
                     }
                 }
             }
-            .padding(14)
             .cardStyle(.secondary)
     }
 
