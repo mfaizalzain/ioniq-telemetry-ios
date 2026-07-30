@@ -44,6 +44,7 @@
 		B2FF332CEFAD88246DC5B1C1 /* PaywallViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C8ADDBDBC5A342476500F5 /* PaywallViewModel.swift */; };
 		BABC7C03FA75D309033AE7FC /* CarPlayCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEE9272FAB694E0E7A2E71E6 /* CarPlayCoordinator.swift */; };
 		BC4FC850E415F1E32168B495 /* BatteryHealthReportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24E658A0630C85D5EADB297 /* BatteryHealthReportView.swift */; };
+		BEC154E380F88BD73F911422 /* NotificationActionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDF661EBC86597CE9E53BC93 /* NotificationActionHandler.swift */; };
 		C806C545266A393FF6046E31 /* CoreData in Frameworks */ = {isa = PBXBuildFile; productRef = CE94BDBFAE6356B793FDC1B5 /* CoreData */; };
 		CD14EF3A45BD2BABB770F360 /* TripsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17DA8DC491CA28199554CE44 /* TripsViewModel.swift */; };
 		D367EF32920B8BBA7A9066E0 /* AIDigestSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAFDDF866DA9EAF02A85E40 /* AIDigestSection.swift */; };
@@ -106,6 +107,7 @@
 		C8897BD5040316FAF28912DC /* PostTripBriefingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTripBriefingView.swift; sourceTree = "<group>"; };
 		C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		CDF661EBC86597CE9E53BC93 /* NotificationActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationActionHandler.swift; sourceTree = "<group>"; };
 		CEE9272FAB694E0E7A2E71E6 /* CarPlayCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayCoordinator.swift; sourceTree = "<group>"; };
 		CFDF516A468A77CCD6985D3A /* DataSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataSection.swift; sourceTree = "<group>"; };
 		D0B90C783C3ACAF0CB846BA4 /* IoniqTelemetry-CarPlay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "IoniqTelemetry-CarPlay.entitlements"; sourceTree = "<group>"; };
@@ -155,6 +157,7 @@
 			children = (
 				D76ACB924B36FF8C171B52B1 /* AlertNotifier.swift */,
 				D0F20D65CD1E45F443D1A915 /* ConnectedCarService.swift */,
+				CDF661EBC86597CE9E53BC93 /* NotificationActionHandler.swift */,
 				27EDF8359710AED96EF1DC16 /* VehicleLocationProvider.swift */,
 			);
 			path = Service;
@@ -488,6 +491,7 @@
 				82BD22F8A6DFE7105725A9B1 /* DisplaySection.swift in Sources */,
 				B1A4DA9B674AAAF6B40425DD /* IoniqTelemetryApp.swift in Sources */,
 				0B661B348BCFD37E44E4F40A /* MapsNavigation.swift in Sources */,
+				BEC154E380F88BD73F911422 /* NotificationActionHandler.swift in Sources */,
 				0C6B1ADF300322C93745F9F3 /* PaywallView.swift in Sources */,
 				B2FF332CEFAD88246DC5B1C1 /* PaywallViewModel.swift in Sources */,
 				13BAD2FF5C03019D0DDF41F3 /* PlanView.swift in Sources */,

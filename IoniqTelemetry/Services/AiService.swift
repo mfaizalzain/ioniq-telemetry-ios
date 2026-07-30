@@ -3,7 +3,7 @@ import CoreDomain
 import Foundation
 
 /// AI-powered service for charging insights, battery health reports, and
-/// contextual aiAssistant chat. Supports Gemini (via Google AI) and DeepSeek
+/// contextual assistant chat. Supports Gemini (via Google AI) and DeepSeek
 /// (OpenAI-compatible API). All methods require a valid API key for the selected
 /// provider and Pro entitlement (gated at the call site).
 @Observable
@@ -45,16 +45,15 @@ final class AiService {
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
 
-        let prompt = buildPostTripBriefingPrompt(
-            trip: trip,
-            recentTrips: recentTrips,
-            telemetrySamples: telemetrySamples,
+        let prompt = AiPrompts.postTripBriefing(
+            tripJson: buildTripJson(trip: trip, samples: telemetrySamples),
+            recentTripsSummary: buildRecentTripsSummary(recentTrips: recentTrips),
             efficiencyBaseline: efficiencyBaseline,
             vehicleName: vehicleName,
             usableBatteryKwh: usableBatteryKwh,
             countryCode: countryCode
         )
-        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
+        return try await send(prompt, provider: aiProvider, apiKey: apiKey)
     }
 
     // MARK: - AI Digest
@@ -62,12 +61,14 @@ final class AiService {
     /// Generates a weekly or monthly digest of driving activity.
     /// - Parameters:
     ///   - trips: Trips in the period.
+    ///   - chargeSessions: Charge sessions in the period, for charging context.
     ///   - period: Weekly or monthly.
     ///   - apiKey: API key for the selected provider.
     ///   - aiProvider: The AI provider to use (Gemini or DeepSeek).
     /// - Returns: AI-generated digest text.
     func generateDigest(
         trips: [TripEntity],
+        chargeSessions: [ChargeSessionEntity] = [],
         period: DigestPeriod,
         apiKey: String,
         vehicleName: String = "Ioniq 5",
@@ -77,8 +78,14 @@ final class AiService {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
         guard !trips.isEmpty else { return "No trips recorded this \(period.label.lowercased())." }
 
-        let prompt = buildDigestPrompt(trips: trips, period: period, vehicleName: vehicleName, countryCode: countryCode)
-        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
+        let prompt = AiPrompts.digest(
+            stats: buildDigestStats(trips: trips),
+            chargeSessionsSummary: buildChargeSessionsSummary(sessions: chargeSessions),
+            period: period,
+            vehicleName: vehicleName,
+            countryCode: countryCode
+        )
+        return try await send(prompt, provider: aiProvider, apiKey: apiKey)
     }
 
     // MARK: - Charging Insight
@@ -98,8 +105,8 @@ final class AiService {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
 
         let recent = Array(chargeSessions.prefix(30))
-        let prompt = buildChargingPrompt(sessions: recent)
-        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
+        let prompt = AiPrompts.chargingInsight(sessionSummary: buildSessionRows(sessions: recent))
+        return try await send(prompt, provider: aiProvider, apiKey: apiKey)
     }
 
     // MARK: - Battery Health Report
@@ -115,12 +122,12 @@ final class AiService {
     ) async throws -> String {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
 
-        let prompt = buildBatteryReportPrompt(
-            sohHistory: sohHistory,
-            voltageDeltas: voltageDeltas,
-            chargeSpeeds: chargeSpeeds
+        let prompt = AiPrompts.batteryReport(
+            sohHistory: buildSohRows(sohHistory),
+            voltageDeltas: buildVoltageDeltaLine(voltageDeltas),
+            chargeSpeeds: buildChargeSpeedRows(chargeSpeeds)
         )
-        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
+        return try await send(prompt, provider: aiProvider, apiKey: apiKey)
     }
 
     // MARK: - AiAssistant with Context
@@ -135,18 +142,8 @@ final class AiService {
         guard !apiKey.isEmpty else { throw AiError.missingApiKey }
         guard !query.isEmpty else { throw AiError.emptyQuery }
 
-        let prompt = """
-            You are an expert automotive AI aiAssistant for an electric vehicle.
-
-            VEHICLE CONTEXT:
-            \(telemetryContext)
-
-            USER QUERY:
-            \(query)
-
-            Provide a clear, concise answer based on the context above.
-            """
-        return try await sendPrompt(provider: aiProvider, apiKey: apiKey, prompt: prompt)
+        let prompt = AiPrompts.assistant(query: query, telemetryContext: telemetryContext)
+        return try await send(prompt, provider: aiProvider, apiKey: apiKey)
     }
 
     // MARK: - Validation
@@ -158,61 +155,22 @@ final class AiService {
         return !res.isEmpty
     }
 
-    // MARK: - Post-Trip Briefing Prompt
+    // MARK: - Prompt data builders
+    //
+    // These assemble the *figures*; the wording lives in AiPrompts so it can be kept
+    // identical to Android.
 
-    private func buildPostTripBriefingPrompt(
-        trip: TripEntity,
-        recentTrips: [TripEntity],
-        telemetrySamples: [SampleEntity],
-        efficiencyBaseline: Double?,
-        vehicleName: String,
-        usableBatteryKwh: Double,
-        countryCode: String?
-    ) -> String {
-        let tripJson = buildTripJson(trip: trip, samples: telemetrySamples)
-        let recentSummary = buildRecentTripsSummary(recentTrips: recentTrips)
-        let baselineStr = efficiencyBaseline.map { String(format: "%.1f", $0) } ?? "unknown"
-        let countryStr = countryCode.map { " for \($0)" } ?? ""
-
-        return """
-        You are an EV efficiency coach for a \(vehicleName) (\(String(format: "%.0f", usableBatteryKwh)) kWh battery).
-
-        This trip data (JSON):
-        \(tripJson)
-
-        Recent trips for comparison:
-        \(recentSummary)
-
-        Write a 3-4 sentence post-trip briefing covering:
-        1. Efficiency (kWh/100km) vs the driver's average (\(baselineStr) kWh/100km)
-        2. Regen score estimate (how much energy was recovered)
-        3. Cost estimate: kWh used × typical local electricity tariff vs equivalent petrol cost\(countryStr), in local currency
-        4. One personalized efficiency tip based on this trip
-        Be concise, friendly, and specific to THIS trip's data.
-        """
-    }
-
-    // MARK: - Digest Prompt
-
-    private func buildDigestPrompt(trips: [TripEntity], period: DigestPeriod, vehicleName: String, countryCode: String?) -> String {
+    private func buildDigestStats(trips: [TripEntity]) -> String {
         let totalDistance = trips.reduce(0) { $0 + $1.distanceKm }
         let totalEnergy = trips.reduce(0) { $0 + $1.energyUsedKwh }
-        let avgConsumption = totalEnergy > 0 ? totalDistance / totalEnergy * 100 : 0
-        let tripCount = trips.count
+        // kWh per 100 km: energy over distance. This was inverted, feeding the model
+        // ~590 kWh/100km for trips averaging 17 — and the prompt prices that figure.
+        let avgConsumption = totalDistance > 0 ? totalEnergy / totalDistance * 100 : 0
         let avgSpeed = trips.compactMap { avgSpeedValue(from: $0) }.reduce(0, +) / max(Float(trips.count), 1)
         let totalDurationMinutes = trips.compactMap { durationMinutes(from: $0) }.reduce(0, +)
 
-        // Best efficiency day
-        let dayGrouped = Dictionary(grouping: trips) { Calendar.current.startOfDay(for: $0.startTime) }
-        let bestDay = dayGrouped.max { a, b in
-            let aConsumption = a.value.compactMap { $0.avgConsumptionKwhPer100km }.reduce(0, +) / max(Float(a.value.count), 1)
-            let bConsumption = b.value.compactMap { $0.avgConsumptionKwhPer100km }.reduce(0, +) / max(Float(b.value.count), 1)
-            return aConsumption > bConsumption
-        }
-
-        let periodLabel = period == .weekly ? "week" : "month"
         var statsLines = [
-            "Trips: \(tripCount)",
+            "Trips: \(trips.count)",
             "Total distance: \(String(format: "%.1f", totalDistance)) km",
             "Total energy: \(String(format: "%.1f", totalEnergy)) kWh",
         ]
@@ -228,43 +186,52 @@ final class AiService {
             statsLines.append("Total driving time: \(h > 0 ? "\(h)h " : "")\(m)m")
         }
 
-        // Best day
+        // Most efficient day — lowest average consumption.
+        let dayGrouped = Dictionary(grouping: trips) { Calendar.current.startOfDay(for: $0.startTime) }
+        let bestDay = dayGrouped.min { a, b in
+            dayConsumption(a.value) < dayConsumption(b.value)
+        }
         if let (day, dayTrips) = bestDay {
-            let dayConsumption = dayTrips.compactMap { $0.avgConsumptionKwhPer100km }.reduce(0, +) / max(Float(dayTrips.count), 1)
             let formatter = DateFormatter()
             formatter.setLocalizedDateFormatFromTemplate("EEEE")
-            statsLines.append("Most efficient day: \(formatter.string(from: day)) (\(String(format: "%.1f", dayConsumption)) kWh/100km)")
+            statsLines.append(
+                "Most efficient day: \(formatter.string(from: day)) "
+                    + "(\(String(format: "%.1f", dayConsumption(dayTrips))) kWh/100km)"
+            )
         }
 
-        // Efficiency trend
         if trips.count >= 3 {
             let sorted = trips.sorted { $0.startTime < $1.startTime }
-            let firstHalf = sorted.prefix(sorted.count / 2)
-            let secondHalf = sorted.suffix(sorted.count / 2)
-            let firstAvg = firstHalf.compactMap { $0.avgConsumptionKwhPer100km }.reduce(0, +) / max(Float(firstHalf.count), 1)
-            let secondAvg = secondHalf.compactMap { $0.avgConsumptionKwhPer100km }.reduce(0, +) / max(Float(secondHalf.count), 1)
+            let mid = sorted.count / 2
+            let firstAvg = dayConsumption(Array(sorted.prefix(mid)))
+            let secondAvg = dayConsumption(Array(sorted.suffix(sorted.count - mid)))
             if firstAvg > 0, secondAvg > 0 {
                 let trend = secondAvg < firstAvg ? "improving" : "declining"
-                statsLines.append("Efficiency trend: \(trend) (from \(String(format: "%.1f", firstAvg)) to \(String(format: "%.1f", secondAvg)) kWh/100km)")
+                statsLines.append(
+                    "Efficiency trend: \(trend) (from \(String(format: "%.1f", firstAvg)) "
+                        + "to \(String(format: "%.1f", secondAvg)) kWh/100km)"
+                )
             }
         }
 
-        let statsJoined = statsLines.joined(separator: "\n")
-
-        let countryStr = countryCode.map { " for \($0)" } ?? ""
-        return """
-        You are an EV driving analyst for a \(vehicleName) driver.
-
-        Summarise the driver's last \(periodLabel) with these trip stats:
-        \(statsJoined)
-
-        Write 2-3 natural sentences covering:
-        1. Total distance driven and estimated cost saved vs petrol\(countryStr), in local currency
-        2. Their most efficient day this \(periodLabel)
-        3. One notable pattern or tip
-        Be encouraging and specific to their data.
-        """
+        return statsLines.joined(separator: "\n")
     }
+
+    private func dayConsumption(_ trips: [TripEntity]) -> Float {
+        let values = trips.compactMap { $0.avgConsumptionKwhPer100km }
+        guard !values.isEmpty else { return 0 }
+        return values.reduce(0, +) / Float(values.count)
+    }
+
+    /// One row per session, matching the charging-insight rows so the digest and the
+    /// charging card describe sessions the same way.
+    private func buildChargeSessionsSummary(sessions: [ChargeSessionEntity]) -> String {
+        guard !sessions.isEmpty else { return "" }
+        var lines = ["Sessions: \(sessions.count)"]
+        lines.append(contentsOf: sessions.prefix(10).map(sessionRow))
+        return lines.joined(separator: "\n")
+    }
+
 
     // MARK: - Prompt helpers
     
@@ -349,7 +316,21 @@ final class AiService {
 
     // MARK: - Private
 
-    /// Dispatches the prompt to the selected AI provider.
+    /// Dispatches a prompt to the selected provider, using each API's own
+    /// convention: DeepSeek takes the persona as a system message, Gemini gets the
+    /// combined text. The model sees the same content either way.
+    private func send(_ prompt: AiPrompt, provider: AiProvider, apiKey: String) async throws -> String {
+        switch provider {
+        case .gemini:
+            return try await callGemini(prompt: prompt.combined, apiKey: apiKey)
+        case .deepseek:
+            return try await callDeepSeek(
+                systemPrompt: prompt.persona, userMessage: prompt.body, apiKey: apiKey
+            )
+        }
+    }
+
+    /// Dispatches a bare prompt with no persona (key validation only).
     private func sendPrompt(provider: AiProvider, apiKey: String, prompt: String) async throws -> String {
         switch provider {
         case .gemini:
@@ -457,83 +438,52 @@ final class AiService {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    private func buildChargingPrompt(sessions: [ChargeSessionEntity]) -> String {
-        var lines = [
-            "Analyse the following \(sessions.count) charging sessions for an E-GMP electric vehicle.",
-            "Identify trends such as charging speed degradation, seasonal warming effects, or changes in peak power.",
-            "",
-            "Session Data:",
-        ]
-
+    /// A session row: everything the charging prompt asks about — including the date
+    /// and pack temperature, without which "are there seasonal patterns?" is
+    /// unanswerable.
+    private func sessionRow(_ session: ChargeSessionEntity) -> String {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withFullDate]
-
-        for session in sessions {
-            let date = formatter.string(from: session.startTime)
-            let endSoc = session.endSoc.map { String(format: "%.0f%%", $0) } ?? "—"
-            let timeTo80 = session.timeTo80Percent
-            let tempStr = session.packTempStartC.map { String(format: "%.0f°C", $0) } ?? "—"
-            lines.append("- \(date): \(String(format: "%.0f", session.startSoc))% → \(endSoc), " +
-                "energy: \(String(format: "%.1f", session.energyAddedKwh)) kWh, " +
-                "peak: \(String(format: "%.1f", session.peakPowerKw)) kW, " +
-                "avg: \(String(format: "%.1f", session.avgPowerKw)) kW, " +
-                "type: \(session.chargeType), " +
-                "10-80% time: \(timeTo80), " +
-                "pack temp: \(tempStr)")
-        }
-
-        lines.append("")
-        lines.append("Summarise: Is charging speed degrading? Are there seasonal patterns? Any anomalies to flag?")
-        lines.append("Keep the response concise and focused on actionable insights for the driver.")
-
-        return lines.joined(separator: "\n")
+        let endSoc = session.endSoc.map { String(format: "%.0f%%", $0) } ?? "—"
+        let tempStr = session.packTempStartC.map { String(format: "%.0f°C", $0) } ?? "—"
+        return "- \(formatter.string(from: session.startTime)): "
+            + "\(String(format: "%.0f", session.startSoc))% → \(endSoc), "
+            + "energy: \(String(format: "%.1f", session.energyAddedKwh)) kWh, "
+            + "peak: \(String(format: "%.1f", session.peakPowerKw)) kW, "
+            + "avg: \(String(format: "%.1f", session.avgPowerKw)) kW, "
+            + "type: \(session.chargeType), "
+            + "10-80% time: \(session.timeTo80Percent), "
+            + "pack temp: \(tempStr)"
     }
 
-    private func buildBatteryReportPrompt(
-        sohHistory: [(Date, Double)],
-        voltageDeltas: [Double],
-        chargeSpeeds: [(Date, Double)]
-    ) -> String {
-        var lines = [
-            "Generate a battery health report for an E-GMP electric vehicle.",
-            "",
-        ]
+    private func buildSessionRows(sessions: [ChargeSessionEntity]) -> String {
+        sessions.map(sessionRow).joined(separator: "\n")
+    }
 
-        // SOH history
-        if !sohHistory.isEmpty {
-            lines.append("SOH (State of Health) over time:")
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withFullDate]
-            for (date, soh) in sohHistory {
-                lines.append("- \(formatter.string(from: date)): \(String(format: "%.1f", soh))%")
-            }
-        }
+    private func buildSohRows(_ history: [(Date, Double)]) -> String {
+        guard !history.isEmpty else { return "" }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        return history
+            .map { "- \(formatter.string(from: $0.0)): \(String(format: "%.1f", $0.1))%" }
+            .joined(separator: "\n")
+    }
 
-        // Voltage deltas
-        if !voltageDeltas.isEmpty {
-            let sorted = voltageDeltas.sorted()
-            lines.append("")
-            lines.append("Cell voltage deltas (mV): min=\(String(format: "%.1f", sorted.first ?? 0)), " +
-                "max=\(String(format: "%.1f", sorted.last ?? 0)), " +
-                "avg=\(String(format: "%.1f", sorted.reduce(0, +) / Double(sorted.count)))")
-        }
+    private func buildVoltageDeltaLine(_ deltas: [Double]) -> String {
+        guard !deltas.isEmpty else { return "" }
+        let sorted = deltas.sorted()
+        return "min=\(String(format: "%.1f", sorted.first ?? 0)), "
+            + "max=\(String(format: "%.1f", sorted.last ?? 0)), "
+            + "avg=\(String(format: "%.1f", sorted.reduce(0, +) / Double(sorted.count)))"
+    }
 
-        // Charge speeds
-        if !chargeSpeeds.isEmpty {
-            lines.append("")
-            lines.append("10-80% charge times over time:")
-            let formatter = ISO8601DateFormatter()
-            formatter.formatOptions = [.withFullDate]
-            for (date, minutes) in chargeSpeeds {
-                lines.append("- \(formatter.string(from: date)): \(String(format: "%.0f", minutes)) min")
-            }
-        }
-
-        lines.append("")
-        lines.append("Rate the overall battery health and highlight any degradation concerns or recommendations.")
-        lines.append("Keep the response clear and actionable.")
-
-        return lines.joined(separator: "\n")
+    private func buildChargeSpeedRows(_ speeds: [(Date, Double)]) -> String {
+        guard !speeds.isEmpty else { return "" }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withFullDate]
+        return speeds
+            .map { "- \(formatter.string(from: $0.0)): \(String(format: "%.0f", $0.1)) min" }
+            .joined(separator: "\n")
     }
 }
 

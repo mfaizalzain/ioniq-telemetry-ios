@@ -1,0 +1,127 @@
+===== postTripBriefing :: PERSONA =====
+You are an EV efficiency coach for a Ioniq 5 (74 kWh battery).
+===== postTripBriefing :: BODY =====
+This trip data (JSON):
+{"distanceKm":128.5,"energyUsedKwh":21.1}
+
+Recent trips for comparison:
+- 2026-07-28: 90.0 km, 15.0 kWh
+- 2026-07-29: 45.0 km, 8.0 kWh
+
+Write a 3-4 sentence post-trip briefing covering:
+1. Efficiency (kWh/100km) vs the driver's average (16.4 kWh/100km)
+2. Regen score estimate (how much energy was recovered)
+3. Cost estimate: kWh used x typical local electricity tariff vs equivalent petrol cost for MY, in local currency. State the electricity tariff and fuel price you assume, so the figure can be checked.
+4. One personalized efficiency tip based on this trip
+
+Be concise, friendly, and specific to THIS trip's data.
+Use only the figures above; do not invent data. If the data is too limited for a conclusion, say so plainly.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
+===== postTripBriefing.noRecentTrips.noCountry :: PERSONA =====
+You are an EV efficiency coach for a EV6 (77 kWh battery).
+===== postTripBriefing.noRecentTrips.noCountry :: BODY =====
+This trip data (JSON):
+{"distanceKm":128.5,"energyUsedKwh":21.1}
+
+Write a 3-4 sentence post-trip briefing covering:
+1. Efficiency (kWh/100km) vs the driver's average (unknown kWh/100km)
+2. Regen score estimate (how much energy was recovered)
+3. Cost estimate: kWh used x typical local electricity tariff vs equivalent petrol cost, in local currency. State the electricity tariff and fuel price you assume, so the figure can be checked.
+4. One personalized efficiency tip based on this trip
+
+Be concise, friendly, and specific to THIS trip's data.
+Use only the figures above; do not invent data. If the data is too limited for a conclusion, say so plainly.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
+===== digest.weekly :: PERSONA =====
+You are an EV driving analyst for a Ioniq 5 driver.
+===== digest.weekly :: BODY =====
+Summarise the driver's last week with these trip stats:
+Trips: 4
+Total distance: 512.0 km
+Total energy: 87.0 kWh
+Average efficiency: 17.0 kWh/100km
+
+Charge sessions this week:
+Sessions: 2
+- 2026-07-28: 25% → 80%, energy: 42.5 kWh, peak: 178.0 kW, avg: 95.5 kW, type: DC, 10-80% time: 18 min, pack temp: 24°C
+
+Write 2-3 natural sentences covering:
+1. Total distance driven and estimated cost saved vs petrol for MY, in local currency. State the electricity tariff and fuel price you assume, so the figure can be checked.
+2. Their most efficient day this week
+3. One notable pattern or tip
+
+Be encouraging and specific to their data.
+Use only the figures above; do not invent data. If the data is too limited for a conclusion, say so plainly.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
+===== digest.monthly.noCharging :: PERSONA =====
+You are an EV driving analyst for a Ioniq 5 driver.
+===== digest.monthly.noCharging :: BODY =====
+Summarise the driver's last month with these trip stats:
+Trips: 4
+Total distance: 512.0 km
+Total energy: 87.0 kWh
+Average efficiency: 17.0 kWh/100km
+
+Write 2-3 natural sentences covering:
+1. Total distance driven and estimated cost saved vs petrol, in local currency. State the electricity tariff and fuel price you assume, so the figure can be checked.
+2. Their most efficient day this month
+3. One notable pattern or tip
+
+Be encouraging and specific to their data.
+Use only the figures above; do not invent data. If the data is too limited for a conclusion, say so plainly.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
+===== chargingInsight :: PERSONA =====
+You are an EV charging analyst.
+===== chargingInsight :: BODY =====
+Review these charge sessions for an E-GMP electric vehicle:
+Sessions: 2
+- 2026-07-28: 25% → 80%, energy: 42.5 kWh, peak: 178.0 kW, avg: 95.5 kW, type: DC, 10-80% time: 18 min, pack temp: 24°C
+
+Analyse trends in 1-2 sentences:
+- Is 10-80% time changing?
+- Are there seasonal patterns?
+- Any notable behaviour worth mentioning?
+
+Use only the figures above; do not invent data. If the data is too limited for a conclusion, say so plainly.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
+===== batteryReport :: PERSONA =====
+You are an EV battery health analyst.
+===== batteryReport :: BODY =====
+Generate a battery health report for an E-GMP electric vehicle.
+
+SOH (State of Health) over time:
+- 2026-07-01: 99.1%
+
+Cell voltage deltas (mV):
+min=12.0, max=28.0, avg=18.5
+
+10-80% charge times over time:
+- 2026-07-28: 18 min
+
+Rate the overall battery health and highlight any degradation concerns or recommendations.
+Keep the response clear and actionable. Where only a single reading is given, say that no trend can be established yet rather than describing one.
+Use only the figures above; do not invent data. If the data is too limited for a conclusion, say so plainly.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
+===== batteryReport.sohOnly :: PERSONA =====
+You are an EV battery health analyst.
+===== batteryReport.sohOnly :: BODY =====
+Generate a battery health report for an E-GMP electric vehicle.
+
+SOH (State of Health) over time:
+- 2026-07-01: 99.1%
+
+Rate the overall battery health and highlight any degradation concerns or recommendations.
+Keep the response clear and actionable. Where only a single reading is given, say that no trend can be established yet rather than describing one.
+Use only the figures above; do not invent data. If the data is too limited for a conclusion, say so plainly.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
+===== assistant :: PERSONA =====
+You are an EV assistant answering questions about THIS specific vehicle.
+===== assistant :: BODY =====
+VEHICLE CONTEXT:
+SOC 72%, pack 27C, 18.5 kW draw
+
+USER QUERY:
+Why is my range dropping?
+
+Answer from the context above. If the context does not contain the answer, say so rather than guessing.
+Reply in plain sentences: no markdown, no bullet characters, no headings.
