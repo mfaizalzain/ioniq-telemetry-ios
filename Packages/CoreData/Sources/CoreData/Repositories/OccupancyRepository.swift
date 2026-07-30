@@ -17,7 +17,13 @@ public struct OccupancySnapshot: Sendable, Equatable {
         public let availableCount: Int
         public let totalCount: Int
 
-        public var isOccupied: Bool { availableCount == 0 && totalCount > 0 }
+        /// Zero free connectors is occupied, whether or not Places also told us how
+        /// many connectors the station has. Requiring `totalCount > 0` meant a
+        /// station that reported "0 available" but omitted `connectorCount` counted
+        /// as *not* occupied and suppressed the alert for the whole stop — the
+        /// opposite of the documented rule, and out of step with Android's
+        /// `available <= 0`.
+        public var isOccupied: Bool { availableCount <= 0 }
     }
 
     /// Only stations that actually reported availability.

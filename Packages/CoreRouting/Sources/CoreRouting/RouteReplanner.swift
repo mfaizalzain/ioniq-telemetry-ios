@@ -42,7 +42,13 @@ public enum RouteGeo {
             let d = haversineKm(lat1: p.lat, lon1: p.lon, lat2: lat, lon2: lon)
             if d < bestDist { bestDist = d; bestIdx = i }
         }
-        let alongKm = totalKm * Float(bestIdx) / Float(max(points.count, 1))
+        // Over segments, not points: with n points there are n-1 segments, so the
+        // last point is the whole route. Dividing by `count` under-reported progress
+        // by a factor of (n-1)/n — 91 km of a 100 km route at the destination on an
+        // 11-point polyline, and half the route on a two-point one. Every ETA and
+        // off-route figure downstream inherited that. Matches Android's
+        // `projectAlongKm`, which divides by `points.size - 1`.
+        let alongKm = totalKm * Float(bestIdx) / Float(max(points.count - 1, 1))
         return (alongKm, Float(bestDist))
     }
 }

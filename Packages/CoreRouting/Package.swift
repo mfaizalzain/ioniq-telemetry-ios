@@ -11,6 +11,7 @@ let package = Package(
         .package(path: "../CoreDomain")
     ],
     targets: [
-        .target(name: "CoreRouting", dependencies: ["CoreDomain"])
+        .target(name: "CoreRouting", dependencies: ["CoreDomain"]),
+        .testTarget(name: "CoreRoutingTests", dependencies: ["CoreRouting"])
     ]
 )
