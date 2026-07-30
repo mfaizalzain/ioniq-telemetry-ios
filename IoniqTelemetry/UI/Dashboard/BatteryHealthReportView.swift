@@ -17,8 +17,7 @@ struct BatteryHealthReportView: View {
     private let aiService = AiService()
 
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
                 // Header — tap to expand/collapse
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -108,8 +107,7 @@ struct BatteryHealthReportView: View {
             }
             .padding(14)
         }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
+        .cardStyle(.secondary)
     }
 
     private var canUseAi: Bool {

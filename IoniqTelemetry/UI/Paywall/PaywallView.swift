@@ -79,15 +79,14 @@ struct PaywallView: View {
 // MARK: - Features
 
 private struct FeatureList: View {
-    private static let features: [(icon: String, title: String, detail: String)] = [
-        ("bell.badge", "Charger Occupancy Alerts", "Know before you arrive at a full charger"),
-        ("map", "Live Charger Availability", "Connector status on nearby chargers, with your Google key"),
-        ("calendar", "365-Day Trip History", "Up from 90 days on the free tier"),
-        ("wand.and.stars", "AI Trip Briefing", "AI-powered summary after every trip"),
-        ("calendar.badge.clock", "Weekly AI Digest", "Weekly and monthly driving summaries"),
-        ("bolt.batteryblock", "Charging Intelligence", "Charge speed trends and degradation analysis"),
-        ("brain.head.profile", "AI Assistant with Context", "Ask questions about your vehicle with real telemetry context"),
-        ("heart.text.clipboard", "Battery Health Report", "SOH tracking and battery health assessment")
+    private static let features: [(icon: String, title: String, detail: String, byok: String?)] = [
+        ("bell.badge", "Charger Occupancy Alerts", "Know before you arrive at a full charger", "Google API key"),
+        ("map", "Live Charger Availability", "Connector status on nearby chargers", "Google API key"),
+        ("calendar", "365-Day Trip History", "Up from 90 days on the free tier", nil),
+        ("wand.and.stars", "AI Trip Briefing", "AI-powered summary after every trip", "AI API key"),
+        ("calendar.badge.clock", "Weekly AI Digest", "Weekly and monthly driving summaries", "AI API key"),
+        ("brain.head.profile", "AI Assistant with Context", "Ask questions about your vehicle with real telemetry context", "AI API key"),
+        ("heart.text.clipboard", "Battery Health Report", "SOH tracking, degradation analysis, and battery health assessment", "AI API key"),
     ]
 
     var body: some View {
@@ -98,8 +97,18 @@ private struct FeatureList: View {
                         .foregroundStyle(Color.appAccent)
                         .frame(width: 24)
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(feature.title)
-                            .font(.subheadline.weight(.medium))
+                        HStack(spacing: 6) {
+                            Text(feature.title)
+                                .font(.subheadline.weight(.medium))
+                            if let byok = feature.byok {
+                                Text(byok)
+                                    .font(.caption2.weight(.bold))
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 1)
+                                    .background(Color.appAmber.opacity(0.15), in: Capsule())
+                                    .foregroundStyle(Color.appAmber)
+                            }
+                        }
                         if !feature.detail.isEmpty {
                             Text(feature.detail)
                                 .font(.caption)
@@ -177,6 +186,11 @@ private struct LegalLinks: View {
     var body: some View {
         VStack(spacing: 6) {
             Text("Pro is a one-time purchase — no subscription, nothing to renew or cancel.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .multilineTextAlignment(.center)
+
+            Text("Features marked AI API key need a key from your chosen provider (set up in Settings). Features marked Google API key need a Google Cloud key with the Places API enabled.")
                 .font(.caption2)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

@@ -21,8 +21,7 @@ struct AiAssistantChatView: View {
     }
 
     var body: some View {
-        GroupBox {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
                 // Header
                 HStack(spacing: 8) {
                     Image(systemName: "sparkles")

@@ -52,6 +52,11 @@ struct DashboardView: View {
 
                 BatteryHeroCard(viewModel: viewModel)
 
+                // Thermal tip — separate card below hero, only when relevant
+                if viewModel.thermalTip != nil {
+                    ThermalTipCard(tip: viewModel.thermalTip!, viewModel: viewModel)
+                }
+
                 // DC fast charge curve card
                 if viewModel.isDcCharging {
                     ChargeCurveCard(telemetry: viewModel.telemetry)
@@ -134,7 +139,7 @@ private struct StaleDataBanner: View {
         }
         .foregroundStyle(Color.appAmber)
         .padding(12)
-        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
+        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: .cornerSmall))
         .padding(.horizontal)
         .accessibilityElement(children: .combine)
     }
@@ -144,7 +149,6 @@ private struct StaleDataBanner: View {
 
 struct BatteryHeroCard: View {
     let viewModel: DashboardViewModel
-    @State private var showThermalTip = false
 
     private var socPercent: Float? { viewModel.socPercent }
     private var fillFraction: Float { min(max((socPercent ?? 0) / 100, 0), 1) }
@@ -162,95 +166,57 @@ struct BatteryHeroCard: View {
     }
 
     var body: some View {
-        GroupBox {
-            GeometryReader { geo in
-                ZStack(alignment: .bottomLeading) {
-                    // Fill level overlay — width = SOC percentage, bottom-anchored
-                    Rectangle()
-                        .fill(fillColor.opacity(0.18))
-                        .frame(width: max(geo.size.width * CGFloat(fillFraction), 0))
-                        .animation(.easeOut(duration: 0.8), value: fillFraction)
+        GeometryReader { geo in
+            ZStack(alignment: .bottomLeading) {
+            // Fill level overlay — width = SOC percentage, bottom-anchored
+            Rectangle()
+                .fill(fillColor.opacity(0.18))
+                .frame(width: max(geo.size.width * CGFloat(fillFraction), 0))
+                .animation(.easeOut(duration: 0.8), value: fillFraction)
 
-                    VStack(spacing: 10) {
-                        HStack(alignment: .firstTextBaseline, spacing: 1) {
-                            Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
-                                .font(.system(size: 52, weight: .bold))
-                                .tracking(-1.5)
-                            Text("%")
-                                .font(.system(size: 26, weight: .medium))
-                                .foregroundStyle(.secondary)
-                            // BMS raw SOC — only when it differs from displayed SOC
-                            if let bms = viewModel.telemetry.socBms, let display = socPercent, abs(bms - display) > 0.4 {
-                                Text("BMS \(String(format: "%.1f", bms))%")
-                                    .font(.system(size: 11, weight: .regular))
-                                    .foregroundStyle(.tertiary)
-                                    .padding(.leading, 4)
-                            }
-                            Spacer()
-                            if let range = estimatedRangeKm {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "bolt.car.fill")
-                                        .font(.caption2)
-                                    Text("Est. \(range) km")
-                                        .font(.caption.weight(.semibold))
-                                }
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(fillColor.opacity(0.15))
-                                .foregroundStyle(fillColor)
-                                .clipShape(Capsule())
-                            }
-                        }
-                        .foregroundStyle(Color.appOnSurface)
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel("State of charge")
-                        .accessibilityValue(socPercent.map { "\(Int($0.rounded())) percent" } ?? "No data")
-
-                        if viewModel.telemetry.isCharging {
-                            ChargingChip(viewModel: viewModel)
-                        }
-
-                        // Collapsible thermal tip integrated inside the hero card
-                        if let tip = viewModel.thermalTip {
-                            Button {
-                                showThermalTip.toggle()
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "thermometer.medium")
-                                        .foregroundStyle(Color.appAmber)
-                                    Text("Thermal")
-                                        .font(.caption.weight(.medium))
-                                        .foregroundStyle(Color.appAmber)
-                                    Image(systemName: showThermalTip ? "chevron.up" : "chevron.down")
-                                        .font(.caption2)
-                                        .foregroundStyle(.tertiary)
-                                }
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 6)
-                                .background(Color.appAmber.opacity(0.12))
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-
-                            if showThermalTip {
-                                Text(tip)
-                                    .font(.ioniqBody)
-                                    .foregroundStyle(.secondary)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .background(Color.appSurfaceVariant.opacity(0.5))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                            }
-                        }
+            VStack(spacing: 10) {
+                HStack(alignment: .firstTextBaseline, spacing: 1) {
+                    Text(socPercent.map { String(format: "%.0f", $0) } ?? "—")
+                        .font(.system(size: 52, weight: .bold))
+                        .tracking(-1.5)
+                    Text("%")
+                        .font(.system(size: 26, weight: .medium))
+                        .foregroundStyle(.secondary)
+                    // BMS raw SOC — only when it differs from displayed SOC
+                    if let bms = viewModel.telemetry.socBms, let display = socPercent, abs(bms - display) > 0.4 {
+                        Text("BMS \(String(format: "%.1f", bms))%")
+                            .font(.system(size: 11, weight: .regular))
+                            .foregroundStyle(.tertiary)
+                            .padding(.leading, 4)
                     }
-                    .padding(16)
+                    Spacer()
+                    if let range = estimatedRangeKm {
+                        HStack(spacing: 4) {
+                            Image(systemName: "bolt.car.fill")
+                                .font(.caption2)
+                            Text("Est. \(range) km")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(fillColor.opacity(0.15))
+                        .foregroundStyle(fillColor)
+                        .clipShape(Capsule())
+                    }
+                }
+                .foregroundStyle(Color.appOnSurface)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("State of charge")
+                .accessibilityValue(socPercent.map { "\(Int($0.rounded())) percent" } ?? "No data")
+
+                if viewModel.telemetry.isCharging {
+                    ChargingChip(viewModel: viewModel)
                 }
             }
-            .frame(minHeight: 110)
+            .padding(16)
         }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
+        .frame(minHeight: 110)
+        .cardStyle(.hero)
     }
 }
 
@@ -276,6 +242,52 @@ private struct ChargingChip: View {
     }
 }
 
+// MARK: - Thermal Tip Card
+
+/// Battery thermal status — extracted from the hero card into its own secondary
+/// card so the hero focuses on SOC and range.
+private struct ThermalTipCard: View {
+    let tip: String
+    let viewModel: DashboardViewModel
+    @State private var expanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                    expanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "thermometer.medium")
+                        .foregroundStyle(Color.appAmber)
+                    Text("Battery Temperature")
+                        .font(.subheadline.weight(.medium))
+                    if let temp = viewModel.packTempC {
+                        Text("\(temp)°C")
+                            .font(.caption.weight(.semibold))
+                    }
+                    Spacer()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                Text(tip)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+            }
+        }
+        .padding(14)
+        .cardStyle(.secondary)
+    }
+}
+
 // MARK: - Since Charge Trip Row
 
 private struct TripStatRow: View {
@@ -298,7 +310,7 @@ private struct TripStatRow: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.appSurfaceVariant.opacity(0.4), in: RoundedRectangle(cornerRadius: 8))
+        .background(Color.appSurfaceVariant.opacity(0.4), in: RoundedRectangle(cornerRadius: .cornerSmall))
         .padding(.horizontal)
     }
 }
@@ -419,7 +431,7 @@ private struct AlertBannerRow: View {
         .padding(12)
         .background(
             (alert.isCritical ? Color.appRed : Color.appAmber).opacity(0.08),
-            in: RoundedRectangle(cornerRadius: 10)
+            in: RoundedRectangle(cornerRadius: .cornerSmall)
         )
         .animation(.easeInOut, value: alert.id)
     }
@@ -442,127 +454,124 @@ private struct ChargeCurveCard: View {
     private var socPercent: Float? { telemetry.socDisplay ?? telemetry.socBms }
 
     var body: some View {
-        GroupBox {
-            VStack(spacing: 8) {
-                // Header
-                HStack {
-                    Image(systemName: "bolt.batteryblock.fill")
-                        .font(.caption)
-                    Text("DC CHARGE CURVE")
-                        .font(.ioniqCaption.weight(.medium))
-                        .ioniqStatLabel()
-                    Spacer()
-                    if let power = telemetry.powerKw {
-                        Text(String(format: "%.1f kW", abs(power)))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(Color.appGreen)
-                    }
+        VStack(spacing: 8) {
+            // Header
+            HStack {
+                Image(systemName: "bolt.batteryblock.fill")
+                    .font(.caption)
+                Text("DC CHARGE CURVE")
+                    .font(.ioniqCaption.weight(.medium))
+                    .ioniqStatLabel()
+                Spacer()
+                if let power = telemetry.powerKw {
+                    Text(String(format: "%.1f kW", abs(power)))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(Color.appGreen)
                 }
-                .foregroundStyle(.secondary)
+            }
+            .foregroundStyle(.secondary)
 
-                // Graph area
-                Canvas { context, size in
-                    let chartRect = CGRect(
-                        x: 28, y: 8,
-                        width: max(size.width - 44, 100),
-                        height: size.height - 24
-                    )
+            // Graph area
+            Canvas { context, size in
+                let chartRect = CGRect(
+                    x: 28, y: 8,
+                    width: max(size.width - 44, 100),
+                    height: size.height - 24
+                )
 
-                    guard chartRect.width > 0, chartRect.height > 0 else { return }
+                guard chartRect.width > 0, chartRect.height > 0 else { return }
 
-                    // --- Grid lines ---
-                    let gridColor = Color.appOutline.opacity(0.25)
-                    let gridPath = Path { p in
-                        // Horizontal grid at power levels
-                        for kw in stride(from: 0, through: 250, by: 50) {
-                            let y = chartRect.maxY - (CGFloat(kw) / CGFloat(Self.maxPower)) * chartRect.height
-                            p.move(to: CGPoint(x: chartRect.minX, y: y))
-                            p.addLine(to: CGPoint(x: chartRect.maxX, y: y))
-                        }
-                    }
-                    context.stroke(gridPath, with: .color(gridColor), style: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
-
-                    // --- Y-axis labels ---
-                    let labelFont = Font.system(size: 9, design: .monospaced).weight(.regular)
-                    let labelColor = Color.secondary
+                // --- Grid lines ---
+                let gridColor = Color.appOutline.opacity(0.25)
+                let gridPath = Path { p in
+                    // Horizontal grid at power levels
                     for kw in stride(from: 0, through: 250, by: 50) {
                         let y = chartRect.maxY - (CGFloat(kw) / CGFloat(Self.maxPower)) * chartRect.height
-                        context.draw(
-                            Text("\(kw)").font(labelFont).foregroundStyle(labelColor),
-                            at: CGPoint(x: chartRect.minX - 4, y: y),
-                            anchor: .trailing
-                        )
+                        p.move(to: CGPoint(x: chartRect.minX, y: y))
+                        p.addLine(to: CGPoint(x: chartRect.maxX, y: y))
                     }
+                }
+                context.stroke(gridPath, with: .color(gridColor), style: StrokeStyle(lineWidth: 0.5, dash: [3, 3]))
 
-                    // --- X-axis labels (SOC) ---
-                    for soc in stride(from: 10, through: 80, by: 10) {
-                        let socF = CGFloat(soc)
-                        let x = chartRect.minX + (socF - CGFloat(Self.minSoc)) / CGFloat(Self.maxSoc - Self.minSoc) * chartRect.width
-                        context.draw(
-                            Text("\(soc)%").font(labelFont).foregroundStyle(labelColor),
-                            at: CGPoint(x: x, y: chartRect.maxY + 4),
-                            anchor: .top
-                        )
-                    }
+                // --- Y-axis labels ---
+                let labelFont = Font.system(size: 9, design: .monospaced).weight(.regular)
+                let labelColor = Color.secondary
+                for kw in stride(from: 0, through: 250, by: 50) {
+                    let y = chartRect.maxY - (CGFloat(kw) / CGFloat(Self.maxPower)) * chartRect.height
+                    context.draw(
+                        Text("\\(kw)").font(labelFont).foregroundStyle(labelColor),
+                        at: CGPoint(x: chartRect.minX - 4, y: y),
+                        anchor: .trailing
+                    )
+                }
 
-                    // --- Background fill under curve ---
-                    if let currentSoc = socPercent, currentSoc >= Self.minSoc {
-                        let clipSoc = min(currentSoc, Self.maxSoc)
-                        let fillPath = Path { p in
-                            let pointsUpTo = Self.curvePoints.filter { $0.soc <= clipSoc }
-                            guard let first = pointsUpTo.first else { return }
-                            let startX = chartRect.minX + (CGFloat(first.soc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
-                            p.move(to: CGPoint(x: startX, y: chartRect.maxY))
-                            for point in pointsUpTo {
-                                let px = chartRect.minX + (CGFloat(point.soc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
-                                let py = chartRect.maxY - (CGFloat(point.kw) / CGFloat(Self.maxPower)) * chartRect.height
-                                p.addLine(to: CGPoint(x: px, y: py))
-                            }
-                            // Close back to bottom
-                            let lastX = chartRect.minX + (CGFloat(clipSoc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
-                            p.addLine(to: CGPoint(x: lastX, y: chartRect.maxY))
-                            p.closeSubpath()
-                        }
-                        context.fill(fillPath, with: .color(Color.appGreen.opacity(0.15)))
-                    }
+                // --- X-axis labels (SOC) ---
+                for soc in stride(from: 10, through: 80, by: 10) {
+                    let socF = CGFloat(soc)
+                    let x = chartRect.minX + (socF - CGFloat(Self.minSoc)) / CGFloat(Self.maxSoc - Self.minSoc) * chartRect.width
+                    context.draw(
+                        Text("\\(soc)%").font(labelFont).foregroundStyle(labelColor),
+                        at: CGPoint(x: x, y: chartRect.maxY + 4),
+                        anchor: .top
+                    )
+                }
 
-                    // --- Curve line ---
-                    let curvePath = Path { p in
-                        guard let first = Self.curvePoints.first else { return }
+                // --- Background fill under curve ---
+                if let currentSoc = socPercent, currentSoc >= Self.minSoc {
+                    let clipSoc = min(currentSoc, Self.maxSoc)
+                    let fillPath = Path { p in
+                        let pointsUpTo = Self.curvePoints.filter { $0.soc <= clipSoc }
+                        guard let first = pointsUpTo.first else { return }
                         let startX = chartRect.minX + (CGFloat(first.soc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
-                        let startY = chartRect.maxY - (CGFloat(first.kw) / CGFloat(Self.maxPower)) * chartRect.height
-                        p.move(to: CGPoint(x: startX, y: startY))
-                        for point in Self.curvePoints.dropFirst() {
+                        p.move(to: CGPoint(x: startX, y: chartRect.maxY))
+                        for point in pointsUpTo {
                             let px = chartRect.minX + (CGFloat(point.soc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
                             let py = chartRect.maxY - (CGFloat(point.kw) / CGFloat(Self.maxPower)) * chartRect.height
                             p.addLine(to: CGPoint(x: px, y: py))
                         }
+                        // Close back to bottom
+                        let lastX = chartRect.minX + (CGFloat(clipSoc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
+                        p.addLine(to: CGPoint(x: lastX, y: chartRect.maxY))
+                        p.closeSubpath()
                     }
-                    context.stroke(curvePath, with: .color(Color.appAccent), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+                    context.fill(fillPath, with: .color(Color.appGreen.opacity(0.15)))
+                }
 
-                    // --- Current SOC marker ---
-                    if let currentSoc = socPercent, currentSoc >= Self.minSoc {
-                        let clampedSoc = min(max(currentSoc, Self.minSoc), Self.maxSoc)
-                        // Interpolate power at the current SOC
-                        let currentKw = interpolatePower(at: clampedSoc)
-                        let dotX = chartRect.minX + (CGFloat(clampedSoc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
-                        let dotY = chartRect.maxY - (CGFloat(currentKw) / CGFloat(Self.maxPower)) * chartRect.height
-
-                        // Outer ring
-                        let ringRect = CGRect(x: dotX - 6, y: dotY - 6, width: 12, height: 12)
-                        context.fill(Path(ellipseIn: ringRect), with: .color(Color.appOnSurface))
-                        // Inner dot
-                        let dotRect = CGRect(x: dotX - 4, y: dotY - 4, width: 8, height: 8)
-                        context.fill(Path(ellipseIn: dotRect), with: .color(Color.appAccent))
+                // --- Curve line ---
+                let curvePath = Path { p in
+                    guard let first = Self.curvePoints.first else { return }
+                    let startX = chartRect.minX + (CGFloat(first.soc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
+                    let startY = chartRect.maxY - (CGFloat(first.kw) / CGFloat(Self.maxPower)) * chartRect.height
+                    p.move(to: CGPoint(x: startX, y: startY))
+                    for point in Self.curvePoints.dropFirst() {
+                        let px = chartRect.minX + (CGFloat(point.soc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
+                        let py = chartRect.maxY - (CGFloat(point.kw) / CGFloat(Self.maxPower)) * chartRect.height
+                        p.addLine(to: CGPoint(x: px, y: py))
                     }
                 }
-                .frame(height: 140)
-                .accessibilityLabel("DC charge curve graph")
+                context.stroke(curvePath, with: .color(Color.appAccent), style: StrokeStyle(lineWidth: 2.5, lineCap: .round, lineJoin: .round))
+
+                // --- Current SOC marker ---
+                if let currentSoc = socPercent, currentSoc >= Self.minSoc {
+                    let clampedSoc = min(max(currentSoc, Self.minSoc), Self.maxSoc)
+                    // Interpolate power at the current SOC
+                    let currentKw = interpolatePower(at: clampedSoc)
+                    let dotX = chartRect.minX + (CGFloat(clampedSoc - Self.minSoc) / CGFloat(Self.maxSoc - Self.minSoc)) * chartRect.width
+                    let dotY = chartRect.maxY - (CGFloat(currentKw) / CGFloat(Self.maxPower)) * chartRect.height
+
+                    // Outer ring
+                    let ringRect = CGRect(x: dotX - 6, y: dotY - 6, width: 12, height: 12)
+                    context.fill(Path(ellipseIn: ringRect), with: .color(Color.appOnSurface))
+                    // Inner dot
+                    let dotRect = CGRect(x: dotX - 4, y: dotY - 4, width: 8, height: 8)
+                    context.fill(Path(ellipseIn: dotRect), with: .color(Color.appAccent))
+                }
             }
-            .padding(16)
+            .frame(height: 140)
+            .accessibilityLabel("DC charge curve graph")
         }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
+        .padding(16)
+        .cardStyle(.primary)
     }
 
     /// Linearly interpolate the charge curve to find power at any SOC between 10-80%.
@@ -591,84 +600,80 @@ struct MetricTilesGrid: View {
     private var telemetry: VehicleTelemetry { viewModel.telemetry }
 
     var body: some View {
-        GroupBox {
-            VStack(spacing: 8) {
-                // Header
-                HStack {
-                    Image(systemName: "chart.bar.fill")
-                        .font(.caption)
-                    Text("LIVE METRICS")
-                        .font(.ioniqCaption.weight(.medium))
-                        .ioniqStatLabel()
-                    Spacer()
-                }
-                .foregroundStyle(.secondary)
-
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
-                    // Row 1
-                    MetricTile(
-                        icon: "bolt.fill",
-                        label: viewModel.isRegenerating ? "POWER · REGEN" : "POWER",
-                        value: DashboardViewModel.format(telemetry.powerKw, unit: "kW", decimals: 1),
-                        valueColor: viewModel.isRegenerating ? .appGreen : .appOnSurface
-                    )
-                    MetricTile(
-                        icon: "chart.line.uptrend.xyaxis",
-                        label: "CELL Δ",
-                        // cellVoltDelta is in volts; millivolts is the readable unit here.
-                        value: telemetry.cellVoltDelta.map { String(format: "%.0f mV", $0 * 1000) } ?? "—",
-                        valueColor: .cellDelta(telemetry.cellVoltDelta)
-                    )
-
-                    // Row 2
-                    MetricTile(
-                        icon: "speedometer",
-                        label: "SPEED",
-                        value: viewModel.speed(telemetry.speedKph),
-                        valueColor: .appAccent
-                    )
-                    MetricTile(
-                        icon: "battery.100percent",
-                        label: "BMS SOC",
-                        value: telemetry.socBms.map { String(format: "%.1f%%", $0) } ?? "—",
-                        valueColor: .appOnSurface
-                    )
-
-                    // Row 3
-                    MetricTile(
-                        icon: "battery.100percent.bolt",
-                        label: "HV VOLTAGE",
-                        value: DashboardViewModel.format(telemetry.packVoltage, unit: "V", decimals: 0),
-                        valueColor: .appAccent
-                    )
-                    MetricTile(
-                        icon: "heart.text.clipboard",
-                        label: "SOH",
-                        value: telemetry.soh.map { String(format: "%.0f%%", $0) } ?? "—",
-                        valueColor: .appGreen
-                    )
-
-                    // Row 4
-                    MetricTile(
-                        icon: "battery.25percent",
-                        label: "AUX BATTERY",
-                        value: DashboardViewModel.format(telemetry.auxVoltage, unit: "V", decimals: 1),
-                        // Below ~12.0 V the 12 V battery is draining faster than the DC-DC
-                        // replaces it — the classic E-GMP no-start warning.
-                        valueColor: (telemetry.auxVoltage ?? 12.6) < 12.0 ? .appAmber : .appGreen
-                    )
-                    MetricTile(
-                        icon: "thermometer.medium",
-                        label: "PACK TEMP",
-                        value: viewModel.temperature(viewModel.packTempC.map(Float.init)),
-                        valueColor: .packTemp(viewModel.packTempC)
-                    )
-                }
+        VStack(spacing: 12) {
+            // Header
+            HStack {
+                Image(systemName: "chart.bar.fill")
+                    .font(.caption)
+                Text("LIVE METRICS")
+                    .font(.ioniqCaption.weight(.medium))
+                    .ioniqStatLabel()
+                Spacer()
             }
-            .padding(12)
+            .foregroundStyle(.secondary)
+
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                // Row 1
+                MetricTile(
+                    icon: "bolt.fill",
+                    label: viewModel.isRegenerating ? "POWER · REGEN" : "POWER",
+                    value: DashboardViewModel.format(telemetry.powerKw, unit: "kW", decimals: 1),
+                    valueColor: viewModel.isRegenerating ? .appGreen : .appOnSurface
+                )
+                MetricTile(
+                    icon: "chart.line.uptrend.xyaxis",
+                    label: "CELL Δ",
+                    // cellVoltDelta is in volts; millivolts is the readable unit here.
+                    value: telemetry.cellVoltDelta.map { String(format: "%.0f mV", $0 * 1000) } ?? "—",
+                    valueColor: .cellDelta(telemetry.cellVoltDelta)
+                )
+
+                // Row 2
+                MetricTile(
+                    icon: "speedometer",
+                    label: "SPEED",
+                    value: viewModel.speed(telemetry.speedKph),
+                    valueColor: .appAccent
+                )
+                MetricTile(
+                    icon: "battery.100percent",
+                    label: "BMS SOC",
+                    value: telemetry.socBms.map { String(format: "%.1f%%", $0) } ?? "—",
+                    valueColor: .appOnSurface
+                )
+
+                // Row 3
+                MetricTile(
+                    icon: "battery.100percent.bolt",
+                    label: "HV VOLTAGE",
+                    value: DashboardViewModel.format(telemetry.packVoltage, unit: "V", decimals: 0),
+                    valueColor: .appAccent
+                )
+                MetricTile(
+                    icon: "heart.text.clipboard",
+                    label: "SOH",
+                    value: telemetry.soh.map { String(format: "%.0f%%", $0) } ?? "—",
+                    valueColor: .appGreen
+                )
+
+                // Row 4
+                MetricTile(
+                    icon: "battery.25percent",
+                    label: "AUX BATTERY",
+                    value: DashboardViewModel.format(telemetry.auxVoltage, unit: "V", decimals: 1),
+                    // Below ~12.0 V the 12 V battery is draining faster than the DC-DC
+                    // replaces it — the classic E-GMP no-start warning.
+                    valueColor: (telemetry.auxVoltage ?? 12.6) < 12.0 ? .appAmber : .appGreen
+                )
+                MetricTile(
+                    icon: "thermometer.medium",
+                    label: "PACK TEMP",
+                    value: viewModel.temperature(viewModel.packTempC.map(Float.init)),
+                    valueColor: .packTemp(viewModel.packTempC)
+                )
+            }
         }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
+        .cardStyle(.primary)
     }
 }
 
@@ -681,40 +686,36 @@ struct TirePressureVisualizerCard: View {
     private static let lowPressureKpa: Float = 220
 
     var body: some View {
-        GroupBox {
-            VStack(spacing: 8) {
-                HStack {
-                    Image(systemName: "tire")
-                    Text("TIRE PRESSURE")
-                        .font(.ioniqCaption.weight(.medium))
-                        .ioniqStatLabel()
-                    Spacer()
-                }
-                .foregroundStyle(.secondary)
-
-                let pressures = viewModel.telemetry.tirePressuresKpa
-                let temps = viewModel.telemetry.tireTempsC
-
-                HStack(spacing: 12) {
-                    tireSquare("FL", pressures?.fl, temps?.fl)
-                    Spacer()
-                    Image(systemName: "car.fill")
-                        .font(.title)
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    tireSquare("FR", pressures?.fr, temps?.fr)
-                }
-                HStack(spacing: 12) {
-                    tireSquare("RL", pressures?.rl, temps?.rl)
-                    Spacer()
-                    Spacer()
-                    tireSquare("RR", pressures?.rr, temps?.rr)
-                }
+        VStack(spacing: 12) {
+            HStack {
+                Image(systemName: "tire")
+                Text("TIRE PRESSURE")
+                    .font(.ioniqCaption.weight(.medium))
+                    .ioniqStatLabel()
+                Spacer()
             }
-            .padding(16)
+            .foregroundStyle(.secondary)
+
+            let pressures = viewModel.telemetry.tirePressuresKpa
+            let temps = viewModel.telemetry.tireTempsC
+
+            HStack(spacing: 12) {
+                tireSquare("FL", pressures?.fl, temps?.fl)
+                Spacer()
+                Image(systemName: "car.fill")
+                    .font(.title)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                tireSquare("FR", pressures?.fr, temps?.fr)
+            }
+            HStack(spacing: 12) {
+                tireSquare("RL", pressures?.rl, temps?.rl)
+                Spacer()
+                Spacer()
+                tireSquare("RR", pressures?.rr, temps?.rr)
+            }
         }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
+        .cardStyle(.primary)
     }
 
     private func tireSquare(_ label: String, _ kpa: Float?, _ tempC: Float?) -> some View {
@@ -753,10 +754,10 @@ struct TirePressureVisualizerCard: View {
         .padding(8)
         .background(statusColor.opacity(0.10))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: .cornerSmall)
                 .stroke(statusColor.opacity(0.3), lineWidth: 1)
         )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: .cornerSmall))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(label) tire")
         .accessibilityValue(

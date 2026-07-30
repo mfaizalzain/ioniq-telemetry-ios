@@ -174,6 +174,55 @@ public extension UIColor {
     }
 }
 
+// MARK: - Card Hierarchy
+
+/// Card elevation levels for visual hierarchy. Use the lowest level that
+/// communicates the content's importance.
+public enum CardLevel {
+    /// Hero content — SOC card, plan summary. Elevated with shadow + accent border.
+    case hero
+    /// Primary content — metric tiles, tire pressure. Standard surface.
+    case primary
+    /// Secondary content — AI cards, digest. Recessed, lighter material.
+    case secondary
+}
+
+public extension View {
+    /// Applies card styling based on hierarchy level.
+    func cardStyle(_ level: CardLevel) -> some View {
+        modifier(CardStyleModifier(level: level))
+    }
+}
+
+private struct CardStyleModifier: ViewModifier {
+    let level: CardLevel
+    
+    func body(content: Content) -> some View {
+        switch level {
+        case .hero:
+            content
+                .background(Color.appSurface)
+                .clipShape(RoundedRectangle(cornerRadius: .cornerLarge))
+                .overlay(
+                    RoundedRectangle(cornerRadius: .cornerLarge)
+                        .stroke(Color.appAccent.opacity(0.2), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.2), radius: 8, x: 0, y: 4)
+                .padding(.horizontal)
+        case .primary:
+            content
+                .background(Color.appSurface)
+                .clipShape(RoundedRectangle(cornerRadius: .cornerMedium))
+                .padding(.horizontal)
+        case .secondary:
+            content
+                .background(Color.appSurface.opacity(0.7))
+                .clipShape(RoundedRectangle(cornerRadius: .cornerMedium))
+                .padding(.horizontal)
+        }
+    }
+}
+
 public extension Color {
     static let appBackground = Color(uiColor: .appBackground)
     static let appSurface = Color(uiColor: .appSurface)
@@ -185,4 +234,16 @@ public extension Color {
     static let appGreen = Color(uiColor: .appGreen)
     static let appAmber = Color(uiColor: .appAmber)
     static let appRed = Color(uiColor: .appRed)
+}
+
+// MARK: - Corner radius constants
+
+/// Three-tier corner radius system matching CardLevel hierarchy.
+public extension CGFloat {
+    /// Small radius — pills, chips, inline badges (tire indicator dot, stat pill).
+    static let cornerSmall: CGFloat = 8
+    /// Medium radius — standard cards, buttons, input fields (MetricTiles, AI cards).
+    static let cornerMedium: CGFloat = 12
+    /// Large radius — hero cards, sheets, modals (BatteryHeroCard, sheet presentations).
+    static let cornerLarge: CGFloat = 16
 }

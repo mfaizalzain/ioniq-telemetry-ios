@@ -24,8 +24,7 @@ struct AIDigestSection: View {
     private let aiService = AiService()
     private let countryCode = Locale.current.region?.identifier
     var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 10) {
                 // Header — tap to expand/collapse
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
@@ -114,8 +113,7 @@ struct AIDigestSection: View {
             }
             .padding(12)
         }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
+        .cardStyle(.secondary)
         .onChange(of: selectedPeriod) { _, newPeriod in
             if expanded && newPeriod != lastFetchedPeriod {
                 Task { await loadDigest() }
