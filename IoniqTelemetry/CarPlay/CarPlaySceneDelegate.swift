@@ -23,6 +23,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
             )
             self.coordinator = coordinator
             coordinator.start()
+            CarPlayConnectionMonitor.shared.setConnected(true)
         }
     }
 
@@ -33,6 +34,7 @@ final class CarPlaySceneDelegate: UIResponder, CPTemplateApplicationSceneDelegat
         Task { @MainActor in
             coordinator?.stop()
             coordinator = nil
+            CarPlayConnectionMonitor.shared.setConnected(false)
         }
     }
 }

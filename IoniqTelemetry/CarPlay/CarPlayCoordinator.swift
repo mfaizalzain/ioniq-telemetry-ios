@@ -41,6 +41,7 @@ final class CarPlayCoordinator {
         selectedIndex: NSNotFound
     )
     private let tripsTemplate = CPListTemplate(title: "Trips", sections: [])
+    private let planTemplate = CPListTemplate(title: "My Plan", sections: [])
 
     private var telemetry = VehicleTelemetry()
     private var connectionState: ObdConnectionState = .disconnected
@@ -56,6 +57,17 @@ final class CarPlayCoordinator {
     private var fetchedChargers: [Charger] = []
     private var lastOrigin: LatLon?
 
+    /// Latest active trip plan, so the plan tab can be rebuilt from the
+    /// subscription without re-subscribing.
+    private var lastPlan: TripPlan?
+
+    /// First plan stop's charger id that already got a "may be full" alert.
+    /// Guards against re-alerting on every poll cycle.
+    private var lastAlertedStopId: String?
+
+    /// Sparse occupancy poller — Places bills per request against the user's key.
+    private var occupancyTimer: Timer?
+
     init(interfaceController: CPInterfaceController, services: AppServices) {
         self.interfaceController = interfaceController
         self.services = services
@@ -68,6 +80,7 @@ final class CarPlayCoordinator {
             statusTemplate,
             chargingTemplate,
             chargersTemplate,
+            planTemplate,
             tripsTemplate
         ])
         interfaceController.setRootTemplate(tabBar, animated: true, completion: nil)
@@ -90,11 +103,27 @@ final class CarPlayCoordinator {
             }
             .store(in: &cancellables)
 
+        services.activePlan.activePlan
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] plan in
+                guard let self else { return }
+                self.lastPlan = plan
+                // A cleared plan means a fresh journey; the next plan may reuse
+                // the same charger, and it deserves its own alert.
+                if plan == nil { self.lastAlertedStopId = nil }
+                self.reloadPlan()
+            }
+            .store(in: &cancellables)
+
+        startOccupancyTimer()
+
         Task { await loadChargers() }
     }
 
     func stop() {
         cancellables.removeAll()
+        occupancyTimer?.invalidate()
+        occupancyTimer = nil
     }
 
     private func onTelemetry(_ sample: VehicleTelemetry) {
@@ -283,6 +312,83 @@ final class CarPlayCoordinator {
         tripsTemplate.updateSections([
             CPListSection(items: items.isEmpty ? [CPListItem(text: "No trips yet", detailText: nil)] : items)
         ])
+    }
+
+    // MARK: - Plan
+
+    private func reloadPlan() {
+        guard let plan = lastPlan else {
+            let placeholder = CPListItem(text: "Plan a trip on your phone", detailText: nil)
+            placeholder.isEnabled = false
+            planTemplate.updateSections([CPListSection(items: [placeholder])])
+            return
+        }
+
+        var items: [CPListItem] = []
+        for (index, stop) in plan.stops.enumerated() {
+            let item = CPListItem(
+                text: "\(index + 1). \(stop.charger.name)",
+                detailText: String(
+                    format: "%.1f km away · arrive %.0f%% · charge %d min · depart %.0f%%",
+                    stop.distanceFromOriginKm,
+                    stop.arrivalSoc,
+                    stop.chargeMinutes,
+                    stop.departureSoc
+                )
+            )
+            // Same as trips: nothing actionable while driving.
+            item.isEnabled = false
+            items.append(item)
+        }
+        let destination = CPListItem(
+            text: "Destination",
+            detailText: String(format: "%.1f km", plan.totalDistanceKm)
+        )
+        destination.isEnabled = false
+        items.append(destination)
+
+        planTemplate.updateSections([CPListSection(items: items)])
+    }
+
+    // MARK: - Occupancy
+
+    /// Polls the first plan stop's surroundings every few minutes. Places bills
+    /// per request against the user's own key, so this stays sparse — once every
+    /// 4 minutes, and the check itself no-ops without a plan or an API key.
+    private func startOccupancyTimer() {
+        occupancyTimer = Timer.scheduledTimer(withTimeInterval: 4 * 60, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.checkOccupancy()
+            }
+        }
+    }
+
+    private func checkOccupancy() {
+        guard let plan = lastPlan,
+              let first = plan.stops.first,
+              let apiKey = services.userPreferences.googleMapsApiKey,
+              !apiKey.isEmpty else { return }
+        guard first.charger.id != lastAlertedStopId else { return }
+
+        Task { [weak self] in
+            guard let self else { return }
+            guard let snapshot = try? await self.services.occupancy.occupancyNear(
+                LatLon(lat: first.charger.lat, lon: first.charger.lon),
+                radiusM: 800,
+                apiKey: apiKey
+            ), snapshot.allOccupied else { return }
+
+            self.lastAlertedStopId = first.charger.id
+            let distance = String(format: "%.1f km", first.distanceFromOriginKm)
+            let alert = CPAlertTemplate(
+                titleVariants: ["Charger may be full"],
+                detailText: "\(first.charger.name) is \(distance) away and nearby stations are occupied.",
+                actions: [CPAlertAction(title: "OK", style: .default, handler: { [weak self] _ in
+                    self?.interfaceController.dismissTemplate(animated: true, completion: nil)
+                })]
+            )
+            self.interfaceController.presentTemplate(alert, animated: true)
+        }
     }
 
     // MARK: - Formatting
