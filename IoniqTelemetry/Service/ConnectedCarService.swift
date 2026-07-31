@@ -57,6 +57,12 @@ final class ConnectedCarService {
     /// rather than idle. The adapter answers nothing, but nothing declares a drop,
     /// so without this the app waits for a manual disconnect that may never come.
     private static let sessionDead: TimeInterval = 120
+    /// A trip whose frames stopped arriving this long ago is over, even when the
+    /// app was suspended and neither the frame-driven idle end nor the supervisor
+    /// got to run. Deliberately longer than `DriveMonitor.tripIdleEnd` (5 min),
+    /// which keeps working while frames or supervisor ticks flow: this is the
+    /// backstop for a frozen process, and 10 minutes of silence is unambiguous.
+    private static let tripIdleEnd: TimeInterval = 10 * 60
     /// Reconnect backoff, mirroring Android's `RECONNECT_BACKOFF_MS`.
     private static let reconnectBackoff: [TimeInterval] = [5, 10, 30, 60]
 
@@ -131,6 +137,12 @@ final class ConnectedCarService {
             .store(in: &cancellables)
 
         startSupervisor()
+
+        // Defensive: an orphaned trip can only survive in memory across a
+        // background/foreground cycle, not a relaunch, so this is usually a
+        // no-op — but a re-entered start() with a stale session flagged should
+        // not keep the old trip open either.
+        finalizeStaleTripIfNeeded()
     }
 
     func stop() {
@@ -280,6 +292,32 @@ final class ConnectedCarService {
         }
     }
 
+    /// Resume hook, called from the SwiftUI scenePhase change when the app
+    /// becomes active again.
+    func appDidBecomeActive() {
+        finalizeStaleTripIfNeeded()
+    }
+
+    /// Ends a trip whose frames stopped arriving long ago.
+    ///
+    /// `DriveMonitor`'s five-minute idle end advances on frames (or supervisor
+    /// ticks), and when iOS suspends the app — car parked, bus silent, screen
+    /// off — the supervisor Task freezes with everything else. Without this the
+    /// trip stays "in progress" until the user manually disconnects. This is
+    /// the backstop: called on resume and service start, it closes any active
+    /// trip that has seen no decoded frame for `tripIdleEnd`, then resets the
+    /// monitor so the next drive starts clean instead of resuming a dead
+    /// session (the monitor's `.end` can only fire from a frame).
+    private func finalizeStaleTripIfNeeded(now: Date = Date()) {
+        guard driveMonitor.tripActive, isTripActive else { return }
+        let stale = lastFrameAt.map { now.timeIntervalSince($0) > Self.tripIdleEnd } ?? true
+        guard stale else { return }
+        finalizeActiveTrip()
+        driveMonitor.reset()
+        parkedEvaluator.reset()
+        parkedState = .unknown
+    }
+
     // MARK: - Pipeline
 
     private func consume(_ raw: VehicleTelemetry) {
@@ -385,7 +423,7 @@ final class ConnectedCarService {
         position: LatLon?,
         telemetry: VehicleTelemetry
     ) async {
-        let liveSoc = telemetry.socDisplay ?? telemetry.socBms
+        let liveSoc = telemetry.socDisplay ?? telemetry.soCBms
         let busy = "All \(alert.statusedStations) chargers with live status near "
             + "\(alert.stopName) are busy — about \(alert.etaMinutes) min ahead."
 
@@ -400,7 +438,7 @@ final class ConnectedCarService {
         }
 
         if let reroute = await computeReroute(
-            plan: plan, routePoints: routePoints, position: position,
+            plan, plan, routePoints: routePoints, position: position,
             liveSoc: liveSoc, occupiedChargerId: alert.occupiedChargerId,
             telemetry: telemetry
         ) {
@@ -429,7 +467,7 @@ final class ConnectedCarService {
     /// Re-solves the remaining route from here, on the current charge, excluding the
     /// stop that is full. Mirrors Android's `computeReroute`.
     private func computeReroute(
-        plan: TripPlan,
+        plan, plan,
         routePoints: [LatLon],
         position: LatLon,
         liveSoc: Float,
@@ -452,9 +490,9 @@ final class ConnectedCarService {
 
         let packTemp = telemetry.moduleTempsC.max().map(Float.init) ?? 25
         let params = SolverParams(
-            usableKwh: Double(Ioniq5Constants.usableKwhForProfile(
+            usableKwh: Double(Ioniq5Constants.usableKwhForProfile({
                 prefs.activeProfileId, customKwh: prefs.customUsableBatteryKwh
-            )),
+            })),
             startSocPercent: liveSoc,
             reserveSocPercent: prefs.reserveSocPercent,
             arrivalReservePercent: prefs.targetArrivalSocPercent,
@@ -462,7 +500,7 @@ final class ConnectedCarService {
             priceWeight: prefs.priceWeight
         )
 
-        return routeReplanner.reroute(
+        return routeReplanner.reoute(
             currentPosition: position,
             liveSocPercent: liveSoc,
             plan: plan,
@@ -487,6 +525,14 @@ final class ConnectedCarService {
         case .none:
             break
         case .start:
+            // Defensive: `DriveMonitor` only emits `.start` from a non-active
+            // state, so a trip still flagged here means an earlier one never got
+            // its `.end` (normally the idle end or the resume hook closes it
+            // first). Finalize it before opening the new one so two drives
+            // never merge into a single log entry.
+            if driveMonitor.tripActive, isTripActive {
+                finalizeActiveTrip()
+            }
             isTripActive = true
             do {
                 try services.tripLog.startTrip(telemetry: telemetry)

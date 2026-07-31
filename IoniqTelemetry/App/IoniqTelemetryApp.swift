@@ -11,6 +11,8 @@ struct IoniqTelemetryApp: App {
     // Shared with the CarPlay scene so one adapter connection feeds both surfaces.
     private let appServices = AppServices.shared
 
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             AppRootView()
@@ -19,6 +21,16 @@ struct IoniqTelemetryApp: App {
                 .task {
                     await appServices.initialize()
                 }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                // While suspended, the supervisor Task freezes with the app, so a
+                // trip whose frames stopped arriving can outlive its idle end.
+                // Close it the moment we're back, before any new frames arrive.
+                Task { @MainActor in
+                    appServices.connectedCar.appDidBecomeActive()
+                }
+            }
         }
     }
 }

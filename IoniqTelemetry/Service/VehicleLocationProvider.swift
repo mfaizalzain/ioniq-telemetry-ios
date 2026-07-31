@@ -11,15 +11,18 @@ import Foundation
 @MainActor
 final class VehicleLocationProvider: NSObject {
 
-    /// Matches the Android build's displacement filter. Larger than it sounds — a
-    /// parked car then produces no fixes at all, which is exactly what
+    /// Displacement before the GPS chip reports a new fix: ~5 m of travel per
+    /// point keeps route maps faithful through junctions and chargers, while a
+    /// parked car still produces no fixes at all — which is exactly what
     /// `DriveMonitor` relies on to tell parked from tunnel.
-    private static let distanceFilterM: CLLocationDistance = 25
+    private static let distanceFilterM: CLLocationDistance = 5
 
-    /// `BestForNavigation` is the turn-by-turn tier — it holds the GPS chip and the
-    /// sensor-fusion pipeline at full power for the whole drive. With a 25 m
-    /// displacement filter that precision is discarded before anyone reads it, so
-    /// the cheaper tier produces identical trip logs for a fraction of the draw.
+    /// `Best` is the turn-by-turn tier — it holds the GPS chip and the
+    /// sensor-fusion pipeline at full power for the whole drive, a draw that
+    /// adds up over a multi-hour session. `NearestTenMeters` under the
+    /// `.automotiveNavigation` activity type stays well below that, and with the
+    /// 5 m displacement filter it already yields a fix every few metres of
+    /// travel: the route map gains nothing from `Best` worth the battery it burns.
     private static let accuracy: CLLocationAccuracy = kCLLocationAccuracyNearestTenMeters
 
     private let manager = CLLocationManager()
@@ -69,7 +72,7 @@ final class VehicleLocationProvider: NSObject {
         // Deliberately off. When iOS pauses updates it suspends the app and never
         // resumes without significant-change or region monitoring to wake it — so a
         // twenty-minute stop at a charger ends trip logging for the rest of the
-        // drive. Leaving the session up costs little: the 25 m displacement filter
+        // drive. Leaving the session up costs little: the 5 m displacement filter
         // already suppresses fixes from a stationary car, which is the same silence
         // `DriveMonitor` reads as parked.
         manager.pausesLocationUpdatesAutomatically = false
