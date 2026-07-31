@@ -406,7 +406,7 @@ final class AiService {
         let body: [String: Any] = [
             "model": "\(deepseekModel)",
             "messages": messages,
-            "max_tokens": 1024,
+            "max_tokens": 4096,
             "temperature": 0.3
         ]
 
@@ -435,7 +435,12 @@ final class AiService {
             throw AiError.decodingError
         }
 
-        return text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw AiError.decodingError
+        }
+
+        return trimmed
     }
 
     /// A session row: everything the charging prompt asks about — including the date
