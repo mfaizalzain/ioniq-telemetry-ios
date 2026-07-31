@@ -219,14 +219,14 @@ private struct RouteBuilderCard: View {
                     }
                 }
 
-                if let msg = viewModel.statusMessage {
+                 if let msg = viewModel.statusMessage {
                     HStack(spacing: 6) {
                         ProgressView().scaleEffect(0.7)
                         Text(msg).font(.caption).foregroundStyle(.secondary)
                     }
                 }
 
-                // Distinct from `errorMessage`: the plan is usable, the charger data
+                // Distinct from errorMessage: the plan is usable, the charger data
                 // just might be stale.
                 if viewModel.chargersAreCached {
                     HStack(spacing: 4) {
@@ -372,9 +372,18 @@ private struct ItineraryTimeline: View {
 
                 Divider().padding(.vertical, 8)
 
-                // Stop cards (origin, chargers, destination)
-                ForEach(Array(plan.stops.enumerated()), id: \.offset) { i, stop in
-                    StopCard(stop: stop, index: i, totalStops: plan.stops.count, viewModel: viewModel)
+                // Stop cards (origin, chargers, destination). Rows are keyed on a
+                // stable id (charger id for charger stops) so re-solving the plan
+                // after an exclusion does not invalidate a row mid-tap.
+                let stopRows = plan.stops.enumerated().map { index, stop in
+                    StopRow(
+                        id: stop.isChargerStop ? "charger-\(stop.charger.id)" : "stop-\(index)",
+                        index: index,
+                        stop: stop
+                    )
+                }
+                ForEach(stopRows) { row in
+                    StopCard(stop: row.stop, index: row.index, totalStops: plan.stops.count, viewModel: viewModel)
                 }
             }
         }
@@ -405,6 +414,15 @@ private struct LegRow: View {
         }
         .padding(.leading, 4)
     }
+}
+
+// Stable identity for a stop card row: charger stops are keyed on their charger
+// id, plain stops on their position, so a plan re-solve never shifts identity
+// under an in-flight tap.
+private struct StopRow: Identifiable {
+    let id: String
+    let index: Int
+    let stop: TripPlan.Stop
 }
 
 private struct StopCard: View {
@@ -440,6 +458,21 @@ private struct StopCard: View {
             }
 
             Spacer()
+
+            // Direct button, not just a Menu item: fires on the first tap. Menu
+            // items can be dropped when the exclusion re-solves the plan (and the
+            // stops array changes) while the menu is dismissing.
+            if stop.isChargerStop {
+                Button {
+                    viewModel.excludeChargerAndReplan(stop.charger.id)
+                } label: {
+                    Image(systemName: "xmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Avoid this charger — re-route")
+            }
 
             Menu {
                 if stop.isChargerStop {
@@ -672,21 +705,27 @@ private struct NearbyChargersSection: View {
 private struct ChargersAlongRouteSection: View {
     let viewModel: PlanViewModel
 
+    /// Chargers still eligible for the current plan, excluded ones drop out of the
+    /// list immediately after an "exclude" tap.
+    private var visibleChargers: [RouteCharger] {
+        viewModel.lastRouteChargers.filter { !viewModel.excludedChargerIds.contains($0.charger.id) }
+    }
+
     var body: some View {
-        if !viewModel.lastRouteChargers.isEmpty {
+        if !visibleChargers.isEmpty || !viewModel.excludedChargerIds.isEmpty {
             GroupBox {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
                         Text("CHARGERS ALONG ROUTE")
                             .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
                         Spacer()
-                        Text("\(viewModel.lastRouteChargers.count) found")
+                        Text("\(visibleChargers.count) found")
                             .font(.caption).foregroundStyle(.secondary)
                     }
 
-                    ForEach(Array(zip(viewModel.lastRouteChargers.indices, viewModel.lastRouteChargers)), id: \.0) { i, rc in
+                    ForEach(Array(visibleChargers.enumerated()), id: \.element.charger.id) { i, rc in
                         ChargerAlongRouteCard(rc: rc, viewModel: viewModel)
-                        if i < viewModel.lastRouteChargers.count - 1 {
+                        if i < visibleChargers.count - 1 {
                             Divider()
                         }
                     }
@@ -736,6 +775,18 @@ private struct ChargerAlongRouteCard: View {
                 }
             }
             Spacer()
+            // Direct button, not just a Menu item: fires on the first tap (see
+            // StopCard for why Menu-only actions get dropped on re-solve).
+            Button {
+                viewModel.excludeChargerAndReplan(rc.charger.id)
+            } label: {
+                Image(systemName: "xmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Exclude from plan")
+
             Menu {
                 Button {
                     viewModel.setDestination(charger: rc.charger)
