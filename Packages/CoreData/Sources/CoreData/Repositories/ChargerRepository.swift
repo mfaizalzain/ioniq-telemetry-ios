@@ -477,7 +477,8 @@ public enum ChargerError: LocalizedError {
                 isAccessKeyRequired: nil,
                 name: entity.name
             ),
-            usageCost: entity.usageCost
+            usageCost: entity.usageCost,
+            hasLiveStatus: entity.hasLiveStatus
         )
     }
 

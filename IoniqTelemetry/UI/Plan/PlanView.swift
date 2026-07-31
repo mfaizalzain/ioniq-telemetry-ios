@@ -1,3 +1,4 @@
+import Combine
 import CoreData
 import CoreDomain
 import CoreRouting
@@ -9,6 +10,13 @@ struct PlanView: View {
     @State private var viewModel: PlanViewModel?
     @State private var showSaveTrip = false
     @State private var tripName = ""
+    /// Drive-start occupancy opt-in, asked once per drive while the car is
+    /// connected and the user has enabled occupancy alerts in Settings.
+    @State private var showOccupancyPrompt = false
+    /// Latest adapter link state; drives both the refresh-on-connect behaviour
+    /// and whether the drive-start prompt is offered at all.
+    @State private var vehicleConnected = false
+    @State private var connectionCancellable: AnyCancellable?
 
     var body: some View {
         NavigationStack {
@@ -22,10 +30,15 @@ struct PlanView: View {
                         if viewModel.canUseAi {
                             AiPlanCard(viewModel: viewModel)
                         }
-                        RouteBuilderCard(viewModel: viewModel, showSaveTrip: $showSaveTrip)
+                        RouteBuilderCard(
+                            viewModel: viewModel,
+                            showSaveTrip: $showSaveTrip,
+                            vehicleConnected: vehicleConnected,
+                            onStartDrive: startDrive
+                        )
 
                         if let plan = viewModel.plan {
-                            ItineraryTimeline(plan: plan, viewModel: viewModel, showSaveTrip: $showSaveTrip, onNavigate: { services.activePlan.setIsNavigating(true) })
+                            ItineraryTimeline(plan: plan, viewModel: viewModel, showSaveTrip: $showSaveTrip, onNavigate: startDrive)
                         }
 
                         ChargersAlongRouteSection(viewModel: viewModel)
@@ -44,7 +57,7 @@ struct PlanView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     if viewModel?.plan != nil {
                         HStack(spacing: 17) {
-                            Button { services.activePlan.setIsNavigating(true) } label: {
+                            Button { startDrive() } label: {
                                 HStack(spacing: 4) {
                                     Image(systemName: "location.fill")
                                     Text("Go").font(.caption.weight(.semibold))
@@ -63,11 +76,27 @@ struct PlanView: View {
                 if viewModel == nil {
                     viewModel = await PlanViewModel(services: services)
                 }
+                connectionCancellable = services.telemetry.connectionState
+                    .receive(on: DispatchQueue.main)
+                    .sink { vehicleConnected = ($0 == .connected) }
             }
-            .onChange(of: services.vehicleMotion?.connectionState) { _, state in
-                if state == .connected {
+            .onChange(of: vehicleConnected) { _, connected in
+                if connected {
                     Task { await viewModel?.loadNearbyChargers() }
                 }
+            }
+            .confirmationDialog("Live occupancy alerts?", isPresented: $showOccupancyPrompt, titleVisibility: .visible) {
+                Button("Enable") {
+                    services.activePlan.setOccupancyTrackingEnabled(true)
+                    services.activePlan.setIsNavigating(true)
+                }
+                Button("Not now") {
+                    services.activePlan.setOccupancyTrackingEnabled(false)
+                    services.activePlan.setIsNavigating(true)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Enable live charger occupancy tracking for this drive?")
             }
         }
         .sheet(isPresented: $showSaveTrip) {
@@ -78,13 +107,32 @@ struct PlanView: View {
 
     /// Quick-access prompts that appear below the AI input field when empty.
     private static let quickPrompt = "Find chargers near me"
+
+    /// Starts the drive. With the car connected and occupancy alerts enabled in
+    /// Settings, the driver is asked once per drive whether live occupancy
+    /// tracking should run (it bills Google Places per request); otherwise the
+    /// drive starts straight away.
+    private func startDrive() {
+        guard vehicleConnected, services.userPreferences.chargerOccupancyAlerts else {
+            services.activePlan.setIsNavigating(true)
+            return
+        }
+        showOccupancyPrompt = true
+    }
 }
 
 // MARK: - Route builder card
 
 private struct RouteBuilderCard: View {
+    @Environment(AppServices.self) private var services
     let viewModel: PlanViewModel
     @Binding var showSaveTrip: Bool
+    /// Whether the adapter is connected; the drive-start occupancy prompt is
+    /// only offered when live data is actually flowing.
+    let vehicleConnected: Bool
+    /// Runs the drive-start flow (possible occupancy opt-in prompt, then
+    /// navigation), owned by `PlanView` so both start buttons share one prompt.
+    let onStartDrive: () -> Void
 
     @State private var focusedSlot: PlanViewModel.Slot?
     @FocusState private var focusedField: PlanViewModel.Slot?
@@ -202,7 +250,7 @@ private struct RouteBuilderCard: View {
                 // Play / Stop buttons — show only on an active plan
                 if viewModel.plan != nil && !viewModel.isPlanning {
                     HStack(spacing: 12) {
-                        Button { services.activePlan.setIsNavigating(true) } label: {
+                        Button { onStartDrive() } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "play.fill")
                                 Text("Start driving").font(.caption.weight(.semibold))
@@ -592,6 +640,10 @@ private struct NearbyChargersSection: View {
                                             .foregroundStyle(.secondary)
                                     }
                                 }
+                                // Rows without a matched live-status station
+                                // carry no badge at all — chargerAvailability
+                                // only ever holds chargers flagged hasLiveStatus,
+                                // so "full" can never be implied from absence.
                                 if let status = viewModel.chargerAvailability[charger.id] {
                                     AvailabilityBadge(status: status)
                                 }

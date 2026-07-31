@@ -17,12 +17,14 @@ public final class ActivePlanHolderImpl: ActivePlanHolder, @unchecked Sendable {
     private var pendingReroutePoints: [LatLon] = []
     private let lock = NSLock()
     private let _isNavigating = CurrentValueSubject<Bool, Never>(false)
+    private let _occupancyTrackingEnabled = CurrentValueSubject<Bool, Never>(false)
 
     public var activePlan: AnyPublisher<TripPlan?, Never> { _activePlan.eraseToAnyPublisher() }
     public var routePoints: AnyPublisher<[LatLon], Never> { _routePoints.eraseToAnyPublisher() }
     public var replanAdvice: AnyPublisher<String?, Never> { _replanAdvice.eraseToAnyPublisher() }
     public var pendingReroute: AnyPublisher<TripPlan?, Never> { _pendingReroute.eraseToAnyPublisher() }
     public var isNavigating: AnyPublisher<Bool, Never> { _isNavigating.eraseToAnyPublisher() }
+    public var occupancyTrackingEnabled: AnyPublisher<Bool, Never> { _occupancyTrackingEnabled.eraseToAnyPublisher() }
 
     /// Current values for callers that need a snapshot rather than a subscription.
     public var currentPlan: TripPlan? { _activePlan.value }
@@ -30,6 +32,9 @@ public final class ActivePlanHolderImpl: ActivePlanHolder, @unchecked Sendable {
     /// Synchronous access to the navigating flag for ConnectedCarService's
     /// telemetry loop, which runs on @MainActor and needs a snapshot.
     public var currentIsNavigating: Bool { _isNavigating.value }
+    /// Synchronous access to the per-drive occupancy opt-in for CarPlay's
+    /// occupancy poller, which runs on @MainActor and needs a snapshot.
+    public var currentOccupancyTrackingEnabled: Bool { _occupancyTrackingEnabled.value }
 
     public init() {}
 
@@ -60,6 +65,10 @@ public final class ActivePlanHolderImpl: ActivePlanHolder, @unchecked Sendable {
 
     public func setIsNavigating(_ value: Bool) {
         _isNavigating.value = value
+    }
+
+    public func setOccupancyTrackingEnabled(_ value: Bool) {
+        _occupancyTrackingEnabled.value = value
     }
 
     public func setPendingReroute(_ plan: TripPlan, points: [LatLon]) {

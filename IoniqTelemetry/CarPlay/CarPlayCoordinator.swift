@@ -364,6 +364,10 @@ final class CarPlayCoordinator {
     }
 
     private func checkOccupancy() {
+        // Per-drive opt-in from the phone's drive-start prompt. Without it this
+        // poller stays silent: no Places calls (billed to the user's key), no
+        // alerts, even with a plan and a key in place.
+        guard services.activePlan.currentOccupancyTrackingEnabled else { return }
         guard let plan = lastPlan,
               let first = plan.stops.first,
               let apiKey = services.userPreferences.googleMapsApiKey,

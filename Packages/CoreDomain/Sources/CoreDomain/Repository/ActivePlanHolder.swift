@@ -23,6 +23,20 @@ public protocol ActivePlanHolder: Sendable {
     /// so they don't poll Google Places when the user is just reviewing a saved plan.
     var isNavigating: AnyPublisher<Bool, Never> { get }
 
+    /// Session-scoped consent for live charger occupancy tracking, asked on the
+    /// phone when a drive starts. CarPlay's occupancy poller is gated behind this
+    /// so it never queries Google Places (billed to the user's key) for a drive
+    /// the driver didn't opt into. Deliberately not persisted: it answers "for
+    /// this drive", not "for ever".
+    var occupancyTrackingEnabled: AnyPublisher<Bool, Never> { get }
+
+    /// Synchronous snapshot of [occupancyTrackingEnabled] for callers that need
+    /// a value rather than a subscription.
+    var currentOccupancyTrackingEnabled: Bool { get }
+
+    /// Set when the driver answers the drive-start occupancy prompt.
+    func setOccupancyTrackingEnabled(_ value: Bool)
+
     /// Set the active trip plan. Clears any prior replan advice.
     func setPlan(_ plan: TripPlan?)
 

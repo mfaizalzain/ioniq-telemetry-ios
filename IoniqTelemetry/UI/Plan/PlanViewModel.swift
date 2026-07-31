@@ -699,7 +699,16 @@ final class PlanViewModel {
                 let station = Self.normalized($0.name)
                 return station == name || station.contains(name) || name.contains(station)
             }
-            guard let hit, hit.totalCount > 0 else { continue }
+            // A matched station reported availability (stations only exist when
+            // availableCount came back), so this charger has live status even if
+            // the station omitted a total count. Rows must never present a
+            // "full" state for chargers without the flag — that state is reserved
+            // for stations that actually reported being full.
+            guard let hit else { continue }
+            if let index = nearbyChargers.firstIndex(where: { $0.id == charger.id }) {
+                nearbyChargers[index].hasLiveStatus = true
+            }
+            guard hit.totalCount > 0 else { continue }
             matched[charger.id] = ChargerAvailability(
                 available: hit.availableCount,
                 total: hit.totalCount

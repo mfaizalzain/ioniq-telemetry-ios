@@ -19,6 +19,10 @@ public final class ChargerEntity {
     //// OCM UsageType.ID, kept so access rules can be re-evaluated without a refetch.
     public var usageTypeId: Int?
     public var usageCost: String?
+    /// Pass-through of the domain model's flag. Live availability is transient,
+    /// so entities are created with false and the occupancy enrichment marks
+    /// matched chargers at display time.
+    public var hasLiveStatus: Bool = false
 
     public init(
         id: String,
@@ -35,7 +39,8 @@ public final class ChargerEntity {
         cachedAt: Date = Date(),
         isRestricted: Bool = false,
         usageTypeId: Int? = nil,
-        usageCost: String? = nil
+        usageCost: String? = nil,
+        hasLiveStatus: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -52,5 +57,6 @@ public final class ChargerEntity {
         self.isRestricted = isRestricted
         self.usageTypeId = usageTypeId
         self.usageCost = usageCost
+        self.hasLiveStatus = hasLiveStatus
     }
 }

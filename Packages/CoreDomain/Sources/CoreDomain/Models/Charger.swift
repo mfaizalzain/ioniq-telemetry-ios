@@ -28,6 +28,11 @@ public struct Charger: Sendable, Identifiable, Equatable {
     public var lastVerified: Date?
     public var isRestricted: Bool
     public var usageCost: String?
+    /// True when the occupancy enrichment matched this charger to a station that
+    /// reported live connector availability. UI must never show a "full" state
+    /// for a charger without this flag — "no data" is not "free", and it is not
+    /// "full" either.
+    public var hasLiveStatus: Bool = false
 
     public init(
         id: String,
@@ -42,7 +47,8 @@ public struct Charger: Sendable, Identifiable, Equatable {
         pricePerKwh: Float? = nil,
         lastVerified: Date? = nil,
         isRestricted: Bool = false,
-        usageCost: String? = nil
+        usageCost: String? = nil,
+        hasLiveStatus: Bool = false
     ) {
         self.id = id
         self.name = name
@@ -57,6 +63,7 @@ public struct Charger: Sendable, Identifiable, Equatable {
         self.lastVerified = lastVerified
         self.isRestricted = isRestricted
         self.usageCost = usageCost
+        self.hasLiveStatus = hasLiveStatus
     }
 }
 
