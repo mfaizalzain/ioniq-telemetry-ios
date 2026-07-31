@@ -423,7 +423,7 @@ final class ConnectedCarService {
         position: LatLon?,
         telemetry: VehicleTelemetry
     ) async {
-        let liveSoc = telemetry.socDisplay ?? telemetry.soCBms
+        let liveSoc = telemetry.socDisplay ?? telemetry.socBms
         let busy = "All \(alert.statusedStations) chargers with live status near "
             + "\(alert.stopName) are busy — about \(alert.etaMinutes) min ahead."
 
@@ -438,7 +438,7 @@ final class ConnectedCarService {
         }
 
         if let reroute = await computeReroute(
-            plan, plan, routePoints: routePoints, position: position,
+            plan: plan, routePoints: routePoints, position: position,
             liveSoc: liveSoc, occupiedChargerId: alert.occupiedChargerId,
             telemetry: telemetry
         ) {
@@ -467,7 +467,7 @@ final class ConnectedCarService {
     /// Re-solves the remaining route from here, on the current charge, excluding the
     /// stop that is full. Mirrors Android's `computeReroute`.
     private func computeReroute(
-        plan, plan,
+        plan: TripPlan,
         routePoints: [LatLon],
         position: LatLon,
         liveSoc: Float,
@@ -490,9 +490,9 @@ final class ConnectedCarService {
 
         let packTemp = telemetry.moduleTempsC.max().map(Float.init) ?? 25
         let params = SolverParams(
-            usableKwh: Double(Ioniq5Constants.usableKwhForProfile({
+            usableKwh: Double(Ioniq5Constants.usableKwhForProfile(
                 prefs.activeProfileId, customKwh: prefs.customUsableBatteryKwh
-            })),
+            )),
             startSocPercent: liveSoc,
             reserveSocPercent: prefs.reserveSocPercent,
             arrivalReservePercent: prefs.targetArrivalSocPercent,
@@ -500,7 +500,7 @@ final class ConnectedCarService {
             priceWeight: prefs.priceWeight
         )
 
-        return routeReplanner.reoute(
+        return routeReplanner.reroute(
             currentPosition: position,
             liveSocPercent: liveSoc,
             plan: plan,
