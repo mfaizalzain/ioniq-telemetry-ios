@@ -17,6 +17,7 @@ public struct LatLon: Sendable, Equatable, Hashable {
 public struct Charger: Sendable, Identifiable, Equatable {
     public var id: String
     public var name: String
+    public var address: String?
     public var lat: Double
     public var lon: Double
     public var connectors: [Connector]
@@ -31,6 +32,7 @@ public struct Charger: Sendable, Identifiable, Equatable {
     public init(
         id: String,
         name: String,
+        address: String? = nil,
         lat: Double,
         lon: Double,
         connectors: [Connector] = [],
@@ -44,6 +46,7 @@ public struct Charger: Sendable, Identifiable, Equatable {
     ) {
         self.id = id
         self.name = name
+        self.address = address
         self.lat = lat
         self.lon = lon
         self.connectors = connectors

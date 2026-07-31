@@ -287,7 +287,7 @@ public final class ChargerRepository: @unchecked Sendable {
         // The field mask decides the billing SKU. `evChargeOptions` is what makes
         // these places usable as chargers rather than pins on a map.
         request.setValue(
-            "places.id,places.displayName,places.location,places.evChargeOptions,places.businessStatus",
+            "places.id,places.displayName,places.formattedAddress,places.location,places.evChargeOptions,places.businessStatus",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
         request.httpBody = try encoder.encode(PlacesNearbyRequest(
@@ -344,6 +344,7 @@ public final class ChargerRepository: @unchecked Sendable {
         return ChargerEntity(
             id: "gp-\(id)",
             name: place.displayName?.text ?? "Charger",
+            address: place.formattedAddress,
             lat: lat,
             lon: lon,
             geohash: Geohash.encode(lat: lat, lon: lon, precision: 6),
@@ -417,9 +418,22 @@ public enum ChargerError: LocalizedError {
             name: poi.AddressInfo?.Title
         )
 
+        // Build address from OCM AddressInfo fields
+        let addressLine1 = poi.AddressInfo?.AddressLine1
+        let town = poi.AddressInfo?.Town
+        let address: String? = {
+            switch (addressLine1, town) {
+            case let (a?, t?): return "\(a), \(t)"
+            case let (a?, nil): return a
+            case let (nil, t?): return t
+            case (nil, nil): return nil
+            }
+        }()
+
         return ChargerEntity(
             id: "ocm-\(id)",
             name: poi.AddressInfo?.Title ?? "Charger",
+            address: address,
             lat: lat,
             lon: lon,
             geohash: Geohash.encode(lat: lat, lon: lon, precision: 6),
@@ -447,6 +461,7 @@ public enum ChargerError: LocalizedError {
         return Charger(
             id: entity.id,
             name: entity.name,
+            address: entity.address,
             lat: entity.lat,
             lon: entity.lon,
             connectors: connectors,
@@ -524,6 +539,7 @@ public enum ChargerError: LocalizedError {
                 let entity = ChargerEntity(
                     id: id,
                     name: name,
+                    address: nil,
                     lat: lat,
                     lon: lon,
                     geohash: Geohash.encode(lat: lat, lon: lon, precision: 6),
@@ -615,6 +631,7 @@ private struct PlacesNearbyResponse: Decodable {
 
         let id: String?
         let displayName: DisplayName?
+        let formattedAddress: String?
         let location: Location?
         let evChargeOptions: EvChargeOptions?
         let businessStatus: String?
@@ -645,6 +662,8 @@ private struct OCMPoi: Codable {
 
 private struct OCMAddressInfo: Codable {
     let Title: String?
+    let AddressLine1: String?
+    let Town: String?
     let Latitude: Double?
     let Longitude: Double?
 }

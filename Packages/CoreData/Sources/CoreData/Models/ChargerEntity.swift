@@ -5,6 +5,7 @@ import SwiftData
 public final class ChargerEntity {
     @Attribute(.unique) public var id: String
     public var name: String
+    public var address: String?
     public var lat: Double
     public var lon: Double
     public var geohash: String
@@ -15,13 +16,14 @@ public final class ChargerEntity {
     public var pricePerKwh: Float?
     public var cachedAt: Date
     public var isRestricted: Bool
-    /// OCM UsageType.ID, kept so access rules can be re-evaluated without a refetch.
+    //// OCM UsageType.ID, kept so access rules can be re-evaluated without a refetch.
     public var usageTypeId: Int?
     public var usageCost: String?
 
     public init(
         id: String,
         name: String,
+        address: String? = nil,
         lat: Double,
         lon: Double,
         geohash: String,
@@ -37,6 +39,7 @@ public final class ChargerEntity {
     ) {
         self.id = id
         self.name = name
+        self.address = address
         self.lat = lat
         self.lon = lon
         self.geohash = geohash

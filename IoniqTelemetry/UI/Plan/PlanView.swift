@@ -14,7 +14,7 @@ struct PlanView: View {
         NavigationStack {
             ScrollView {
                 if let viewModel {
-                    LazyVStack(spacing: 16) {
+                    lazyVStack(spacing: 16) {
                         if let notice = viewModel.routingNotice {
                             RoutingNoticeBar(message: notice, onDismiss: viewModel.dismissRoutingNotice)
                         }
@@ -26,557 +26,274 @@ struct PlanView: View {
 
                         if let plan = viewModel.plan {
                             ItineraryTimeline(plan: plan, viewModel: viewModel, showSaveTrip: $showSaveTrip, onNavigate: { services.activePlan.setIsNavigating(true) })
-                            ChargersAlongRouteSection(viewModel: viewModel)
                         }
 
-                        SavedTripsSection(viewModel: viewModel)
+                        ChargersAlongRouteSection(viewModel: viewModel)
                         NearbyChargersSection(viewModel: viewModel)
+
+                        Spacer(minLength: 120)
                     }
-                    .padding(.vertical)
-                } else {
-                    ProgressView()
+                    .padding(.horizontal)
                 }
             }
-            .background(Color.appBackground)
-            .navigationTitle("Plan")
-            .alert("Save this plan", isPresented: $showSaveTrip) {
-                TextField("Name", text: $tripName)
-                Button("Cancel", role: .cancel) { tripName = "" }
-                Button("Save") {
-                    let fallback = viewModel?.defaultTripName ?? "Trip"
-                    viewModel?.saveTrip(named: tripName.isEmpty ? fallback : tripName)
-                    tripName = ""
-                }
-            }
-        }
-        .task {
-            if viewModel == nil { viewModel = PlanViewModel(services: services) }
-            viewModel?.reloadSaved()
-        }
-    }
-}
-
-// MARK: - Notices
-
-private struct RoutingNoticeBar: View {
-    let message: String
-    let onDismiss: () -> Void
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "info.circle.fill")
-                .foregroundStyle(Color.appAmber)
-            Text(message)
-                .font(.caption)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer()
-            Button {
-                onDismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.caption)
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .background(Color.appSurface, in: RoundedRectangle(cornerRadius: 10))
-        .padding(.horizontal)
-    }
-}
-
-// MARK: - AI planning
-
-private struct AiPlanCard: View {
-    let viewModel: PlanViewModel
-    @State private var expanded = false
-
-    private static let quickPrompt = "Find chargers near me"
-
-    var body: some View {
-        GroupBox {
-            VStack(alignment: .leading, spacing: 12) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { expanded.toggle() }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .foregroundStyle(Color.appAccent)
-                        Text("AI Assistant")
-                            .font(.subheadline.weight(.semibold))
-                        Text(viewModel.aiProviderLabel.uppercased())
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.appAccent.opacity(0.15), in: Capsule())
-                            .foregroundStyle(Color.appAccent)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .rotationEffect(.degrees(expanded ? 180 : 0))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .buttonStyle(.plain)
-
-                if expanded {
-                    HStack(spacing: 8) {
-                        HStack(spacing: 6) {
-                            TextField("e.g. Find chargers near me, or drive to Penang…",
-                                      text: Binding(
-                                        get: { viewModel.aiInput },
-                                        set: { viewModel.aiInput = $0 }
-                                      ),
-                                      axis: .vertical)
-                            .lineLimit(1...3)
-                            .textFieldStyle(.plain)
-                            .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
-
-                            if !viewModel.aiInput.isEmpty {
-                                Button {
-                                    viewModel.clearAiInput()
-                                } label: {
-                                    Image(systemName: "xmark.circle.fill")
+            .scrollDismissesKeyboard(.interactively)
+            .refreshable { await viewModel?.loadNearbyChargers() }
+            .navigationTitle("Trip plan")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if viewModel?.plan != nil {
+                        HStack(spacing: 17) {
+                            Button { services.activePlan.setIsNavigating(true) } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "location.fill")
+                                    Text("Go").font(.caption.weight(.semibold))
                                 }
-                                .buttonStyle(.plain)
-                                .foregroundStyle(.tertiary)
-                                .accessibilityLabel("Clear")
+                                .font(.callout)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Color.appAccent, in: Capsule())
+                                .foregroundStyle(.white)
                             }
-                        }
-                        .padding(10)
-                        .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
-
-                        Button {
-                            Task { await viewModel.planFromNaturalLanguage() }
-                        } label: {
-                            if viewModel.aiBusy {
-                                ProgressView().controlSize(.small)
-                            } else {
-                                Image(systemName: "arrow.up.circle.fill").font(.title2)
-                            }
-                        }
-                        .tint(Color.appAccent)
-                        .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .accessibilityLabel("Plan this trip")
-                    }
-
-                    if viewModel.aiInput.isEmpty && !viewModel.aiBusy && viewModel.aiInterpretation == nil {
-                        Button {
-                            viewModel.aiInput = Self.quickPrompt
-                            Task { await viewModel.planFromNaturalLanguage() }
-                        } label: {
-                            Text(Self.quickPrompt)
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
-                                .background(Color.appSurface, in: Capsule())
-                        }
-                        .tint(.primary)
-                    }
-
-                    if let interpretation = viewModel.aiInterpretation {
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(Color.appGreen)
-                            Text(interpretation)
-                                .font(.caption)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-
-                    if let error = viewModel.aiError {
-                        HStack(alignment: .top, spacing: 8) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundStyle(Color.appAmber)
-                            Text(error).font(.caption)
-                            Spacer()
-                            Button {
-                                viewModel.dismissAiError()
-                            } label: {
-                                Image(systemName: "xmark").font(.caption2)
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(.secondary)
                         }
                     }
                 }
             }
-            .padding(14)
+            .task {
+                if viewModel == nil {
+                    viewModel = await PlanViewModel(services: services)
+                }
+            }
+            .onChange(of: services.vehicleMotion?.connectionState) { _, state in
+                if state == .connected {
+                    Task { await viewModel?.loadNearbyChargers() }
+                }
+            }
         }
-        .padding(.horizontal)
-        .backgroundStyle(Color.appAccent.opacity(0.08))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8)
-                .strokeBorder(Color.appAccent.opacity(0.3), lineWidth: 1)
-                .padding(.horizontal)
+        .sheet(isPresented: $showSaveTrip) {
+            SaveTripSheet(viewModel: viewModel, tripName: $tripName, showSaveTrip: $showSaveTrip)
+                .presentationDetents([.height(200)])
         }
     }
+
+    /// Quick-access prompts that appear below the AI input field when empty.
+    private static let quickPrompt = "Find chargers near me"
 }
 
-// MARK: - Route builder
+// MARK: - Route builder card
 
 private struct RouteBuilderCard: View {
     let viewModel: PlanViewModel
     @Binding var showSaveTrip: Bool
-    @State private var advancedExpanded = false
+
+    @State private var focusedSlot: PlanViewModel.Slot?
+    @FocusState private var focusedField: PlanViewModel.Slot?
 
     var body: some View {
         GroupBox {
-            VStack(spacing: 10) {
-                // Endpoint fields
-                HStack(spacing: 8) {
-                    VStack(spacing: 8) {
-                        EndpointField(viewModel: viewModel, slot: .origin,
-                                      systemImage: "location.circle", placeholder: "Origin")
-                        ForEach(Array(viewModel.waypoints.enumerated()), id: \.element.id) { index, _ in
-                            EndpointField(
-                                viewModel: viewModel,
-                                slot: .waypoint(index),
-                                systemImage: "mappin.and.ellipse",
-                                placeholder: "Stopover \(index + 1)",
-                                onRemove: { viewModel.removeWaypoint(at: index) }
-                            )
+            VStack(alignment: .leading, spacing: 10) {
+                // Origin row
+                SlotRow(
+                    slot: .origin,
+                    viewModel: viewModel,
+                    focusedSlot: $focusedSlot,
+                    focusedField: $focusedField,
+                    placeholder: "Origin",
+                    systemImage: "location.circle"
+                )
+
+                // Stopover rows
+                ForEach(Array(viewModel.waypoints.enumerated()), id: \.offset) { i, _ in
+                    HStack(spacing: 6) {
+                        SlotRow(
+                            slot: .waypoint(i),
+                            viewModel: viewModel,
+                            focusedSlot: $focusedSlot,
+                            focusedField: $focusedField,
+                            placeholder: "Stopover \(i + 1)",
+                            systemImage: "mappin.and.ellipse"
+                        )
+                        Button { viewModel.removeWaypoint(at: i) } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.tertiary)
                         }
-                        EndpointField(viewModel: viewModel, slot: .destination,
-                                      systemImage: "mappin.circle", placeholder: "Destination")
+                        .buttonStyle(.plain)
                     }
-                    Button {
-                        viewModel.swapEndpoints()
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    .tint(Color.appAccent)
-                    .accessibilityLabel("Swap origin and destination")
                 }
 
-                // Inline favourite places + Use my location / Add stopover
+                // Destination row
+                SlotRow(
+                    slot: .destination,
+                    viewModel: viewModel,
+                    focusedSlot: $focusedSlot,
+                    focusedField: $focusedField,
+                    placeholder: "Destination",
+                    systemImage: "flag.circle"
+                )
+
+                // Control rows
                 HStack {
-                    Button {
-                        Task { await viewModel.useCurrentLocation() }
-                    } label: {
-                        Label("Current location", systemImage: "location.fill").font(.caption)
+                    Button { viewModel.addWaypoint() } label: {
+                        Label("Add stop", systemImage: "plus.circle")
+                            .font(.caption)
                     }
                     Spacer()
-                    Button {
-                        viewModel.addWaypoint()
-                    } label: {
-                        Label("Add stopover", systemImage: "plus.circle").font(.caption)
-                    }
-                }
-                .tint(Color.appAccent)
-
-                // Inline favourite places chips
-                if !viewModel.favoritePlaces.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(viewModel.favoritePlaces, id: \.id) { place in
-                                Menu {
-                                    Button("Set as origin") { viewModel.selectFavorite(place, for: .origin) }
-                                    Button("Set as destination") { viewModel.selectFavorite(place, for: .destination) }
-                                    Button("Add as stopover") { viewModel.addFavoriteAsWaypoint(place) }
-                                } label: {
-                                    HStack(spacing: 5) {
-                                        Image(systemName: "star.fill").font(.caption2)
-                                        Text(place.name).font(.caption)
-                                    }
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color.appSurface, in: Capsule())
-                                }
-                                .tint(.primary)
-                            }
+                    Button { viewModel.swapEndpoints() } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.arrow.down")
+                            Text("Swap ends").font(.caption)
                         }
                     }
                 }
 
-                Divider()
+                // Charge corridor slider
+                HStack {
+                    Text("CHARGER CORRIDOR")
+                        .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                    Spacer()
+                    Text("\(Int(viewModel.corridorRadiusKm)) km").font(.caption).foregroundStyle(.secondary)
+                }
+                Slider(value: Binding(
+                    get: { viewModel.corridorRadiusKm },
+                    set: { viewModel.setCorridorRadius($0) }
+                ), in: 2...30, step: 1)
 
-                // Collapsible Advanced section (battery parameters)
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { advancedExpanded.toggle() }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "bolt.fill")
-                            .foregroundStyle(Color.appAccent)
-                            .font(.caption)
-                        Text("Advanced")
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .rotationEffect(.degrees(advancedExpanded ? 180 : 0))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                // Plan button
+                HStack {
+                    Button(viewModel.canPlan ? "Plan" : "Select both endpoints") {
+                        Task { await viewModel.plan() }
                     }
+                    .buttonStyle(.borderedProminent).disabled(!viewModel.canPlan)
+
+                    if let msg = viewModel.errorMessage {
+                        Text(msg)
+                            .font(.caption).foregroundStyle(Color.appRed)
+                    }
+                }
+
+                if let msg = viewModel.statusMessage {
+                    HStack(spacing: 6) {
+                        ProgressView().scaleEffect(0.7)
+                        Text(msg).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                // Distinct from `errorMessage`: the plan is usable, the charger data
+                // just might be stale.
+                if viewModel.chargersAreCached {
+                    HStack(spacing: 4) {
+                        Image(systemName: "exclamationmark.triangle").font(.caption)
+                        Text("Charger data couldn't be refreshed — showing saved results, which may be out of date.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                // Restore excluded chargers banner
+                if !viewModel.excludedChargerIds.isEmpty {
+                    Button {
+                        viewModel.restoreExcludedChargers()
+                    } label: {
+                        Label("Restore \(viewModel.excludedChargerIds.count) excluded chargers",
+                              systemImage: "arrow.counterclockwise.circle")
+                            .font(.caption).foregroundStyle(Color.appAccent)
+                    }
+                }
+
+                // Play / Stop buttons — show only on an active plan
+                if viewModel.plan != nil && !viewModel.isPlanning {
+                    HStack(spacing: 12) {
+                        Button { services.activePlan.setIsNavigating(true) } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "play.fill")
+                                Text("Start driving").font(.caption.weight(.semibold))
+                            }
+                            .padding(.horizontal, 20).padding(.vertical, 8)
+                            .background(Color.appAccent, in: Capsule())
+                            .foregroundStyle(.white)
+                        }
+                        Button {
+                            viewModel.clearPlan()
+                            services.activePlan.clearPlan()
+                            services.activePlan.setIsNavigating(false)
+                        } label: {
+                            Text("Cancel trip").font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+        .backgroundStyle(.ultraThinMaterial)
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Slot row
+
+private struct SlotRow: View {
+    let slot: PlanViewModel.Slot
+    let viewModel: PlanViewModel
+    @Binding var focusedSlot: PlanViewModel.Slot?
+    @FocusState.Binding var focusedField: PlanViewModel.Slot?
+    let placeholder: String
+    let systemImage: String
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: systemImage)
+                .foregroundStyle(slot == .destination ? Color.appAccent : .secondary)
+            TextField(placeholder, text: Binding(
+                get: { viewModel.endpoint(for: slot).query },
+                set: { viewModel.setQuery($0, for: slot) }
+            ))
+            .focused($focusedField, equals: slot)
+            .font(.subheadline)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .onChange(of: focusedField) {
+                focusedSlot = $1
+            }
+
+            if let selected = viewModel.endpoint(for: slot).selected {
+                if viewModel.isFavorite(selected) {
+                    Image(systemName: "star.fill")
+                        .font(.caption).foregroundStyle(Color.appAmber)
+                }
+                Button { viewModel.clearEndpoint(slot) } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-
-                if advancedExpanded {
-                    VStack(alignment: .leading, spacing: 14) {
-                        // Departure charge
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("DEPARTURE CHARGE")
-                                    .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                                if viewModel.usesLiveSoc && viewModel.liveSocAvailable {
-                                    Text("LIVE")
-                                        .font(.caption2.weight(.bold))
-                                        .padding(.horizontal, 5).padding(.vertical, 1)
-                                        .background(Color.appGreen.opacity(0.2), in: Capsule())
-                                        .foregroundStyle(Color.appGreen)
-                                }
-                                Spacer()
-                                percentBadge(viewModel.departureSoc)
-                            }
-                            Slider(
-                                value: Binding(
-                                    get: { viewModel.departureSoc },
-                                    set: { viewModel.setDepartureSoc($0) }
-                                ),
-                                in: 10...100, step: 5
-                            )
-                            .tint(Color.appAccent)
-
-                            if !viewModel.usesLiveSoc && viewModel.liveSocAvailable {
-                                Button("Use live charge from car") { viewModel.useLiveSoc() }
-                                    .font(.caption)
-                                    .tint(Color.appAccent)
-                            }
-                        }
-
-                        // Arrival reserve
-                        sliderRow("ARRIVAL RESERVE", value: Binding(
-                            get: { viewModel.arrivalReserve },
-                            set: { viewModel.arrivalReserve = $0 }
-                        ), range: 5...50)
-
-                        // Corridor radius
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                Text("CHARGER CORRIDOR")
-                                    .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                                Spacer()
-                                Text("\(Int(viewModel.corridorRadiusKm)) km")
-                                    .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 8).padding(.vertical, 3)
-                                    .background(Color.appAccent.opacity(0.18), in: Capsule())
-                                    .foregroundStyle(Color.appAccent)
-                            }
-                            Slider(
-                                value: Binding(
-                                    get: { viewModel.corridorRadiusKm },
-                                    set: { viewModel.setCorridorRadius($0) }
-                                ),
-                                in: 2...25, step: 1
-                            )
-                            .tint(Color.appAccent)
-                        }
-                    }
-                    .padding(.leading, 4)
-                }
-
-                Divider()
-
-                // Plan Route button (card footer)
-                VStack(spacing: 8) {
-                    Button {
-                        Task { await viewModel.plan() }
-                    } label: {
-                        HStack {
-                            if viewModel.isPlanning { ProgressView().tint(Color.appOnAccent) }
-                            Text(viewModel.isPlanning ? (viewModel.statusMessage ?? "Planning…") : "Plan Route")
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        // Explicit fill and label rather than `.borderedProminent` + tint:
-                        // the system pairs the bright accent with a light label, which is
-                        // unreadable on it.
-                        .foregroundStyle(viewModel.canPlan ? Color.appOnAccent : Color.appOnSurface.opacity(0.4))
-                        .background(
-                            viewModel.canPlan ? Color.appAccent : Color.appSurfaceVariant,
-                            in: RoundedRectangle(cornerRadius: 12)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!viewModel.canPlan)
-
-                    // Up front, not after a 20 s timeout: routing needs the network, and a
-                    // driver in a car park should be told that before they wait.
-                    if viewModel.isOffline {
-                        Label(
-                            "You're offline. Route planning needs a connection — this will work again once you have signal.",
-                            systemImage: "wifi.slash"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(Color.appAmber)
-                        .multilineTextAlignment(.center)
-                    }
-
-                    if let error = viewModel.errorMessage {
-                        Label(error, systemImage: "exclamationmark.triangle.fill")
-                            .font(.caption)
-                            .foregroundStyle(Color.appAmber)
-                            .multilineTextAlignment(.center)
-                    }
-
-                    // Distinct from `errorMessage`: the plan is usable, the charger data
-                    // behind it just couldn't be refreshed. Saying nothing would let a
-                    // driver route to a station that closed since the cache was written.
-                    if viewModel.chargersAreCached {
-                        Label(
-                            "Charger data couldn't be refreshed — showing saved results, which may be out of date.",
-                            systemImage: "wifi.exclamationmark"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                    }
+            } else if viewModel.endpoint(for: slot).isSearching {
+                ProgressView().scaleEffect(0.7)
+            }
+        }
+        .padding(8)
+        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
+        // Show suggestions when this slot has focus and results exist
+        .overlay(alignment: .topLeading) {
+            if focusedSlot == slot {
+                let suggestions = viewModel.endpoint(for: slot).suggestions
+                if !suggestions.isEmpty || viewModel.endpoint(for: slot).query.count >= 3 {
+                    SuggestionsDropdown(
+                        suggestions: suggestions,
+                        onSelect: { viewModel.select($0, for: slot) },
+                        onUseCurrentLocation: { Task { await viewModel.useCurrentLocation() } },
+                        favorites: viewModel.favoritePlaces,
+                        onSelectFavorite: { viewModel.selectFavorite($0, for: slot) },
+                        onAddFavoriteAsWaypoint: { viewModel.addFavoriteAsWaypoint($0) },
+                        query: viewModel.endpoint(for: slot).query,
+                        slot: slot
+                    )
+                    .offset(y: 40)
+                    .zIndex(100)
                 }
             }
-            .padding(14)
         }
-        .padding(.horizontal)
-        .backgroundStyle(.ultraThinMaterial)
-    }
-
-    private func percentBadge(_ value: Float) -> some View {
-        Text("\(Int(value))%")
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 8).padding(.vertical, 3)
-            .background(Color.appAccent.opacity(0.18), in: Capsule())
-            .foregroundStyle(Color.appAccent)
-    }
-
-    private func sliderRow(_ title: String, value: Binding<Float>, range: ClosedRange<Float>) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(title).font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                Spacer()
-                percentBadge(value.wrappedValue)
-            }
-            Slider(value: value, in: range, step: 5)
-                .tint(Color.appAccent)
-                .accessibilityValue("\(Int(value.wrappedValue)) percent")
-        }
+        .zIndex(focusedSlot == slot ? 10 : 0)
     }
 }
 
-private struct EndpointField: View {
-    let viewModel: PlanViewModel
-    let slot: PlanViewModel.Slot
-    let systemImage: String
-    let placeholder: String
-    var onRemove: (() -> Void)?
-
-    private var endpoint: PlanViewModel.Endpoint { viewModel.endpoint(for: slot) }
-
-    var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: systemImage)
-                    .foregroundStyle(.secondary)
-
-                TextField(placeholder, text: Binding(
-                    get: { endpoint.query },
-                    set: { viewModel.setQuery($0, for: slot) }
-                ))
-                .autocorrectionDisabled()
-
-                if endpoint.isSearching {
-                    ProgressView().controlSize(.small)
-                }
-                if !endpoint.query.isEmpty {
-                    Button {
-                        viewModel.clearEndpoint(slot)
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.tertiary)
-                    .accessibilityLabel("Clear \(placeholder)")
-                }
-                if let selected = endpoint.selected {
-                    Button {
-                        viewModel.toggleFavorite(selected)
-                    } label: {
-                        Image(systemName: viewModel.isFavorite(selected) ? "star.fill" : "star")
-                    }
-                    .buttonStyle(.plain)
-                    .tint(Color.appAccent)
-                    .accessibilityLabel(viewModel.isFavorite(selected) ? "Remove from favourites" : "Add to favourites")
-                }
-                if let onRemove {
-                    Button(action: onRemove) {
-                        Image(systemName: "minus.circle")
-                    }
-                    .buttonStyle(.plain)
-                    .tint(Color.appRed)
-                    .accessibilityLabel("Remove stopover")
-                }
-            }
-            .padding(10)
-            .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 10))
-
-            if !endpoint.suggestions.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(endpoint.suggestions) { place in
-                        Button {
-                            viewModel.select(place, for: slot)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(place.name).font(.subheadline)
-                                if !place.subtitle.isEmpty {
-                                    Text(place.subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.vertical, 8)
-                        }
-                        .tint(.primary)
-                        Divider()
-                    }
-                }
-                .padding(.horizontal, 10)
-            }
-        }
-    }
-}
-
-// MARK: - Itinerary
-
-/// Route elevation, led by the figure that actually drives consumption.
-///
-/// The provider's ascent and descent are cumulative over every sampled point, and
-/// the elevation model it samples is noisy — a flat trunk road across Peninsular
-/// Malaysia can total several kilometres of "climb" from metre-scale wobble that no
-/// driver would call a hill. Only the net change moves the energy estimate
-/// (`TripSolver` uses `RouteElevation.netM`), so that goes first and the cumulative
-/// pair is labelled as the rolling total it is.
-private struct ElevationLine: View {
-    let elevation: RouteElevation
-
-    private var netText: String {
-        let net = Int(elevation.netM.rounded())
-        if net > 0 { return "Net climb \(net) m" }
-        if net < 0 { return "Net descent \(abs(net)) m" }
-        return "Net level"
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(netText)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Rolling total +\(Int(elevation.ascendM)) m / −\(Int(elevation.descendM)) m")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-        }
-        .accessibilityElement(children: .combine)
-    }
-}
+// MARK: - Itinerary timeline
 
 private struct ItineraryTimeline: View {
     let plan: TripPlan
@@ -587,357 +304,254 @@ private struct ItineraryTimeline: View {
     var body: some View {
         GroupBox {
             VStack(alignment: .leading, spacing: 0) {
-                summary
-                if viewModel.hasElevationData, let elevation = plan.elevation {
-                    ElevationLine(elevation: elevation)
-                        .padding(.top, 6)
-                }
-
-                // Header actions: Save, Clear, Navigate
+                // Summary header
                 HStack {
-                    if !viewModel.excludedChargerIds.isEmpty {
-                        Button {
-                            viewModel.restoreExcludedChargers()
-                        } label: {
-                            Label(
-                                "Restore \(viewModel.excludedChargerIds.count)",
-                                systemImage: "arrow.uturn.backward"
-                            )
-                            .font(.caption)
-                        }
-                        .tint(Color.appAccent)
-                    }
-                    if let plan = viewModel.plan {
-                        Button {
-                            onNavigate()
-                            MapsNavigation.navigateTrip(plan)
-                        } label: {
-                            Label("Navigate", systemImage: "arrow.triangle.turn.up.right.circle.fill")
-                                .font(.caption.weight(.medium))
-                        }
-                        .tint(Color.appAccent)
-                    }
+                    Image(systemName: "battery.100.bolt")
+                        .foregroundStyle(Color.appAccent)
+                    Text("\(Int(plan.totalKwh)) kWh · \(plan.stops.count) stop(s)")
+                        .font(.subheadline.weight(.medium))
                     Spacer()
-                    Button {
-                        showSaveTrip = true
-                    } label: {
-                        Label("Save plan", systemImage: "star")
-                            .font(.caption)
-                    }
-                    .disabled(!viewModel.canSaveTrip)
-                    Button("Clear", role: .destructive) { viewModel.clearPlan() }
-                        .font(.caption)
-                }
-                .padding(.top, 8)
-
-                Divider().padding(.vertical, 10)
-
-                TimelineRow(
-                    icon: "flag.fill", tint: .appGreen, title: "Departure",
-                    detail: String(format: "%.0f%% charge", plan.legs.first?.startSoc ?? 0),
-                    isLast: waypointsAndStops.isEmpty
-                )
-
-                // Stopovers and charge stops share one timeline in route order —
-                // listing only the charge stops made a stopover the driver had
-                // explicitly asked for vanish from the plan.
-                ForEach(Array(waypointsAndStops.enumerated()), id: \.offset) { _, entry in
-                    switch entry {
-                    case .stop(let stop):
-                        ChargeStopRow(stop: stop, viewModel: viewModel)
-                    case .waypoint(let waypoint):
-                        TimelineRow(
-                            icon: "mappin.and.ellipse", tint: .appAccent,
-                            title: waypoint.name,
-                            detail: String(format: "Stopover · %.0f km from start", waypoint.distanceFromOriginKm),
-                            isLast: false
-                        )
+                    Button { showSaveTrip = true } label: {
+                        Image(systemName: "bookmark").font(.caption)
                     }
                 }
+                .padding(.bottom, 12)
 
-                TimelineRow(
-                    icon: "flag.checkered", tint: .appAccent, title: "Arrival",
-                    detail: String(format: "%.0f%% remaining", plan.arrivalSoc),
-                    isLast: true
-                )
+                // Legs
+                ForEach(Array(plan.legs.enumerated()), id: \.offset) { i, leg in
+                    LegRow(leg: leg, index: i, totalLegs: plan.legs.count)
+                }
+
+                Divider().padding(.vertical, 8)
+
+                // Stop cards (origin, chargers, destination)
+                ForEach(Array(plan.stops.enumerated()), id: \.offset) { i, stop in
+                    StopCard(stop: stop, index: i, totalStops: plan.stops.count, viewModel: viewModel)
+                }
             }
-            .padding(14)
         }
-        .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
     }
-
-    /// One entry per intermediate point, ordered by distance from the origin.
-    private enum TimelineEntry {
-        case waypoint(UserWaypoint)
-        case stop(ChargeStop)
-
-        var distanceKm: Float {
-            switch self {
-            case .waypoint(let waypoint): return waypoint.distanceFromOriginKm
-            case .stop(let stop): return stop.distanceFromOriginKm
-            }
-        }
-    }
-
-    private var waypointsAndStops: [TimelineEntry] {
-        (plan.userWaypoints.map(TimelineEntry.waypoint) + plan.stops.map(TimelineEntry.stop))
-            .sorted { $0.distanceKm < $1.distanceKm }
-    }
-
-    private var summary: some View {
-        HStack(spacing: 0) {
-            stat("DISTANCE", String(format: "%.0f km", plan.totalDistanceKm))
-            stat("DRIVE", formatMinutes(plan.totalDriveMinutes))
-            stat("CHARGE", formatMinutes(plan.totalChargeMinutes))
-            stat("STOPS", "\(plan.stops.count)")
-        }
-    }
-
-    private func formatMinutes(_ minutes: Int) -> String {
-        minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
-    }
-
-    private func stat(_ label: String, _ value: String) -> some View {
-        VStack(spacing: 4) {
-            Text(label).font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-            Text(value).font(.system(size: 14, weight: .semibold)).minimumScaleFactor(0.7).lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
-        .accessibilityElement(children: .combine)
-    }
 }
 
-/// A charge stop, with the re-route affordance: rejecting a stop re-solves against
-/// the cached route rather than re-requesting it, so it costs no API calls.
-private struct ChargeStopRow: View {
-    let stop: ChargeStop
-    let viewModel: PlanViewModel
-
-    private var speedBadgeText: String? {
-        let kw = stop.charger.maxPowerKw
-        if kw >= 250 { return "\(Int(kw)) kW Ultra-Fast" }
-        if kw >= 100 { return "\(Int(kw)) kW Fast" }
-        if kw > 0 { return "\(Int(kw)) kW DC" }
-        return nil
-    }
+private struct LegRow: View {
+    let leg: TripPlan.Leg
+    let index: Int
+    let totalLegs: Int
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(spacing: 8) {
             VStack(spacing: 0) {
-                Image(systemName: "bolt.fill")
-                    .font(.caption)
-                    .foregroundStyle(Color.appAccent)
-                    .frame(width: 28, height: 28)
-                    .background(Color.appAccent.opacity(0.15), in: Circle())
-                Rectangle().fill(Color.appOutline).frame(width: 2).frame(minHeight: 24)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
-                    Text(stop.charger.name).font(.subheadline.weight(.medium))
-                    if let badge = speedBadgeText {
-                        Text(badge)
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(Color.appGreen.opacity(0.18), in: Capsule())
-                            .foregroundStyle(Color.appGreen)
-                    }
-                }
-                Text(detail).font(.caption).foregroundStyle(.secondary)
-            }
-            .padding(.bottom, 12)
-            Spacer()
-            Menu {
-                Button {
-                    MapsNavigation.navigate(
-                        to: LatLon(lat: stop.charger.lat, lon: stop.charger.lon),
-                        name: stop.charger.name
-                    )
-                } label: {
-                    Label("Navigate here", systemImage: "arrow.triangle.turn.up.right.circle")
-                }
-                Button(role: .destructive) {
-                    viewModel.excludeChargerAndReplan(stop.charger.id)
-                } label: {
-                    Label("Avoid this charger — re-route", systemImage: "arrow.triangle.branch")
-                }
-            } label: {
-                Image(systemName: "ellipsis.circle").foregroundStyle(.secondary)
-            }
-            .accessibilityLabel("Options for \(stop.charger.name)")
-        }
-    }
-
-    private var detail: String {
-        var parts = [
-            String(format: "%.0f%% → %.0f%%", stop.arrivalSoc, stop.departureSoc),
-            "\(stop.chargeMinutes) min"
-        ]
-        if let price = stop.charger.pricePerKwh { parts.append(String(format: "%.2f/kWh", price)) }
-        return parts.joined(separator: " · ")
-    }
-}
-
-private struct TimelineRow: View {
-    let icon: String
-    let tint: Color
-    let title: String
-    let detail: String
-    let isLast: Bool
-
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(spacing: 0) {
-                Image(systemName: icon)
-                    .font(.caption)
-                    .foregroundStyle(tint)
-                    .frame(width: 28, height: 28)
-                    .background(tint.opacity(0.15), in: Circle())
-                if !isLast {
-                    Rectangle().fill(Color.appOutline).frame(width: 2).frame(minHeight: 24)
-                }
+                Circle().fill(Color.appAccent).frame(width: 8, height: 8)
+                Rectangle().fill(Color.appAccent.opacity(0.3)).frame(width: 2, height: 30)
+                if index == totalLegs - 1 { Circle().fill(Color.appAccent).frame(width: 8, height: 8) }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.medium))
-                Text(detail).font(.caption).foregroundStyle(.secondary)
+                Text("\(String(format: "%.0f", leg.distanceKm)) km · \(leg.estimateString)")
+                    .font(.caption.weight(.medium))
+                if leg.startSoc > 0 || leg.endSoc > 0 {
+                    Text("SOC \(Int(leg.startSoc))% → \(Int(leg.endSoc))%")
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
             }
-            .padding(.bottom, isLast ? 0 : 12)
-            Spacer()
         }
-        .accessibilityElement(children: .combine)
+        .padding(.leading, 4)
     }
 }
 
-// MARK: - Saved trips
-
-private struct SavedTripsSection: View {
+private struct StopCard: View {
+    let stop: TripPlan.Stop
+    let index: Int
+    let totalStops: Int
     let viewModel: PlanViewModel
-    @State private var savedTripsExpanded = false
-
-    private var tripCount: Int { viewModel.savedTrips.count }
-    private static let maxCollapsed = 3
 
     var body: some View {
-        if !viewModel.savedTrips.isEmpty {
-            GroupBox {
-                VStack(alignment: .leading, spacing: 10) {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { savedTripsExpanded.toggle() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Text("SAVED TRIPS (\(tripCount))")
-                                .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                            Spacer()
-                            Image(systemName: "chevron.down")
-                                .rotationEffect(.degrees(savedTripsExpanded ? 180 : 0))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
+        HStack(spacing: 8) {
+            ZStack {
+                Circle().fill(index == 0 || index == totalStops - 1 ? Color.appAccent : Color.appAccent.opacity(0.6))
+                    .frame(width: 24, height: 24)
+                Text("\(index + 1)").font(.caption.weight(.bold)).foregroundStyle(.white)
+            }
 
-                    let trips = savedTripsExpanded
-                        ? viewModel.savedTrips
-                        : Array(viewModel.savedTrips.prefix(Self.maxCollapsed))
-
-                    ForEach(trips) { trip in
-                        Button {
-                            viewModel.loadTrip(trip)
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(trip.name).font(.subheadline)
-                                    Text("\(trip.def.origin.name) → \(trip.def.destination.name)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                        .lineLimit(1)
-                                }
-                                Spacer()
-                                if !trip.def.waypoints.isEmpty {
-                                    Text("\(trip.def.waypoints.count) stop\(trip.def.waypoints.count == 1 ? "" : "s")")
-                                        .font(.caption2)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(stop.label).font(.subheadline.weight(.medium))
+                if stop.isChargerStop, let address = stop.charger.address {
+                    Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
+                if stop.isChargerStop {
+                    let kw = stop.charger.maxPowerKw
+                    HStack(spacing: 4) {
+                        if kw > 0 {
+                            Text(String(format: "%.0f kW", kw)).font(.caption.weight(.semibold))
                         }
-                        .tint(.primary)
-                        .swipeActions {
-                            Button(role: .destructive) { viewModel.deleteTrip(trip) } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
+                        if let price = stop.charger.pricePerKwh, price > 0 {
+                            Text(String(format: "$%.2f/kWh", price)).font(.caption).foregroundStyle(.secondary)
                         }
-                        .contextMenu {
-                            Button(role: .destructive) { viewModel.deleteTrip(trip) } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
-                        Divider()
-                    }
-
-                    // Show all / Show less footer
-                    if tripCount > Self.maxCollapsed {
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.2)) { savedTripsExpanded.toggle() }
-                        } label: {
-                            HStack {
-                                Spacer()
-                                Text(savedTripsExpanded ? "Show less" : "Show all \(tripCount)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                            }
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
-                .padding(14)
             }
-            .padding(.horizontal)
-            .backgroundStyle(.ultraThinMaterial)
+
+            Spacer()
+
+            Menu {
+                if stop.isChargerStop {
+                    Button {
+                        viewModel.setDestination(charger: stop.charger)
+                    } label: {
+                        Label("Navigate here", systemImage: "arrow.triangle.turn.up.right.diamond")
+                    }
+                    Button {
+                        viewModel.excludeChargerAndReplan(stop.charger.id)
+                    } label: {
+                        Label("Avoid this charger — re-route", systemImage: "arrow.triangle.branch")
+                    }
+                }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityLabel("Options for \(stop.label)")
         }
+        .padding(.vertical, 4)
     }
 }
 
-// MARK: - Nearby chargers
+// MARK: - Save trip sheet
 
-/// Tariff for a charger row.
-///
-/// Prefers the parsed per-kWh figure and falls back to whatever free-text tariff
-/// the source gave, trimmed — many entries are only ever a sentence. Google Places
-/// carries no pricing at all, so rows from that source show nothing here.
-private enum ChargerPrice {
-    static func label(for charger: Charger) -> String? {
-        if let price = charger.pricePerKwh {
-            return price == 0 ? "Free" : String(format: "%.2f/kWh", price)
+private struct SaveTripSheet: View {
+    let viewModel: PlanViewModel?
+    @Binding var tripName: String
+    @Binding var showSaveTrip: Bool
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("Save trip").font(.headline)
+            TextField("Trip name", text: $tripName)
+                .textFieldStyle(.roundedBorder)
+            HStack {
+                Button("Cancel") { showSaveTrip = false }
+                    .buttonStyle(.bordered)
+                Button("Save") {
+                    viewModel?.saveTrip(named: tripName)
+                    showSaveTrip = false
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(tripName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
         }
-        guard let cost = charger.usageCost?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !cost.isEmpty
-        else { return nil }
-        return cost.count > 24 ? String(cost.prefix(24)) + "…" : cost
+        .padding()
     }
 }
 
-/// Live connector availability. Only shown when Places actually reported it —
-/// there is no "assumed free" state.
+// MARK: - Suggestions dropdown
+
+private struct SuggestionsDropdown: View {
+    let suggestions: [PlaceResult]
+    let onSelect: (PlaceResult) -> Void
+    let onUseCurrentLocation: () -> Void
+    let favorites: [SavedPlaceEntity]
+    let onSelectFavorite: (SavedPlaceEntity) -> Void
+    let onAddFavoriteAsWaypoint: (SavedPlaceEntity) -> Void
+    let query: String
+    let slot: PlanViewModel.Slot
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Current location
+            Button {
+                onUseCurrentLocation()
+            } label: {
+                Label("Current location", systemImage: "location.circle")
+                    .font(.subheadline).padding(8)
+            }
+            .buttonStyle(.plain)
+
+            if !favorites.isEmpty {
+                Divider()
+                ForEach(favorites) { fav in
+                    HStack {
+                        Button {
+                            onSelectFavorite(fav)
+                        } label: {
+                            Label(fav.name, systemImage: "star.fill")
+                                .font(.subheadline).padding(8)
+                        }
+                        .buttonStyle(.plain)
+                        if slot != .destination && slot != .origin {
+                            Button {
+                                onAddFavoriteAsWaypoint(fav)
+                            } label: {
+                                Image(systemName: "plus.circle")
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            if !suggestions.isEmpty {
+                Divider()
+                ForEach(suggestions) { suggestion in
+                    Button {
+                        onSelect(suggestion)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(suggestion.name).font(.subheadline)
+                            if !suggestion.subtitle.isEmpty {
+                                Text(suggestion.subtitle).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(8)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .frame(maxWidth: 300)
+    }
+}
+
+// MARK: - Routing notice bar
+
+private struct RoutingNoticeBar: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "info.circle").font(.caption)
+            Text(message).font(.caption).foregroundStyle(.secondary)
+            Spacer()
+            Button(action: onDismiss) {
+                Image(systemName: "xmark").font(.caption2)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 10))
+    }
+}
+
+// MARK: - Availability badge
+
 private struct AvailabilityBadge: View {
     let status: PlanViewModel.ChargerAvailability
 
     var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(status.isFull ? Color.appRed : Color.appGreen)
-                .frame(width: 6, height: 6)
+        HStack(spacing: 3) {
+            Image(systemName: status.isFull ? "bolt.slash" : "bolt.fill")
+                .font(.caption2)
             Text(status.isFull
-                 ? "All \(status.total) in use"
-                 : "\(status.available) of \(status.total) free")
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(status.isFull ? Color.appRed : Color.appGreen)
+                 ? "All connectors busy"
+                 : "\(status.available) of \(status.total) connectors free")
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(status.isFull
-                            ? "All \(status.total) connectors in use"
-                            : "\(status.available) of \(status.total) connectors free")
+        .font(.caption2)
+        .foregroundStyle(status.isFull ? Color.appRed : .green)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(status.isFull ? Color.appRed.opacity(0.1) : Color.green.opacity(0.1), in: Capsule())
     }
 }
 
@@ -965,6 +579,9 @@ private struct NearbyChargersSection: View {
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(charger.name).font(.subheadline).lineLimit(1)
+                                if let address = charger.address {
+                                    Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                                }
                                 HStack(spacing: 6) {
                                     if let op = charger.operator {
                                         Text(op).font(.caption).foregroundStyle(.secondary).lineLimit(1)
@@ -1046,6 +663,9 @@ private struct ChargerAlongRouteCard: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(rc.charger.name)
                     .font(.subheadline.weight(.medium)).lineLimit(1)
+                if let address = rc.charger.address {
+                    Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+                }
                 HStack(spacing: 6) {
                     if rc.charger.maxPowerKw > 0 {
                         Text(String(format: "%.0f kW", rc.charger.maxPowerKw))
@@ -1093,4 +713,18 @@ private func ChargerPriceText(charger: Charger) -> String {
         return charger.usageCost!
     }
     return ""
+}
+
+// MARK: - Charger price label
+
+/// Tariff for a charger row.
+private enum ChargerPrice {
+    static func label(for charger: Charger) -> String? {
+        if let price = charger.pricePerKwh {
+            return String(format: "$%.2f/kWh", price)
+        }
+        guard let cost = charger.usageCost?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !cost.isEmpty else { return nil }
+        return cost
+    }
 }
