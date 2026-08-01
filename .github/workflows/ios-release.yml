@@ -129,6 +129,8 @@ jobs:
             -archivePath "$RUNNER_TEMP/IoniqTelemetry.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
             -exportPath "$RUNNER_TEMP/export"
+          echo "--- export dir contents ---"
+          ls -laR "$RUNNER_TEMP/export"
 
       - name: Upload to App Store Connect (TestFlight)
         env:
@@ -137,8 +139,11 @@ jobs:
         run: |
           set -euo pipefail
           # Apple ID + app-specific password auth (no API key needed).
+          IPA_PATH="$(find "$RUNNER_TEMP/export" -maxdepth 2 -name '*.ipa' | head -1)"
+          test -n "$IPA_PATH" || { echo "ERROR: no .ipa found in $RUNNER_TEMP/export"; exit 1; }
+          echo "Uploading: $IPA_PATH"
           xcrun altool --upload-app \
-            -f "$RUNNER_TEMP/export/IoniqTelemetry.ipa" \
+            -f "$IPA_PATH" \
             -t ios \
             -u "$APPLE_ID" \
             -p "$APP_SPECIFIC_PASSWORD" \
