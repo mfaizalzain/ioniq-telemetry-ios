@@ -35,7 +35,7 @@ final class PlanViewModel {
         var isFull: Bool { available == 0 }
     }
 
-    enum Slot: Equatable {
+    enum Slot: Hashable {
         case origin
         case destination
         case waypoint(Int)
