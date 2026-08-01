@@ -91,16 +91,15 @@ jobs:
           MARKETING_VERSION: ${{ inputs.marketing_version }}
         run: |
           set -euo pipefail
+          # Signing settings (CODE_SIGN_STYLE/IDENTITY/PROFILE_SPECIFIER) live in
+          # project.yml Release config, target-scoped, so they don't leak into
+          # SPM package targets. PROFILE_NAME env var expands into the specifier.
           xcodebuild archive \
             -project IoniqTelemetry.xcodeproj \
             -scheme IoniqTelemetry \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/IoniqTelemetry.xcarchive" \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            DEVELOPMENT_TEAM=S232V5F699 \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
             MARKETING_VERSION="$MARKETING_VERSION" \
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
