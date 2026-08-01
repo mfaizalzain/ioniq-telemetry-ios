@@ -50,6 +50,12 @@ targets:
           CODE_SIGN_ENTITLEMENTS: IoniqTelemetry/Resources/IoniqTelemetry-CarPlay.entitlements
         Release:
           CODE_SIGN_ENTITLEMENTS: IoniqTelemetry/Resources/IoniqTelemetry-CarPlay.entitlements
+          # Signing settings live HERE (target-scoped) so they never leak into
+          # SPM package targets. PROFILE_NAME comes from the release workflow's
+          # env (derived from the installed .mobileprovision at runtime).
+          CODE_SIGN_STYLE: Manual
+          CODE_SIGN_IDENTITY: "Apple Distribution"
+          PROVISIONING_PROFILE_SPECIFIER: "$(PROFILE_NAME)"
     dependencies:
       - package: CoreOBD
       - package: CoreDomain
