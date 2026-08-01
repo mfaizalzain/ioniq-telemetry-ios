@@ -8,7 +8,7 @@ on:
         required: false
         default: '1.0.0'
       build_number:
-        description: 'Build number (CFBundleVersion). Empty = auto (repo run number, guaranteed unique per version).'
+        description: 'Build number (CFBundleVersion). Empty = auto (timestamp-based, always higher than the last upload).'
         required: false
         default: ''
   push:
@@ -83,7 +83,13 @@ jobs:
           INPUT_BUILD_NUMBER: ${{ inputs.build_number }}
         run: |
           set -euo pipefail
-          BUILD_NUMBER="${INPUT_BUILD_NUMBER:-${{ github.run_number }}}"
+          if [ -n "$INPUT_BUILD_NUMBER" ]; then
+            BUILD_NUMBER="$INPUT_BUILD_NUMBER"
+          else
+            # Auto: timestamp-based, always higher than any previous upload
+            # (ASC rejects build numbers <= the last uploaded one).
+            BUILD_NUMBER="$(date +%Y%m%d%H%M%S)"
+          fi
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
 
       - name: Archive (Release, manual signing)
