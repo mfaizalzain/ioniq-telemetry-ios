@@ -1,4 +1,4 @@
-import CarPlay
+@preconcurrency import CarPlay
 import Combine
 import CoreData
 import CoreDomain
