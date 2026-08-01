@@ -28,18 +28,22 @@ jobs:
       - name: Install XcodeGen
         run: brew install xcodegen
 
-      - name: Generate project
-        run: xcodegen generate
-
-      - name: Create Secrets.xcconfig
-        # The real file is gitignored; CI uses the example. A blank OCM key is
-        # fine for compiling — runtime keys come from Settings in the app.
+      - name: Prepare workspace (Secrets.xcconfig + missing test dir)
+        # Secrets.xcconfig is gitignored; XcodeGen validates its existence at
+        # generate time, so it must exist BEFORE xcodegen runs.
+        # IoniqTelemetryTests/ is referenced by project.yml but not committed;
+        # create it so generation validates (target stays empty until pushed).
         run: |
           cp Secrets.xcconfig.example Secrets.xcconfig
           if [ -n "${{ secrets.OPEN_CHARGE_MAP_API_KEY }}" ]; then
             echo "OPEN_CHARGE_MAP_API_KEY=${{ secrets.OPEN_CHARGE_MAP_API_KEY }}" >> Secrets.xcconfig
           fi
           cat Secrets.xcconfig
+          mkdir -p IoniqTelemetryTests
+          ls -la
+
+      - name: Generate project
+        run: xcodegen generate
 
       - name: Run package tests (CoreOBD, CoreDomain)
         run: |
