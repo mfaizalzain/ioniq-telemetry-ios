@@ -61,7 +61,16 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            build 2>&1 | tail -40
+            build > /tmp/build.log 2>&1 || {
+              echo "===== BUILD FAILED ====="
+              grep -nE "error:|warning:" /tmp/build.log | head -80
+              echo "===== LAST 30 LINES ====="
+              tail -30 /tmp/build.log
+              exit 1
+            }
+          echo "===== BUILD OK (warnings) ====="
+          grep -nE "warning:" /tmp/build.log | head -30 || true
+          tail -5 /tmp/build.log
 
       - name: Run app unit tests (simulator)
         run: |
@@ -72,4 +81,12 @@ jobs:
             -configuration Debug \
             -destination 'platform=iOS Simulator,name=iPhone 16' \
             CODE_SIGNING_ALLOWED=NO \
-            test 2>&1 | tail -60
+            test > /tmp/test.log 2>&1 || {
+              echo "===== TEST FAILED ====="
+              grep -nE "error:|failed" /tmp/test.log | head -60
+              echo "===== LAST 30 LINES ====="
+              tail -30 /tmp/test.log
+              exit 1
+            }
+          echo "===== TESTS OK ====="
+          grep -E "Executed|passed" /tmp/test.log | tail -5
