@@ -385,8 +385,10 @@ final class CarPlayCoordinator {
             self.lastAlertedStopId = first.charger.id
             let distance = String(format: "%.1f km", first.distanceFromOriginKm)
             let alert = CPAlertTemplate(
-                titleVariants: ["Charger may be full"],
-                detailText: "\(first.charger.name) is \(distance) away and nearby stations are occupied.",
+                titleVariants: [
+                    "Charger may be full",
+                    "\(first.charger.name) is \(distance) away and nearby stations are occupied."
+                ],
                 actions: [CPAlertAction(title: "OK", style: .default, handler: { [weak self] _ in
                     self?.interfaceController.dismissTemplate(animated: true, completion: nil)
                 })]
