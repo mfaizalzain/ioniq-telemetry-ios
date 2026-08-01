@@ -66,7 +66,7 @@ struct PlanView: View {
                                 .padding(.horizontal, 12)
                                 .padding(.vertical, 6)
                                 .background(Color.appAccent, in: Capsule())
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color.appOnAccent)
                             }
                         }
                     }
@@ -188,6 +188,9 @@ private struct AiPlanCard: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(Color.appAccent)
+                    // The system's label choice on the bright accent is unreadable.
+                    .foregroundStyle(Color.appOnAccent)
                     .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
 
                     Spacer()
@@ -292,7 +295,11 @@ private struct RouteBuilderCard: View {
                     Button(viewModel.canPlan ? "Plan" : "Select both endpoints") {
                         Task { await viewModel.plan() }
                     }
-                    .buttonStyle(.borderedProminent).disabled(!viewModel.canPlan)
+                    .buttonStyle(.borderedProminent)
+                    .tint(Color.appAccent)
+                    // The system's label choice on the bright accent is unreadable.
+                    .foregroundStyle(Color.appOnAccent)
+                    .disabled(!viewModel.canPlan)
 
                     if let msg = viewModel.errorMessage {
                         Text(msg)
@@ -338,7 +345,7 @@ private struct RouteBuilderCard: View {
                             }
                             .padding(.horizontal, 20).padding(.vertical, 8)
                             .background(Color.appAccent, in: Capsule())
-                            .foregroundStyle(.white)
+                            .foregroundStyle(Color.appOnAccent)
                         }
                         Button {
                             viewModel.clearPlan()
@@ -352,7 +359,6 @@ private struct RouteBuilderCard: View {
             }
         }
         .backgroundStyle(.ultraThinMaterial)
-        .padding(.horizontal)
     }
 }
 
@@ -517,7 +523,7 @@ private struct StopCard: View {
             ZStack {
                 Circle().fill(index == 0 || index == totalStops - 1 ? Color.appAccent : Color.appAccent.opacity(0.6))
                     .frame(width: 24, height: 24)
-                Text("\(index + 1)").font(.caption.weight(.bold)).foregroundStyle(.white)
+                Text("\(index + 1)").font(.caption.weight(.bold)).foregroundStyle(Color.appOnAccent)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -592,6 +598,9 @@ private struct SaveTripSheet: View {
                     showSaveTrip = false
                 }
                 .buttonStyle(.borderedProminent)
+                .tint(Color.appAccent)
+                // The system's label choice on the bright accent is unreadable.
+                .foregroundStyle(Color.appOnAccent)
                 .disabled(tripName.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
@@ -812,9 +821,7 @@ private struct ChargersAlongRouteSection: View {
                         .font(.caption)
                     }
                 }
-                .padding(14)
             }
-            .padding(.horizontal)
             .backgroundStyle(.ultraThinMaterial)
         }
     }
