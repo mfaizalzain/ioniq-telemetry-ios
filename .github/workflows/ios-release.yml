@@ -28,9 +28,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Show Xcode version
-        # Same rule as ios-build.yml: never xcode-select a specific version.
-        run: xcodebuild -version
+      - name: Select Xcode 26
+        # Apple requires the iOS 26 SDK (Xcode 26+) for uploads; the macos-15
+        # image defaults to an older Xcode, so pin the newest 26.x explicitly.
+        run: |
+          set -euo pipefail
+          XCODE_APP="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)"
+          test -n "$XCODE_APP" || { echo "ERROR: no Xcode 26 found"; ls /Applications | grep -i xcode || true; exit 1; }
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version
 
       - name: Install XcodeGen
         run: brew install xcodegen
