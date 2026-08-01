@@ -86,18 +86,6 @@ jobs:
           BUILD_NUMBER="${INPUT_BUILD_NUMBER:-${{ github.run_number }}}"
           echo "BUILD_NUMBER=$BUILD_NUMBER" >> "$GITHUB_ENV"
 
-      - name: Prepare App Store Connect API key
-        env:
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
-        run: |
-          set -euo pipefail
-          # xcodebuild (-authenticationKeyPath) and altool (default lookup dir)
-          # both use the same .p8 file.
-          mkdir -p "$HOME/.appstoreconnect/private_keys"
-          echo "$ASC_API_KEY_P8" > "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
-          chmod 600 "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
-
       - name: Archive (Release, manual signing)
         env:
           MARKETING_VERSION: ${{ inputs.marketing_version }}
@@ -116,9 +104,6 @@ jobs:
             CURRENT_PROJECT_VERSION="$BUILD_NUMBER"
 
       - name: Export IPA
-        env:
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
         run: |
           set -euo pipefail
           cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
@@ -129,7 +114,7 @@ jobs:
               <key>method</key>
               <string>app-store-connect</string>
               <key>uploadSymbols</key>
-              <true/>
+              <false/>
               <key>teamID</key>
               <string>S232V5F699</string>
               <key>provisioningProfiles</key>
@@ -143,21 +128,18 @@ jobs:
           xcodebuild -exportArchive \
             -archivePath "$RUNNER_TEMP/IoniqTelemetry.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -exportPath "$RUNNER_TEMP/export" \
-            -authenticationKeyID "$ASC_API_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_API_ISSUER_ID" \
-            -authenticationKeyPath "$HOME/.appstoreconnect/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+            -exportPath "$RUNNER_TEMP/export"
 
       - name: Upload to App Store Connect (TestFlight)
         env:
-          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
-          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
         run: |
           set -euo pipefail
-          # altool finds the .p8 at ~/.appstoreconnect/private_keys/AuthKey_<keyID>.p8
+          # Apple ID + app-specific password auth (no API key needed).
           xcrun altool --upload-app \
             -f "$RUNNER_TEMP/export/IoniqTelemetry.ipa" \
             -t ios \
-            --apiKey "$ASC_API_KEY_ID" \
-            --apiIssuer "$ASC_API_ISSUER_ID" \
+            -u "$APPLE_ID" \
+            -p "$APP_SPECIFIC_PASSWORD" \
             --verbose
