@@ -1,6 +1,6 @@
 import CoreDomain
 import CoreLocation
-import MapKit
+@preconcurrency import MapKit
 import UIKit
 
 /// Hand-off to a navigation app.
