@@ -22,7 +22,7 @@ struct PlanView: View {
         NavigationStack {
             ScrollView {
                 if let viewModel {
-                    lazyVStack(spacing: 16) {
+                    LazyVStack(spacing: 16) {
                         if let notice = viewModel.routingNotice {
                             RoutingNoticeBar(message: notice, onDismiss: viewModel.dismissRoutingNotice)
                         }
@@ -118,6 +118,87 @@ struct PlanView: View {
             return
         }
         showOccupancyPrompt = true
+    }
+}
+
+// MARK: - AI plan card
+
+/// Natural-language trip planning: type a request and the configured AI provider
+/// extracts the destination and waypoints. Gated on `canUseAi` by the caller.
+private struct AiPlanCard: View {
+    let viewModel: PlanViewModel
+
+    var body: some View {
+        GroupBox {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .foregroundStyle(Color.appAccent)
+                    Text("Plan by conversation")
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(viewModel.aiProviderLabel.uppercased())
+                        .font(.caption2.weight(.bold))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.appAccent.opacity(0.15), in: Capsule())
+                        .foregroundStyle(Color.appAccent)
+                }
+
+                TextField("e.g. Drive to the airport, charge to 80%", text: Binding(
+                    get: { viewModel.aiInput },
+                    set: { viewModel.aiInput = $0 }
+                ))
+                .textFieldStyle(.roundedBorder)
+                .font(.subheadline)
+                .disabled(viewModel.aiBusy)
+                .onSubmit { Task { await viewModel.planFromNaturalLanguage() } }
+
+                if viewModel.aiBusy {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                        Text("Planning…").font(.caption).foregroundStyle(.secondary)
+                    }
+                } else if let interpretation = viewModel.aiInterpretation {
+                    Text(interpretation).font(.caption).foregroundStyle(.secondary)
+                }
+
+                if let error = viewModel.aiError {
+                    HStack(spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(Color.appRed)
+                        Text(error).font(.caption).foregroundStyle(Color.appRed)
+                        Spacer()
+                        Button { viewModel.dismissAiError() } label: {
+                            Image(systemName: "xmark.circle.fill").font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                HStack {
+                    Button {
+                        Task { await viewModel.planFromNaturalLanguage() }
+                    } label: {
+                        if viewModel.aiBusy {
+                            ProgressView().scaleEffect(0.8)
+                        } else {
+                            Label("Plan trip", systemImage: "sparkles")
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+                    Spacer()
+
+                    if !viewModel.aiInput.isEmpty {
+                        Button("Clear") { viewModel.clearAiInput() }
+                            .font(.caption)
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -356,7 +437,7 @@ private struct ItineraryTimeline: View {
                 HStack {
                     Image(systemName: "battery.100.bolt")
                         .foregroundStyle(Color.appAccent)
-                    Text("\(Int(plan.totalKwh)) kWh · \(plan.stops.count) stop(s)")
+                    Text("\(Int(plan.stops.reduce(0) { $0 + $1.energyAddedKwh })) kWh · \(plan.stops.count) stop(s)")
                         .font(.subheadline.weight(.medium))
                     Spacer()
                     Button { showSaveTrip = true } label: {
@@ -404,7 +485,7 @@ private struct LegRow: View {
                 if index == totalLegs - 1 { Circle().fill(Color.appAccent).frame(width: 8, height: 8) }
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(String(format: "%.0f", leg.distanceKm)) km · \(leg.estimateString)")
+                Text("\(String(format: "%.0f", leg.distanceKm)) km · \(leg.driveMinutes) min")
                     .font(.caption.weight(.medium))
                 if leg.startSoc > 0 || leg.endSoc > 0 {
                     Text("SOC \(Int(leg.startSoc))% → \(Int(leg.endSoc))%")
@@ -440,7 +521,7 @@ private struct StopCard: View {
             }
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(stop.label).font(.subheadline.weight(.medium))
+                Text(stop.charger.name).font(.subheadline.weight(.medium))
                 if stop.isChargerStop, let address = stop.charger.address {
                     Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
@@ -491,7 +572,7 @@ private struct StopCard: View {
                 Image(systemName: "ellipsis.circle")
                     .foregroundStyle(.secondary)
             }
-            .accessibilityLabel("Options for \(stop.label)")
+            .accessibilityLabel("Options for \(stop.charger.name)")
         }
         .padding(.vertical, 4)
     }
