@@ -393,7 +393,7 @@ final class CarPlayCoordinator {
                     self?.interfaceController.dismissTemplate(animated: true, completion: nil)
                 })]
             )
-            self.interfaceController.presentTemplate(alert, animated: true)
+            try? await self.interfaceController.presentTemplate(alert, animated: true)
         }
     }
 
