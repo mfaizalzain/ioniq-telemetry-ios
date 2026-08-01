@@ -458,7 +458,7 @@ private struct ItineraryTimeline: View {
                 // after an exclusion does not invalidate a row mid-tap.
                 let stopRows = plan.stops.enumerated().map { index, stop in
                     StopRow(
-                        id: stop.isChargerStop ? "charger-\(stop.charger.id)" : "stop-\(index)",
+                        id: "charger-\(stop.charger.id)",
                         index: index,
                         stop: stop
                     )
@@ -522,18 +522,16 @@ private struct StopCard: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(stop.charger.name).font(.subheadline.weight(.medium))
-                if stop.isChargerStop, let address = stop.charger.address {
+                if let address = stop.charger.address {
                     Text(address).font(.caption).foregroundStyle(.secondary).lineLimit(2)
                 }
-                if stop.isChargerStop {
-                    let kw = stop.charger.maxPowerKw
-                    HStack(spacing: 4) {
-                        if kw > 0 {
-                            Text(String(format: "%.0f kW", kw)).font(.caption.weight(.semibold))
-                        }
-                        if let price = stop.charger.pricePerKwh, price > 0 {
-                            Text(String(format: "$%.2f/kWh", price)).font(.caption).foregroundStyle(.secondary)
-                        }
+                let kw = stop.charger.maxPowerKw
+                HStack(spacing: 4) {
+                    if kw > 0 {
+                        Text(String(format: "%.0f kW", kw)).font(.caption.weight(.semibold))
+                    }
+                    if let price = stop.charger.pricePerKwh, price > 0 {
+                        Text(String(format: "$%.2f/kWh", price)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -543,30 +541,26 @@ private struct StopCard: View {
             // Direct button, not just a Menu item: fires on the first tap. Menu
             // items can be dropped when the exclusion re-solves the plan (and the
             // stops array changes) while the menu is dismissing.
-            if stop.isChargerStop {
+            Button {
+                viewModel.excludeChargerAndReplan(stop.charger.id)
+            } label: {
+                Image(systemName: "xmark.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Avoid this charger — re-route")
+
+            Menu {
+                Button {
+                    viewModel.setDestination(charger: stop.charger)
+                } label: {
+                    Label("Navigate here", systemImage: "arrow.triangle.turn.up.right.diamond")
+                }
                 Button {
                     viewModel.excludeChargerAndReplan(stop.charger.id)
                 } label: {
-                    Image(systemName: "xmark.circle")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Avoid this charger — re-route")
-            }
-
-            Menu {
-                if stop.isChargerStop {
-                    Button {
-                        viewModel.setDestination(charger: stop.charger)
-                    } label: {
-                        Label("Navigate here", systemImage: "arrow.triangle.turn.up.right.diamond")
-                    }
-                    Button {
-                        viewModel.excludeChargerAndReplan(stop.charger.id)
-                    } label: {
-                        Label("Avoid this charger — re-route", systemImage: "arrow.triangle.branch")
-                    }
+                    Label("Avoid this charger — re-route", systemImage: "arrow.triangle.branch")
                 }
             } label: {
                 Image(systemName: "ellipsis.circle")
