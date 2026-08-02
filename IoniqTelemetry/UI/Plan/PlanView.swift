@@ -17,6 +17,9 @@ struct PlanView: View {
     /// and whether the drive-start prompt is offered at all.
     @State private var vehicleConnected = false
     @State private var connectionCancellable: AnyCancellable?
+    /// Slot whose search field currently has focus; drives the suggestions panel.
+    @State private var focusedSlot: PlanViewModel.Slot?
+    @FocusState private var focusedField: PlanViewModel.Slot?
 
     var body: some View {
         NavigationStack {
@@ -34,7 +37,9 @@ struct PlanView: View {
                             viewModel: viewModel,
                             showSaveTrip: $showSaveTrip,
                             vehicleConnected: vehicleConnected,
-                            onStartDrive: startDrive
+                            onStartDrive: startDrive,
+                            focusedSlot: $focusedSlot,
+                            focusedField: $focusedField
                         )
 
                         if let plan = viewModel.plan {
@@ -50,6 +55,32 @@ struct PlanView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
+            // Suggestions render as a bottom inset (above the keyboard) instead
+            // of an inline overlay on the row: the old overlay was clipped by
+            // the card/scroll stack (list appeared behind the buttons) and
+            // opened below the focused field, i.e. hidden behind the keyboard.
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let slot = focusedSlot,
+                   let vm = viewModel,
+                   !vm.favoritePlaces.isEmpty
+                    || !vm.endpoint(for: slot).suggestions.isEmpty
+                    || vm.endpoint(for: slot).query.count >= 3 {
+                    SearchSuggestionsPanel(
+                        suggestions: vm.endpoint(for: slot).suggestions,
+                        favorites: vm.favoritePlaces,
+                        slot: slot,
+                        onSelect: { vm.select($0, for: slot) },
+                        onSelectFavorite: { vm.selectFavorite($0, for: slot) },
+                        onAddFavoriteAsWaypoint: { vm.addFavoriteAsWaypoint($0) },
+                        onUseCurrentLocation: { Task { await vm.useCurrentLocation() } },
+                        onDismiss: {
+                            focusedSlot = nil
+                            focusedField = nil
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
             .refreshable { await viewModel?.loadNearbyChargers() }
             .navigationTitle("Trip plan")
             .navigationBarTitleDisplayMode(.large)
@@ -218,8 +249,8 @@ private struct RouteBuilderCard: View {
     /// navigation), owned by `PlanView` so both start buttons share one prompt.
     let onStartDrive: () -> Void
 
-    @State private var focusedSlot: PlanViewModel.Slot?
-    @FocusState private var focusedField: PlanViewModel.Slot?
+    @Binding var focusedSlot: PlanViewModel.Slot?
+    @FocusState.Binding var focusedField: PlanViewModel.Slot?
 
     var body: some View {
         GroupBox {
@@ -404,27 +435,8 @@ private struct SlotRow: View {
         }
         .padding(8)
         .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
-        // Show suggestions when this slot has focus and results exist
-        .overlay(alignment: .topLeading) {
-            if focusedSlot == slot {
-                let suggestions = viewModel.endpoint(for: slot).suggestions
-                if !suggestions.isEmpty || viewModel.endpoint(for: slot).query.count >= 3 {
-                    SuggestionsDropdown(
-                        suggestions: suggestions,
-                        onSelect: { viewModel.select($0, for: slot) },
-                        onUseCurrentLocation: { Task { await viewModel.useCurrentLocation() } },
-                        favorites: viewModel.favoritePlaces,
-                        onSelectFavorite: { viewModel.selectFavorite($0, for: slot) },
-                        onAddFavoriteAsWaypoint: { viewModel.addFavoriteAsWaypoint($0) },
-                        query: viewModel.endpoint(for: slot).query,
-                        slot: slot
-                    )
-                    .offset(y: 40)
-                    .zIndex(100)
-                }
-            }
-        }
-        .zIndex(focusedSlot == slot ? 10 : 0)
+        // Suggestions are rendered by PlanView as a bottom safe-area inset
+        // (above the keyboard), keyed off focusedSlot — see PlanView.body.
     }
 }
 
@@ -608,73 +620,123 @@ private struct SaveTripSheet: View {
     }
 }
 
-// MARK: - Suggestions dropdown
+// MARK: - Search suggestions panel
+//
+// Rendered by PlanView as a `.safeAreaInset(edge: .bottom)` so it always sits
+// ABOVE the keyboard (SwiftUI insets respect the keyboard safe area), spans
+// the full card width, and is never clipped by the card/scroll stack. The list
+// scrolls internally, so long favorites lists stay fully reachable.
 
-private struct SuggestionsDropdown: View {
+private struct SearchSuggestionsPanel: View {
     let suggestions: [PlaceResult]
     let onSelect: (PlaceResult) -> Void
     let onUseCurrentLocation: () -> Void
     let favorites: [SavedPlaceEntity]
     let onSelectFavorite: (SavedPlaceEntity) -> Void
     let onAddFavoriteAsWaypoint: (SavedPlaceEntity) -> Void
-    let query: String
     let slot: PlanViewModel.Slot
+    let onDismiss: () -> Void
+
+    /// Height cap: the panel floats above the keyboard, and a scrollable list
+    /// keeps every row reachable no matter how many favorites exist.
+    private let maxListHeight: CGFloat = 280
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Current location
-            Button {
-                onUseCurrentLocation()
-            } label: {
-                Label("Current location", systemImage: "location.circle")
-                    .font(.subheadline).padding(8)
+            // Header: label + dismiss
+            HStack {
+                Text("SAVED & RESULTS")
+                    .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                Spacer()
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.body)
+                        .foregroundStyle(.tertiary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close suggestions")
             }
-            .buttonStyle(.plain)
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
 
-            if !favorites.isEmpty {
-                Divider()
-                ForEach(favorites) { fav in
-                    HStack {
-                        Button {
-                            onSelectFavorite(fav)
-                        } label: {
-                            Label(fav.name, systemImage: "star.fill")
-                                .font(.subheadline).padding(8)
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    // Current location
+                    Button {
+                        onUseCurrentLocation()
+                        onDismiss()
+                    } label: {
+                        Label("Current location", systemImage: "location.circle")
+                            .font(.subheadline).padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+
+                    if !favorites.isEmpty {
+                        Divider()
+                        ForEach(favorites) { fav in
+                            HStack(spacing: 4) {
+                                Button {
+                                    onSelectFavorite(fav)
+                                    onDismiss()
+                                } label: {
+                                    Label(fav.name, systemImage: "star.fill")
+                                        .font(.subheadline)
+                                        .lineLimit(1)
+                                        .padding(10)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                if slot != .destination && slot != .origin {
+                                    Button {
+                                        onAddFavoriteAsWaypoint(fav)
+                                        onDismiss()
+                                    } label: {
+                                        Image(systemName: "plus.circle")
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.trailing, 8)
+                                    .accessibilityLabel("Add \(fav.name) as stopover")
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
-                        if slot != .destination && slot != .origin {
+                    }
+
+                    if !suggestions.isEmpty {
+                        Divider()
+                        ForEach(suggestions) { suggestion in
                             Button {
-                                onAddFavoriteAsWaypoint(fav)
+                                onSelect(suggestion)
+                                onDismiss()
                             } label: {
-                                Image(systemName: "plus.circle")
-                                    .foregroundStyle(.tertiary)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(suggestion.name).font(.subheadline)
+                                    if !suggestion.subtitle.isEmpty {
+                                        Text(suggestion.subtitle).font(.caption2).foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(10)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
             }
-
-            if !suggestions.isEmpty {
-                Divider()
-                ForEach(suggestions) { suggestion in
-                    Button {
-                        onSelect(suggestion)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 1) {
-                            Text(suggestion.name).font(.subheadline)
-                            if !suggestion.subtitle.isEmpty {
-                                Text(suggestion.subtitle).font(.caption2).foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(8)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
+            .frame(maxHeight: maxListHeight)
+            .scrollDismissesKeyboard(.immediately)
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
-        .frame(maxWidth: 300)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.15), radius: 12, y: -4)
+        .padding(.horizontal)
+        .padding(.bottom, 6)
     }
 }
 
