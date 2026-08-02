@@ -101,11 +101,11 @@ struct PlanView: View {
             .confirmationDialog("Live occupancy alerts?", isPresented: $showOccupancyPrompt, titleVisibility: .visible) {
                 Button("Enable") {
                     services.activePlan.setOccupancyTrackingEnabled(true)
-                    services.activePlan.setIsNavigating(true)
+                    beginNavigation()
                 }
                 Button("Not now") {
                     services.activePlan.setOccupancyTrackingEnabled(false)
-                    services.activePlan.setIsNavigating(true)
+                    beginNavigation()
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
@@ -127,10 +127,20 @@ struct PlanView: View {
     /// drive starts straight away.
     private func startDrive() {
         guard vehicleConnected, services.userPreferences.chargerOccupancyAlerts else {
-            services.activePlan.setIsNavigating(true)
+            beginNavigation()
             return
         }
         showOccupancyPrompt = true
+    }
+
+    /// Flips the active plan into navigating state and hands the whole route —
+    /// origin, every stopover and charge stop, destination — to Google Maps as
+    /// waypoints. With no plan there is nothing to hand off, so only the flag
+    /// changes (occupancy/reroute monitoring still runs for free drives).
+    private func beginNavigation() {
+        services.activePlan.setIsNavigating(true)
+        guard let plan = viewModel?.plan else { return }
+        MapsNavigation.navigateTrip(plan)
     }
 }
 
