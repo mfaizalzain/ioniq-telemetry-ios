@@ -158,6 +158,12 @@ final class PlanViewModel {
         origin.selected != nil && destination.selected != nil && !isPlanning
     }
 
+    /// True when the natural-language planner can run: an API key is set, the
+    /// request is non-empty, and no request is in flight.
+    var canRunAi: Bool {
+        !aiBusy && !aiInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
     // MARK: - Natural-language planning
 
     /// Parses a natural-language trip request using the configured AI provider.
@@ -495,12 +501,20 @@ final class PlanViewModel {
     func setDepartureSoc(_ soc: Float) {
         usesLiveSoc = false
         departureSoc = soc
+        invalidatePlan()
     }
 
     /// Hands the slider back to the car.
     func useLiveSoc() {
         usesLiveSoc = true
         if let soc = telemetry.socDisplay ?? telemetry.socBms { departureSoc = soc }
+        invalidatePlan()
+    }
+
+    /// Target arrival SOC — the battery the route should arrive with.
+    func setArrivalReserve(_ percent: Float) {
+        arrivalReserve = percent
+        invalidatePlan()
     }
 
     var liveSocAvailable: Bool {

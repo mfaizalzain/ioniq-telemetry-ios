@@ -200,10 +200,11 @@ private struct AiPlanCard: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color.appAccent)
-                    // The system's label choice on the bright accent is unreadable.
-                    .foregroundStyle(Color.appOnAccent)
-                    .disabled(viewModel.aiBusy || viewModel.aiInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .tint(viewModel.canRunAi ? Color.appAccent : Color(.systemGray4))
+                    // The system's label choice on the bright accent is unreadable;
+                    // the disabled state must be visibly gray, not a washed accent.
+                    .foregroundStyle(viewModel.canRunAi ? Color.appOnAccent : Color.secondary)
+                    .disabled(!viewModel.canRunAi)
 
                     Spacer()
 
@@ -299,15 +300,76 @@ private struct RouteBuilderCard: View {
                     set: { viewModel.setCorridorRadius($0) }
                 ), in: 2...30, step: 1)
 
+                // Starting battery — live SOC from the car when connected, or a
+                // manual slider. Mirrors Android's "Advanced" battery section.
+                HStack {
+                    Text("STARTING BATTERY")
+                        .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                    Spacer()
+                    Text("\(Int(viewModel.departureSoc))%")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.appOnAccent)
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(Color.appAccent, in: Capsule())
+                }
+
+                if viewModel.usesLiveSoc && viewModel.liveSocAvailable {
+                    HStack(spacing: 6) {
+                        Label("Live from vehicle", systemImage: "bolt.car")
+                            .font(.caption).foregroundStyle(.secondary)
+                        Spacer()
+                        Button("Set manually") {
+                            viewModel.setDepartureSoc(viewModel.departureSoc)
+                        }
+                        .font(.caption)
+                    }
+                } else {
+                    Slider(value: Binding(
+                        get: { viewModel.departureSoc },
+                        set: { viewModel.setDepartureSoc($0) }
+                    ), in: 10...100, step: 1)
+                    if viewModel.liveSocAvailable {
+                        // Vehicle connected but the driver took the slider — offer
+                        // to hand tracking back to the car.
+                        HStack(spacing: 6) {
+                            Label("Manual value", systemImage: "slider.horizontal.3")
+                                .font(.caption).foregroundStyle(.secondary)
+                            Spacer()
+                            Button("Use live SOC") { viewModel.useLiveSoc() }
+                                .font(.caption)
+                        }
+                    } else {
+                        Label("Vehicle disconnected — using manual value", systemImage: "car.slash")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+
+                // Target arrival battery
+                HStack {
+                    Text("TARGET ARRIVAL BATTERY")
+                        .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
+                    Spacer()
+                    Text("\(Int(viewModel.arrivalReserve))%")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(Color.appOnAccent)
+                        .padding(.horizontal, 8).padding(.vertical, 2)
+                        .background(Color.appAccent, in: Capsule())
+                }
+                Slider(value: Binding(
+                    get: { viewModel.arrivalReserve },
+                    set: { viewModel.setArrivalReserve($0) }
+                ), in: 5...50, step: 5)
+
                 // Plan button
                 HStack {
                     Button(viewModel.canPlan ? "Plan" : "Select both endpoints") {
                         Task { await viewModel.plan() }
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(Color.appAccent)
-                    // The system's label choice on the bright accent is unreadable.
-                    .foregroundStyle(Color.appOnAccent)
+                    .tint(viewModel.canPlan ? Color.appAccent : Color(.systemGray4))
+                    // The system's label choice on the bright accent is unreadable;
+                    // the disabled state must be visibly gray, not a washed accent.
+                    .foregroundStyle(viewModel.canPlan ? Color.appOnAccent : Color.secondary)
                     .disabled(!viewModel.canPlan)
 
                     if let msg = viewModel.errorMessage {
@@ -583,6 +645,10 @@ private struct SaveTripSheet: View {
     @Binding var tripName: String
     @Binding var showSaveTrip: Bool
 
+    private var canSave: Bool {
+        !tripName.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
     var body: some View {
         VStack(spacing: 16) {
             Text("Save trip").font(.headline)
@@ -596,10 +662,11 @@ private struct SaveTripSheet: View {
                     showSaveTrip = false
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(Color.appAccent)
-                // The system's label choice on the bright accent is unreadable.
-                .foregroundStyle(Color.appOnAccent)
-                .disabled(tripName.trimmingCharacters(in: .whitespaces).isEmpty)
+                .tint(canSave ? Color.appAccent : Color(.systemGray4))
+                // The system's label choice on the bright accent is unreadable;
+                // the disabled state must be visibly gray, not a washed accent.
+                .foregroundStyle(canSave ? Color.appOnAccent : Color.secondary)
+                .disabled(!canSave)
             }
         }
         .padding()
