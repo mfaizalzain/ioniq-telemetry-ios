@@ -628,13 +628,14 @@ private struct SaveTripSheet: View {
 // scrolls internally, so long favorites lists stay fully reachable.
 
 private struct SearchSuggestionsPanel: View {
+    // Property order matches the memberwise init call in PlanView.body.
     let suggestions: [PlaceResult]
-    let onSelect: (PlaceResult) -> Void
-    let onUseCurrentLocation: () -> Void
     let favorites: [SavedPlaceEntity]
+    let slot: PlanViewModel.Slot
+    let onSelect: (PlaceResult) -> Void
     let onSelectFavorite: (SavedPlaceEntity) -> Void
     let onAddFavoriteAsWaypoint: (SavedPlaceEntity) -> Void
-    let slot: PlanViewModel.Slot
+    let onUseCurrentLocation: () -> Void
     let onDismiss: () -> Void
 
     /// Height cap: the panel floats above the keyboard, and a scrollable list
