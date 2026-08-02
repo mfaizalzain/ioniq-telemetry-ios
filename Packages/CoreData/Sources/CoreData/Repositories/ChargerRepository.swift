@@ -507,8 +507,8 @@ public enum ChargerError: LocalizedError {
     // MARK: - Apple Maps
 
     /// Searches for EV chargers near each centre point via MKLocalSearch and
-    /// persists results (name, location only — Apple's POI data has no pricing,
-    /// connector type or operator information).
+    /// persists results (name, address, location only — Apple's POI data has
+    /// no pricing, connector type or operator information).
     private func refreshAppleMaps(centers: [LatLon]) async throws {
         let now = Date()
         var inserted = 0
@@ -529,18 +529,31 @@ public enum ChargerError: LocalizedError {
                 let lat = loc.coordinate.latitude
                 let lon = loc.coordinate.longitude
                 let name = item.name ?? "EV Charger"
+                // Build the address from the placemark the way OCM does
+                // ("Street, Town"): Apple's POI results carry full address
+                // fields, so storing nil here hides them from every list row.
+                let address = Self.appleAddress(from: item.placemark)
                 let id = "apple-\(Geohash.encode(lat: lat, lon: lon, precision: 10))"
-                // Skip if already cached (dedup across tiles and future refreshes)
+                // Skip if already cached (dedup across tiles and future refreshes).
+                // Backfill the address when a cached entry lacks one — older
+                // Apple Maps entries were stored with address: nil and would
+                // otherwise never show a street address until the cache cleared.
                 let existing = try modelContext.fetch(
                     FetchDescriptor<ChargerEntity>(
                         predicate: #Predicate { $0.id == id }
                     )
                 )
-                guard existing.isEmpty else { continue }
+                if let cached = existing.first {
+                    if cached.address == nil, let address {
+                        cached.address = address
+                        cached.cachedAt = now
+                    }
+                    continue
+                }
                 let entity = ChargerEntity(
                     id: id,
                     name: name,
-                    address: nil,
+                    address: address,
                     lat: lat,
                     lon: lon,
                     geohash: Geohash.encode(lat: lat, lon: lon, precision: 6),
@@ -560,6 +573,23 @@ public enum ChargerError: LocalizedError {
         }
         print("[ChargerRepo] Apple Maps: \(inserted) chargers found near \(centers.count) centre(s)")
         try modelContext.save()
+    }
+
+    /// Formats an address from an Apple Maps placemark. MKPlacemark splits the
+    /// address into structured fields, so this joins the street and city the
+    /// same way the OCM path does — no street or city means no address.
+    private static func appleAddress(from placemark: MKPlacemark) -> String? {
+        var parts: [String] = []
+        if let number = placemark.subThoroughfare, !number.isEmpty {
+            parts.append(number)
+        }
+        if let street = placemark.thoroughfare, !street.isEmpty {
+            parts.append(street)
+        }
+        if let city = placemark.locality, !city.isEmpty {
+            parts.append(city)
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
     /// Removes Apple Maps entries that are within 200m of an OCM entry.
