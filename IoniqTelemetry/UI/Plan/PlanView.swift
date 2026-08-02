@@ -17,9 +17,8 @@ struct PlanView: View {
     /// and whether the drive-start prompt is offered at all.
     @State private var vehicleConnected = false
     @State private var connectionCancellable: AnyCancellable?
-    /// Slot whose search field currently has focus; drives the suggestions panel.
-    @State private var focusedSlot: PlanViewModel.Slot?
-    @FocusState private var focusedField: PlanViewModel.Slot?
+    /// Slot whose full-screen search sheet is presented; nil = no sheet.
+    @State private var searchTarget: SlotTarget?
 
     var body: some View {
         NavigationStack {
@@ -38,8 +37,7 @@ struct PlanView: View {
                             showSaveTrip: $showSaveTrip,
                             vehicleConnected: vehicleConnected,
                             onStartDrive: startDrive,
-                            focusedSlot: $focusedSlot,
-                            focusedField: $focusedField
+                            onActivateSlot: { searchTarget = SlotTarget(slot: $0) }
                         )
 
                         if let plan = viewModel.plan {
@@ -55,33 +53,16 @@ struct PlanView: View {
                 }
             }
             .scrollDismissesKeyboard(.interactively)
-            // Suggestions render as a bottom inset (above the keyboard) instead
-            // of an inline overlay on the row: the old overlay was clipped by
-            // the card/scroll stack (list appeared behind the buttons) and
-            // opened below the focused field, i.e. hidden behind the keyboard.
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if let slot = focusedSlot,
-                   let vm = viewModel,
-                   !vm.favoritePlaces.isEmpty
-                    || !vm.endpoint(for: slot).suggestions.isEmpty
-                    || vm.endpoint(for: slot).query.count >= 3 {
-                    SearchSuggestionsPanel(
-                        suggestions: vm.endpoint(for: slot).suggestions,
-                        favorites: vm.favoritePlaces,
-                        slot: slot,
-                        onSelect: { vm.select($0, for: slot) },
-                        onSelectFavorite: { vm.selectFavorite($0, for: slot) },
-                        onAddFavoriteAsWaypoint: { vm.addFavoriteAsWaypoint($0) },
-                        onUseCurrentLocation: { Task { await vm.useCurrentLocation() } },
-                        onDismiss: {
-                            focusedSlot = nil
-                            focusedField = nil
-                        }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            .refreshable { await viewModel?.loadNearbyChargers() }
+            // Full-screen place search (Apple Maps style): tapping a slot opens a
+            // sheet with its own search field, so results are never clipped by
+            // the card stack or hidden behind the keyboard. The sheet also
+            // carries saved-places and saved-trips management (delete, load).
+            .sheet(item: $searchTarget) { target in
+                if let vm = viewModel {
+                    PlaceSearchSheet(slot: target.slot, viewModel: vm)
                 }
             }
-            .refreshable { await viewModel?.loadNearbyChargers() }
             .navigationTitle("Trip plan")
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
@@ -249,8 +230,8 @@ private struct RouteBuilderCard: View {
     /// navigation), owned by `PlanView` so both start buttons share one prompt.
     let onStartDrive: () -> Void
 
-    @Binding var focusedSlot: PlanViewModel.Slot?
-    @FocusState.Binding var focusedField: PlanViewModel.Slot?
+    /// Opens the full-screen search sheet for a slot.
+    let onActivateSlot: (PlanViewModel.Slot) -> Void
 
     var body: some View {
         GroupBox {
@@ -259,10 +240,9 @@ private struct RouteBuilderCard: View {
                 SlotRow(
                     slot: .origin,
                     viewModel: viewModel,
-                    focusedSlot: $focusedSlot,
-                    focusedField: $focusedField,
                     placeholder: "Origin",
-                    systemImage: "location.circle"
+                    systemImage: "location.circle",
+                    onActivate: { onActivateSlot(.origin) }
                 )
 
                 // Stopover rows
@@ -271,10 +251,9 @@ private struct RouteBuilderCard: View {
                         SlotRow(
                             slot: .waypoint(i),
                             viewModel: viewModel,
-                            focusedSlot: $focusedSlot,
-                            focusedField: $focusedField,
                             placeholder: "Stopover \(i + 1)",
-                            systemImage: "mappin.and.ellipse"
+                            systemImage: "mappin.and.ellipse",
+                            onActivate: { onActivateSlot(.waypoint(i)) }
                         )
                         Button { viewModel.removeWaypoint(at: i) } label: {
                             Image(systemName: "xmark.circle.fill")
@@ -288,10 +267,9 @@ private struct RouteBuilderCard: View {
                 SlotRow(
                     slot: .destination,
                     viewModel: viewModel,
-                    focusedSlot: $focusedSlot,
-                    focusedField: $focusedField,
                     placeholder: "Destination",
-                    systemImage: "flag.circle"
+                    systemImage: "flag.circle",
+                    onActivate: { onActivateSlot(.destination) }
                 )
 
                 // Control rows
@@ -398,26 +376,26 @@ private struct RouteBuilderCard: View {
 private struct SlotRow: View {
     let slot: PlanViewModel.Slot
     let viewModel: PlanViewModel
-    @Binding var focusedSlot: PlanViewModel.Slot?
-    @FocusState.Binding var focusedField: PlanViewModel.Slot?
     let placeholder: String
     let systemImage: String
+    /// Opens the full-screen search sheet for this slot.
+    let onActivate: () -> Void
 
     var body: some View {
         HStack(spacing: 6) {
             Image(systemName: systemImage)
                 .foregroundStyle(slot == .destination ? Color.appAccent : .secondary)
-            TextField(placeholder, text: Binding(
-                get: { viewModel.endpoint(for: slot).query },
-                set: { viewModel.setQuery($0, for: slot) }
-            ))
-            .focused($focusedField, equals: slot)
-            .font(.subheadline)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .onChange(of: focusedField) {
-                focusedSlot = $1
+            Button(action: onActivate) {
+                HStack {
+                    Text(displayText)
+                        .font(.subheadline)
+                        .foregroundStyle(hasValue ? .primary : .secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
             if let selected = viewModel.endpoint(for: slot).selected {
                 if viewModel.isFavorite(selected) {
@@ -429,14 +407,22 @@ private struct SlotRow: View {
                         .foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
-            } else if viewModel.endpoint(for: slot).isSearching {
-                ProgressView().scaleEffect(0.7)
             }
         }
         .padding(8)
         .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 8))
-        // Suggestions are rendered by PlanView as a bottom safe-area inset
-        // (above the keyboard), keyed off focusedSlot — see PlanView.body.
+    }
+
+    /// The row is display-only: it shows what the slot holds (or a placeholder)
+    /// and tapping it opens the full-screen search sheet — see `PlaceSearchSheet`.
+    private var displayText: String {
+        let endpoint = viewModel.endpoint(for: slot)
+        return endpoint.selected?.name ?? (endpoint.query.isEmpty ? placeholder : endpoint.query)
+    }
+
+    private var hasValue: Bool {
+        let endpoint = viewModel.endpoint(for: slot)
+        return endpoint.selected != nil || !endpoint.query.trimmingCharacters(in: .whitespaces).isEmpty
     }
 }
 
@@ -620,124 +606,249 @@ private struct SaveTripSheet: View {
     }
 }
 
-// MARK: - Search suggestions panel
+// MARK: - Place search sheet
 //
-// Rendered by PlanView as a `.safeAreaInset(edge: .bottom)` so it always sits
-// ABOVE the keyboard (SwiftUI insets respect the keyboard safe area), spans
-// the full card width, and is never clipped by the card/scroll stack. The list
-// scrolls internally, so long favorites lists stay fully reachable.
+// Apple Maps style: tapping a slot opens this full-screen sheet with its own
+// search field. Being a modal sheet it is always above the card stack and the
+// keyboard, so results are never clipped or hidden — the inline dropdown this
+// replaces was clipped by the scroll stack and sat behind the keyboard. The
+// sheet also exposes saved-places and saved-trips management (delete, load)
+// for parity with Android, which shows chips and a saved-trips row on the plan
+// card.
 
-private struct SearchSuggestionsPanel: View {
-    // Property order matches the memberwise init call in PlanView.body.
-    let suggestions: [PlaceResult]
-    let favorites: [SavedPlaceEntity]
+/// Identifiable wrapper so `.sheet(item:)` can present per-slot search.
+private struct SlotTarget: Identifiable {
     let slot: PlanViewModel.Slot
-    let onSelect: (PlaceResult) -> Void
-    let onSelectFavorite: (SavedPlaceEntity) -> Void
-    let onAddFavoriteAsWaypoint: (SavedPlaceEntity) -> Void
-    let onUseCurrentLocation: () -> Void
-    let onDismiss: () -> Void
 
-    /// Height cap: the panel floats above the keyboard, and a scrollable list
-    /// keeps every row reachable no matter how many favorites exist.
-    private let maxListHeight: CGFloat = 280
+    var id: String {
+        switch slot {
+        case .origin: return "origin"
+        case .destination: return "destination"
+        case .waypoint(let index): return "waypoint-\(index)"
+        }
+    }
+}
+
+/// What the confirmation dialog is about to delete.
+private enum PendingDelete: Identifiable {
+    case favorite(SavedPlaceEntity)
+    case trip(SavedTrip)
+
+    var id: String {
+        switch self {
+        case .favorite(let favorite): return "favorite-\(favorite.id)"
+        case .trip(let trip): return "trip-\(trip.id)"
+        }
+    }
+}
+
+private struct PlaceSearchSheet: View {
+    let slot: PlanViewModel.Slot
+    let viewModel: PlanViewModel
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var searchFieldFocused: Bool
+    /// Single delete target so the two confirmation dialogs can share one
+    /// `.alert` — SwiftUI only honors the last `.alert` attached to a view.
+    @State private var pendingDelete: PendingDelete?
+
+    private var query: String { viewModel.endpoint(for: slot).query }
+    private var suggestions: [PlaceResult] { viewModel.endpoint(for: slot).suggestions }
+    private var isSearching: Bool { viewModel.endpoint(for: slot).isSearching }
+    private var canSearch: Bool { query.trimmingCharacters(in: .whitespaces).count >= 3 }
+
+    private var title: String {
+        switch slot {
+        case .origin: return "Set origin"
+        case .destination: return "Set destination"
+        case .waypoint(let index): return "Set stopover \(index + 1)"
+        }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header: label + dismiss
-            HStack {
-                Text("SAVED & RESULTS")
-                    .font(.ioniqCaption).foregroundStyle(.secondary).ioniqStatLabel()
-                Spacer()
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.body)
-                        .foregroundStyle(.tertiary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close suggestions")
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 10)
-            .padding(.bottom, 6)
-
-            Divider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // Current location
-                    Button {
-                        onUseCurrentLocation()
-                        onDismiss()
-                    } label: {
-                        Label("Current location", systemImage: "location.circle")
-                            .font(.subheadline).padding(10)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-
-                    if !favorites.isEmpty {
-                        Divider()
-                        ForEach(favorites) { fav in
-                            HStack(spacing: 4) {
-                                Button {
-                                    onSelectFavorite(fav)
-                                    onDismiss()
-                                } label: {
-                                    Label(fav.name, systemImage: "star.fill")
-                                        .font(.subheadline)
-                                        .lineLimit(1)
-                                        .padding(10)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.plain)
-                                if slot != .destination && slot != .origin {
-                                    Button {
-                                        onAddFavoriteAsWaypoint(fav)
-                                        onDismiss()
-                                    } label: {
-                                        Image(systemName: "plus.circle")
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .padding(.trailing, 8)
-                                    .accessibilityLabel("Add \(fav.name) as stopover")
-                                }
-                            }
-                        }
-                    }
-
-                    if !suggestions.isEmpty {
-                        Divider()
-                        ForEach(suggestions) { suggestion in
-                            Button {
-                                onSelect(suggestion)
-                                onDismiss()
-                            } label: {
-                                VStack(alignment: .leading, spacing: 1) {
-                                    Text(suggestion.name).font(.subheadline)
-                                    if !suggestion.subtitle.isEmpty {
-                                        Text(suggestion.subtitle).font(.caption2).foregroundStyle(.secondary)
-                                    }
-                                }
-                                .padding(10)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+        NavigationStack {
+            List {
+                Section {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField("Search places", text: queryBinding)
+                            .focused($searchFieldFocused)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .submitLabel(.search)
+                        if !query.isEmpty {
+                            Button { viewModel.setQuery("", for: slot) } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.tertiary)
                             }
                             .buttonStyle(.plain)
                         }
                     }
                 }
+
+                if canSearch {
+                    searchResultsSection
+                } else {
+                    quickActionsSection
+                    favoritesSection
+                    savedTripsSection
+                }
             }
-            .frame(maxHeight: maxListHeight)
-            .scrollDismissesKeyboard(.immediately)
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .onAppear { searchFieldFocused = true }
+            .alert("Remove saved item?", isPresented: deleteBinding, presenting: pendingDelete) { target in
+                switch target {
+                case .favorite(let favorite):
+                    Button("Remove", role: .destructive) { viewModel.deleteFavorite(favorite) }
+                    Button("Cancel", role: .cancel) {}
+                case .trip(let trip):
+                    Button("Delete", role: .destructive) { viewModel.deleteTrip(trip) }
+                    Button("Cancel", role: .cancel) {}
+                }
+            } message: { target in
+                switch target {
+                case .favorite(let favorite):
+                    Text("Remove \u{201C}\(favorite.name)\u{201D} from your saved places?")
+                case .trip(let trip):
+                    Text("Delete \u{201C}\(trip.name)\u{201D} from your saved trips?")
+                }
+            }
         }
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: .black.opacity(0.15), radius: 12, y: -4)
-        .padding(.horizontal)
-        .padding(.bottom, 6)
+    }
+
+    private var queryBinding: Binding<String> {
+        Binding(
+            get: { viewModel.endpoint(for: slot).query },
+            set: { viewModel.setQuery($0, for: slot) }
+        )
+    }
+
+    private var deleteBinding: Binding<Bool> {
+        Binding(
+            get: { pendingDelete != nil },
+            set: { if !$0 { pendingDelete = nil } }
+        )
+    }
+
+    @ViewBuilder private var searchResultsSection: some View {
+        if isSearching {
+            Section {
+                HStack { Spacer(); ProgressView(); Spacer() }
+            }
+        } else if suggestions.isEmpty {
+            Section {
+                Text("No places found for \u{201C}\(query)\u{201D}.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+        } else {
+            Section("Results") {
+                ForEach(suggestions) { suggestion in
+                    Button {
+                        viewModel.select(suggestion, for: slot)
+                        dismiss()
+                    } label: {
+                        VStack(alignment: .leading, spacing: 1) {
+                            Text(suggestion.name).font(.subheadline)
+                            if !suggestion.subtitle.isEmpty {
+                                Text(suggestion.subtitle).font(.caption2).foregroundStyle(.secondary)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var quickActionsSection: some View {
+        Section {
+            Button {
+                Task {
+                    await viewModel.useCurrentLocation(for: slot)
+                    dismiss()
+                }
+            } label: {
+                Label("Current location", systemImage: "location.circle")
+            }
+        }
+    }
+
+    @ViewBuilder private var favoritesSection: some View {
+        if !viewModel.favoritePlaces.isEmpty {
+            Section("Favorite places") {
+                ForEach(viewModel.favoritePlaces) { favorite in
+                    HStack(spacing: 4) {
+                        Button {
+                            viewModel.selectFavorite(favorite, for: slot)
+                            dismiss()
+                        } label: {
+                            Label(favorite.name, systemImage: "star.fill")
+                                .font(.subheadline)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        if slot != .destination && slot != .origin {
+                            Button {
+                                viewModel.addFavoriteAsWaypoint(favorite)
+                            } label: {
+                                Image(systemName: "plus.circle")
+                                    .foregroundStyle(.tertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Button {
+                            pendingDelete = .favorite(favorite)
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var savedTripsSection: some View {
+        if !viewModel.savedTrips.isEmpty {
+            Section("Saved trips") {
+                ForEach(viewModel.savedTrips) { trip in
+                    HStack(spacing: 4) {
+                        Button {
+                            viewModel.loadTrip(trip)
+                            dismiss()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(trip.name).font(.subheadline)
+                                Text("\(trip.def.origin.name) → \(trip.def.destination.name)")
+                                    .font(.caption2).foregroundStyle(.secondary)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        Button {
+                            pendingDelete = .trip(trip)
+                        } label: {
+                            Image(systemName: "trash")
+                                .foregroundStyle(.red)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
     }
 }
 

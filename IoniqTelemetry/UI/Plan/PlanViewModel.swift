@@ -350,11 +350,17 @@ final class PlanViewModel {
     }
 
     func useCurrentLocation() async {
+        await useCurrentLocation(for: .origin)
+    }
+
+    /// Fills the given slot with the device's current location. The search sheet
+    /// uses this so "Current location" lands in whichever field was tapped.
+    func useCurrentLocation(for slot: Slot) async {
         guard let location = await locationProvider.currentLocation() else {
             errorMessage = "Location unavailable. Check permissions in Settings."
             return
         }
-        select(PlaceResult(name: "Current location", location: location), for: .origin)
+        select(PlaceResult(name: "Current location", location: location), for: slot)
     }
 
     /// Uses a nearby charger as the destination — the "drive to this charger" case,
