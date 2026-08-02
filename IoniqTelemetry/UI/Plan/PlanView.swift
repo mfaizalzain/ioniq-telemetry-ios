@@ -52,6 +52,7 @@ struct PlanView: View {
                     .padding(.horizontal)
                 }
             }
+            .background(Color.appBackground)
             .scrollDismissesKeyboard(.interactively)
             .refreshable { await viewModel?.loadNearbyChargers() }
             // Full-screen place search (Apple Maps style): tapping a slot opens a
