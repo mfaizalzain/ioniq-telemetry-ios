@@ -64,6 +64,11 @@ public final class TripLogRepository: @unchecked Sendable {
     private let pendingSamplesLock = NSLock()
     private var pendingSamples: [SampleEntity] = []
 
+    /// Samples of recently-deleted trips, retained so undo restores the full route
+    /// and charts rather than a bare trip row. Keyed by trip id; lives only until
+    /// the undo window passes or the process ends.
+    private var deletedTripSamples: [String: [SampleEntity]] = [:]
+
     // Active trip state
     private var activeTripId: String?
     private var tripStartSocDisplay: Float?
@@ -197,9 +202,22 @@ public final class TripLogRepository: @unchecked Sendable {
         pendingSamplesLock.withLock {
             pendingSamples.removeAll { $0.tripId == id }
         }
-        // Delete samples
+        // Hold detached copies of the samples so an immediate undo restores the
+        // full route and charts. They only live in memory until the undo window
+        // passes or the process ends.
         let sampleDescriptor = FetchDescriptor<SampleEntity>(predicate: #Predicate { $0.tripId == id })
-        for sample in try modelContext.fetch(sampleDescriptor) {
+        let samples = try modelContext.fetch(sampleDescriptor)
+        pendingSamplesLock.withLock {
+            deletedTripSamples[id] = samples.map {
+                SampleEntity(
+                    tripId: $0.tripId, timestamp: $0.timestamp,
+                    soc: $0.soc, powerKw: $0.powerKw, speedKph: $0.speedKph,
+                    lat: $0.lat, lon: $0.lon, elevationM: $0.elevationM,
+                    ambientTempC: $0.ambientTempC, packTempC: $0.packTempC
+                )
+            }
+        }
+        for sample in samples {
             modelContext.delete(sample)
         }
         // Delete trip
@@ -211,7 +229,24 @@ public final class TripLogRepository: @unchecked Sendable {
     }
 
     public func restoreTrip(_ trip: TripEntity) throws {
-        modelContext.insert(trip)
+        // Restore the samples captured at delete time so undo brings back the
+        // route and charts, not a bare trip row. Fresh instances get fresh
+        // persistent ids; the tripId link is what matters.
+        let samples = pendingSamplesLock.withLock {
+            deletedTripSamples.removeValue(forKey: trip.id) ?? []
+        }
+        // A deleted model object cannot be re-inserted — SwiftData silently drops
+        // the insert. Rebuild a fresh instance with the same values.
+        let restored = TripEntity(
+            id: trip.id, startTime: trip.startTime, endTime: trip.endTime,
+            startSoc: trip.startSoc, endSoc: trip.endSoc,
+            distanceKm: trip.distanceKm, energyUsedKwh: trip.energyUsedKwh,
+            avgConsumptionKwhPer100km: trip.avgConsumptionKwhPer100km,
+            ambientTempAvgC: trip.ambientTempAvgC, note: trip.note,
+            aiBriefing: trip.aiBriefing
+        )
+        modelContext.insert(restored)
+        for sample in samples { modelContext.insert(sample) }
         try modelContext.save()
     }
 
