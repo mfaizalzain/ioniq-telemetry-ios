@@ -86,7 +86,8 @@ Dependencies point one way: `CoreDomain` ← everything, `CoreData`/`CoreOBD`/`C
 - BMS state of charge and display SOC, BMS-reported SOH, pack voltage/current and
   derived power, cell min/max and delta in mV, per-module pack temperatures, inlet
   and ambient/cabin temperature, speed, odometer, 12 V auxiliary voltage, TPMS
-  pressures and temperatures.
+  pressures and temperatures. The SOH tile also shows the coulomb-counted
+  estimate as an "Est X%" badge next to the BMS figure.
 - Charging detection with AC/DC type, and a DC charge-curve chart on the dashboard.
 - Range estimate labelled by provenance: `measured` from the driver's own logged
   trips, or `nominal` (18 kWh/100 km E-GMP default) when there isn't enough history.
@@ -102,6 +103,10 @@ Dependencies point one way: `CoreDomain` ← everything, `CoreData`/`CoreOBD`/`C
 - Charge sessions logged with energy added, peak/average power and SOC gained.
 - Independent coulomb-counted SOH (`BatteryHealthEstimator`), stored separately from
   the BMS figure and only published after a large enough SOC swing.
+- The battery report adds a charge-acceptance trend chart (peak DC kW per
+  session, last 90 days) alongside the AI write-up.
+- Trip details render the summary to a PNG (`ImageRenderer`) and share it through
+  the system share sheet.
 
 ### Route and charge-stop planning
 - Place search, origin/destination swap, ordered stopovers, saved trips and favourite
@@ -118,6 +123,9 @@ Dependencies point one way: `CoreDomain` ← everything, `CoreData`/`CoreOBD`/`C
 - Reject a charger and re-solve without spending another routing or charger API call.
 - Hand the finished trip to Google Maps (when installed) or Apple Maps — the app
   plans, it does not navigate.
+- The itinerary quotes the estimated charging bill (`TripPlan.totalChargingCost`,
+  currency symbol parsed from the OCM `usageCost` string); the figure appears
+  only when every stop is priced.
 
 ### While driving
 - `LiveReplanMonitor` matches the GPS fix onto the routed polyline and compares
@@ -129,6 +137,20 @@ Dependencies point one way: `CoreDomain` ← everything, `CoreData`/`CoreOBD`/`C
   next stop is occupied and the stop is minutes away; the notification carries a
   "Re-route" action that commits the parked alternative. Stations with no live status
   are never counted as free.
+- A Live Activity (ActivityKit) shows SOC, range and charging state on the lock
+  screen / Dynamic Island while the adapter is connected, updated on meaningful
+  change or every 30 s, and ended on disconnect.
+
+### Reminders
+
+Two daily reminders via `UNCalendarNotificationTrigger`
+(`ReminderScheduler`), re-armed idempotently whenever settings change:
+
+- **Preconditioning** — a nudge at the driver-set departure time so the battery
+  is preconditioned before leaving.
+- **Off-peak charging** — an evening check (19:00, before the 23:00 window
+  opens) nudging a charge toward off-peak rates, shown only when the driver's
+  usual charging hour falls outside 23:00–06:00.
 
 ### CarPlay
 Tab bar with Vehicle, Charging, Chargers (point-of-interest map) and Trips. Templates
