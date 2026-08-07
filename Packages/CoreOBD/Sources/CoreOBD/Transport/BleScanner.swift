@@ -39,7 +39,14 @@ public final class BleScanner: NSObject, @unchecked Sendable {
     }
 
     /// Non-nil when the radio is in a state that blocks scanning.
-    public private(set) var unavailableReason: String?
+    ///
+    /// Written on the CoreBluetooth queue (centralManagerDidUpdateState) and read on
+    /// the main thread by the UI — a plain stored property would race. Both sides go
+    /// through the lock.
+    private var _unavailableReason: String?
+    public var unavailableReason: String? {
+        lock.withLock { _unavailableReason }
+    }
 
     public override init() {
         super.init()
@@ -99,19 +106,19 @@ extension BleScanner: CBCentralManagerDelegate {
     public func centralManagerDidUpdateState(_ central: CBCentralManager) {
         switch central.state {
         case .poweredOn:
-            unavailableReason = nil
+            lock.withLock { _unavailableReason = nil }
             if lock.withLock({ wantsScan }) { beginScan() }
         case .poweredOff:
-            unavailableReason = "Bluetooth is turned off."
+            lock.withLock { _unavailableReason = "Bluetooth is turned off." }
             _isScanning.send(false)
         case .unauthorized:
-            unavailableReason = "Bluetooth permission was denied for this app."
+            lock.withLock { _unavailableReason = "Bluetooth permission was denied for this app." }
             _isScanning.send(false)
         case .unsupported:
-            unavailableReason = "This device does not support Bluetooth LE."
+            lock.withLock { _unavailableReason = "This device does not support Bluetooth LE." }
             _isScanning.send(false)
         default:
-            unavailableReason = nil
+            lock.withLock { _unavailableReason = nil }
         }
     }
 

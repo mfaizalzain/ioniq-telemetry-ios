@@ -501,6 +501,38 @@ public final class TripLogRepository: @unchecked Sendable {
         try modelContext.save()
     }
 
+    /// Closes trips left open by a killed process.
+    ///
+    /// `startTrip` persists a trip immediately with provisional values, and only
+    /// `endTrip` (driven by telemetry frames or the supervisor) finalizes it. If the
+    /// OS kills the process mid-drive, the row survives with `endTime == nil` — shown
+    /// as "In progress" forever. Called on launch and app resume, this gives each such
+    /// trip an end time (the last sample's timestamp, or `now` when nothing was
+    /// flushed) so the list and summaries stay honest. It never touches the in-memory
+    /// active trip, which the running session finalizes itself.
+    public func finalizeOrphanedTrips(now: Date = Date()) throws {
+        let descriptor = FetchDescriptor<TripEntity>(
+            predicate: #Predicate { $0.endTime == nil }
+        )
+        let open = try modelContext.fetch(descriptor)
+        guard !open.isEmpty else { return }
+
+        for trip in open {
+            // Last flushed sample gives the most honest end time; without one, the
+            // trip started but nothing was logged, so now is the best available.
+            // (The id is captured as a plain value — a keypath-to-keypath
+            // comparison inside #Predicate fails to type-check on Swift 6.3.)
+            let tripId = trip.id
+            let sampleDescriptor = FetchDescriptor<SampleEntity>(
+                predicate: #Predicate { $0.tripId == tripId },
+                sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+            )
+            let lastSample = try modelContext.fetch(sampleDescriptor).first
+            trip.endTime = lastSample?.timestamp ?? now
+        }
+        try modelContext.save()
+    }
+
     // MARK: - Export
 
     public func exportCsv(samples: [SampleEntity]) -> String {

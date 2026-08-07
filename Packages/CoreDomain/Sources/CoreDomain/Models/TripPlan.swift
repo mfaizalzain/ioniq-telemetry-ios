@@ -97,6 +97,8 @@ public struct ChargeStop: Sendable, Equatable {
     public var chargeMinutes: Int
     public var energyAddedKwh: Float
     public var distanceFromOriginKm: Float
+    /// Perpendicular drive off the main route to reach this charger, in km.
+    public var detourKm: Float
 
     public init(
         charger: Charger,
@@ -104,7 +106,8 @@ public struct ChargeStop: Sendable, Equatable {
         departureSoc: Float,
         chargeMinutes: Int,
         energyAddedKwh: Float,
-        distanceFromOriginKm: Float
+        distanceFromOriginKm: Float,
+        detourKm: Float = 0
     ) {
         self.charger = charger
         self.arrivalSoc = arrivalSoc
@@ -112,6 +115,7 @@ public struct ChargeStop: Sendable, Equatable {
         self.chargeMinutes = chargeMinutes
         self.energyAddedKwh = energyAddedKwh
         self.distanceFromOriginKm = distanceFromOriginKm
+        self.detourKm = detourKm
     }
 }
 

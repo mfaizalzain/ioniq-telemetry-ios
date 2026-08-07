@@ -40,7 +40,14 @@ enum KeychainStore {
 
     /// Writes, or deletes the entry entirely when `value` is nil or empty — so a
     /// cleared key field leaves nothing behind.
-    static func write(_ value: String?, account: String) {
+    ///
+    /// Returns success only when the write actually landed. The old version dropped
+    /// every non-`errSecItemNotFound` status, so a key the user just typed could
+    /// silently fail to persist (locked device, `errSecInteractionNotAllowed`) and
+    /// come back missing on the next launch. Callers surface the failure rather than
+    /// pretending the write happened.
+    @discardableResult
+    static func write(_ value: String?, account: String) -> Result<Void, KeychainError> {
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -48,8 +55,10 @@ enum KeychainStore {
         ]
 
         guard let value, !value.isEmpty else {
-            SecItemDelete(base as CFDictionary)
-            return
+            let status = SecItemDelete(base as CFDictionary)
+            return status == errSecSuccess || status == errSecItemNotFound
+                ? .success(())
+                : .failure(KeychainError(status: status, operation: "delete"))
         }
 
         let data = Data(value.utf8)
@@ -61,7 +70,28 @@ enum KeychainStore {
         // Update first; SecItemAdd fails with errSecDuplicateItem on an existing entry.
         let status = SecItemUpdate(base as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
-            SecItemAdd(base.merging(attributes) { _, new in new } as CFDictionary, nil)
+            let addStatus = SecItemAdd(base.merging(attributes) { _, new in new } as CFDictionary, nil)
+            return addStatus == errSecSuccess
+                ? .success(())
+                : .failure(KeychainError(status: addStatus, operation: "add"))
         }
+        return status == errSecSuccess
+            ? .success(())
+            : .failure(KeychainError(status: status, operation: "update"))
+    }
+}
+
+enum KeychainError: Error, CustomStringConvertible {
+    case osStatus(OSStatus, operation: String)
+
+    init(status: OSStatus, operation: String) {
+        self = .osStatus(status, operation: operation)
+    }
+
+    var description: String {
+        if case .osStatus(let status, let operation) = self {
+            return "Keychain \(operation) failed with OSStatus \(status)"
+        }
+        return "Keychain operation failed"
     }
 }

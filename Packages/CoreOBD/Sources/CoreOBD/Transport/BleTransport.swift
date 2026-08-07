@@ -153,11 +153,17 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
                 lastIdentifier = identifier
             }
 
-            try await withStageTimeout(Self.setupTimeout) {
+            try await withStageTimeout(
+                Self.setupTimeout,
+                timeoutError: BleError.connectFailed("Timed out establishing the link.")
+            ) {
                 self.centralManager.connect(target, options: nil)
             }
 
-            try await withStageTimeout(Self.setupTimeout) {
+            try await withStageTimeout(
+                Self.setupTimeout,
+                timeoutError: BleError.noUsableCharacteristics
+            ) {
                 target.discoverServices(nil)
             }
 
@@ -335,7 +341,7 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
             lock.withLock { targetIdentifier = nil }
         }
 
-        try await withStageTimeout(Self.discoveryTimeout) {
+        try await withStageTimeout(Self.discoveryTimeout, timeoutError: BleError.deviceNotFound) {
             // Nil services: ELM327 clones frequently omit their service UUIDs
             // from the advertisement packet, so filtering by UUID misses them.
             self.centralManager.scanForPeripherals(withServices: nil, options: nil)
@@ -346,12 +352,18 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
     }
 
     /// Runs `action` and suspends until a delegate callback resumes the stage
-    /// continuation, or the timeout elapses.
-    private func withStageTimeout(_ seconds: TimeInterval, _ action: @escaping () -> Void) async throws {
+    /// continuation, or the timeout elapses. `timeoutError` is what the caller will
+    /// see — a discovery timeout is not "adapter not found", so the stage names its
+    /// own failure instead of every timeout collapsing to deviceNotFound.
+    private func withStageTimeout(
+        _ seconds: TimeInterval,
+        timeoutError: Error,
+        _ action: @escaping () -> Void
+    ) async throws {
         let timeoutTask = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
             guard !Task.isCancelled else { return }
-            self?.takePendingStage()?.resume(throwing: BleError.deviceNotFound)
+            self?.takePendingStage()?.resume(throwing: timeoutError)
         }
         defer { timeoutTask.cancel() }
 

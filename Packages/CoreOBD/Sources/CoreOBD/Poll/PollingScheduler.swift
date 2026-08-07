@@ -80,7 +80,13 @@ public final class PollingScheduler: @unchecked Sendable {
             lock.withLock { currentHeader = request.header }
         }
 
-        let framed = isoTpSingleFrame(requestHex: request.request)
+        // A request profile longer than 7 bytes cannot be a single frame; treating
+        // the failure as a timeout surfaces the misconfiguration instead of silently
+        // mis-framing it.
+        guard let framed = try? isoTpSingleFrame(requestHex: request.request) else {
+            registerFailure(request: request)
+            return
+        }
 
         // Retry with exponential backoff
         var raw: String?
@@ -114,7 +120,10 @@ public final class PollingScheduler: @unchecked Sendable {
     private func configureHeader(header: String) async -> Bool {
         for cmd in ["ATSH\(header)", "ATFCSH\(header)", "ATFCSD300000", "ATFCSM1"] {
             do {
-                _ = try await transport.send(command: cmd, timeoutMs: 500)
+                // A '?' reply means the command wasn't applied — treat it like a timeout.
+                if isErrorResponse(try await transport.send(command: cmd, timeoutMs: 500)) {
+                    return false
+                }
             } catch { return false }
         }
         return true

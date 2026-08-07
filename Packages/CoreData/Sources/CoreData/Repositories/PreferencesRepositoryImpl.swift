@@ -133,13 +133,24 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(prefs.dynamicColor, forKey: "dynamicColor")
         setFloatOrNil(prefs.estimatedSohPercent, forKey: "estimatedSohPercent", in: defaults)
         defaults.set(Int(prefs.estimatedSohTimestamp), forKey: "estimatedSohTimestamp")
-        KeychainStore.write(prefs.googleMapsApiKey, account: SecretKey.googleMaps)
-        KeychainStore.write(prefs.orsApiKey, account: SecretKey.ors)
-        KeychainStore.write(prefs.openChargeMapApiKey, account: SecretKey.openChargeMap)
+        // A failed Keychain write means the key will be missing next launch. Fail
+        // loud enough to be noticed rather than silently dropping it.
+        let keyWrites: [(String, Result<Void, KeychainError>)] = [
+            (SecretKey.googleMaps, KeychainStore.write(prefs.googleMapsApiKey, account: SecretKey.googleMaps)),
+            (SecretKey.ors, KeychainStore.write(prefs.orsApiKey, account: SecretKey.ors)),
+            (SecretKey.openChargeMap, KeychainStore.write(prefs.openChargeMapApiKey, account: SecretKey.openChargeMap)),
+        ]
         defaults.set(prefs.routingProvider.rawValue, forKey: "routingProvider")
-        KeychainStore.write(prefs.geminiApiKey, account: SecretKey.gemini)
-        KeychainStore.write(prefs.deepseekApiKey, account: SecretKey.deepseek)
+        let aiWrites: [(String, Result<Void, KeychainError>)] = [
+            (SecretKey.gemini, KeychainStore.write(prefs.geminiApiKey, account: SecretKey.gemini)),
+            (SecretKey.deepseek, KeychainStore.write(prefs.deepseekApiKey, account: SecretKey.deepseek)),
+        ]
         defaults.set(prefs.aiProvider.rawValue, forKey: "aiProvider")
+        for (account, result) in keyWrites + aiWrites {
+            if case .failure(let error) = result {
+                print("[PreferencesRepository] failed to persist key '\(account)': \(error)")
+            }
+        }
         defaults.set(prefs.aiFeaturesEnabled, forKey: "aiFeaturesEnabled")
         defaults.set(prefs.aiCoachingEnabled, forKey: "aiCoachingEnabled")
         defaults.set(prefs.chargerOccupancyAlerts, forKey: "chargerOccupancyAlerts")

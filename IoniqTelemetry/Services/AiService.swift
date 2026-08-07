@@ -166,7 +166,11 @@ final class AiService {
         // kWh per 100 km: energy over distance. This was inverted, feeding the model
         // ~590 kWh/100km for trips averaging 17 — and the prompt prices that figure.
         let avgConsumption = totalDistance > 0 ? totalEnergy / totalDistance * 100 : 0
-        let avgSpeed = trips.compactMap { avgSpeedValue(from: $0) }.reduce(0, +) / max(Float(trips.count), 1)
+        // Divide by the number of trips that actually have an average speed, not by
+        // trips.count — avgSpeedValue returns nil for a trip with no endTime, so a
+        // single incomplete trip used to inflate the mean toward it.
+        let speeds = trips.compactMap { avgSpeedValue(from: $0) }
+        let avgSpeed = speeds.isEmpty ? 0 : speeds.reduce(0, +) / Float(speeds.count)
         let totalDurationMinutes = trips.compactMap { durationMinutes(from: $0) }.reduce(0, +)
 
         var statsLines = [
@@ -342,7 +346,7 @@ final class AiService {
 
     /// Calls the Gemini API (Google AI Studio).
     private func callGemini(prompt: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: "\(baseURLGemini)?key=\(apiKey)") else {
+        guard let url = URL(string: baseURLGemini) else {
             throw AiError.invalidURL
         }
 
@@ -360,6 +364,10 @@ final class AiService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        // The key goes in the x-goog-api-key header, never the URL query string:
+        // a query-embedded key leaks into proxy/referrer logs. The Places/ORS/
+        // DeepSeek calls already use headers.
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 

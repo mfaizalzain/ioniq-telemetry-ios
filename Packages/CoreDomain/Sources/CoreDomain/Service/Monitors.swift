@@ -174,7 +174,9 @@ public final class TirePressureMonitor {
         let newlyLow = low.filter { !alerted.contains($0.0) }
         guard !newlyLow.isEmpty else { return }
         newlyLow.forEach { alerted.insert($0.0) }
-        onAlert(low.map { ($0.0, Int($0.1)) })
+        // Only the wheels that newly crossed the threshold. Passing `low` here
+        // re-alerted already-announced wheels every time another one went low.
+        onAlert(newlyLow.map { ($0.0, Int($0.1)) })
     }
 }
 

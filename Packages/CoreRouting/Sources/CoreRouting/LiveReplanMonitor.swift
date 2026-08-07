@@ -80,6 +80,9 @@ public final class LiveReplanMonitor {
             deadReckonedKm = travelledKm
         } else {
             // Dead reckoning: integrate speed. Never yields an off-route figure.
+            // A zero rate (leg.startSoc == leg.endSoc) would predict startSoc forever
+            // and silently disable drift detection — bail out instead.
+            guard socPerKm > 0 else { return nil }
             let dtHours = telemetry.timestamp.timeIntervalSince(lastTimestamp ?? telemetry.timestamp) / 3600
             if dtHours > 0, dtHours < 1 {
                 deadReckonedKm += Double(telemetry.speedKph ?? 0) * dtHours

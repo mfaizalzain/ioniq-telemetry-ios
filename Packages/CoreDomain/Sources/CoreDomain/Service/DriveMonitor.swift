@@ -101,6 +101,8 @@ public final class DriveMonitor {
     public static let movementSpeedKph: Float = 3
     /// No fix for this long, at a 25 m filter, means under 25 m covered.
     public static let staleFix: TimeInterval = 30
+    /// No E-GMP car exceeds this; a computed figure above it is GPS jitter, not motion.
+    public static let maxPlausibleKph: Float = 250
     /// Last-resort trip start when nothing can observe movement.
     public static let blindStartAfter: TimeInterval = 30
 
@@ -243,7 +245,13 @@ public final class DriveMonitor {
             let dtSeconds = fix.at.timeIntervalSince(previous.at)
             if dtSeconds > 0 {
                 let kph = Float(previous.distance(to: fix) / dtSeconds * 3.6)
-                lastSpeedKph = (kph.isFinite && kph >= 0) ? kph : 0
+                // Two near-simultaneous fixes with a few metres of GPS jitter can
+                // compute to hundreds of km/h — enough to flip a parked car to
+                // `.driving` for the whole stale window. Cap at a figure no E-GMP
+                // car can reach so jitter reads as a plausible-but-high speed, not
+                // as motion evidence.
+                let clamped = min(kph, Self.maxPlausibleKph)
+                lastSpeedKph = (clamped.isFinite && clamped >= 0) ? clamped : 0
             }
             previousFix = fix
             return lastSpeedKph

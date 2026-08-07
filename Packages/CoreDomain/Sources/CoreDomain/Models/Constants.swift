@@ -64,7 +64,11 @@ public enum Ioniq5Constants {
 
     public static func usableKwhForProfile(_ profileId: String, customKwh: Float? = nil) -> Float {
         if let customKwh, customKwh > 0 { return customKwh }
-        return allVehicles.first { $0.id == profileId }?.usableKwh
+        // Match by catalog id OR obdProfileId — the routing layer passes the active
+        // OBD profile id (e.g. "ioniq5_84kwh"), which is not a catalog id. Without
+        // the obdProfileId arm an 84 kWh owner got the 77.4 kWh default in the
+        // range/charge math.
+        return allVehicles.first { $0.id == profileId || $0.obdProfileId == profileId }?.usableKwh
             ?? 77.4 // default
     }
 }

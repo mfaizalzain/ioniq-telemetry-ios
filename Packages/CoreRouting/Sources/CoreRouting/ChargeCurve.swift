@@ -40,6 +40,9 @@ public struct ChargeCurve: Sendable {
 
     /// Interpolated charge power at a given SOC.
     public func powerAtSoc(socPercent: Float) -> Float {
+        // An empty curve (public init) must not force-unwrap and crash; no curve
+        // means no charging, so report zero.
+        guard !curve.isEmpty else { return 0 }
         let clamped = min(max(socPercent, 0), 100)
         let upper = curve.first(where: { Float($0.0) >= clamped }) ?? curve.last!
         let lower = curve.last(where: { Float($0.0) <= clamped }) ?? curve.first!
@@ -62,6 +65,9 @@ public struct ChargeCurve: Sendable {
         packTempC: Float = 25
     ) -> Int {
         if toSocPercent <= fromSocPercent { return 0 }
+        // No curve means no charging — powerAtSoc floors at 1 kW to avoid a divide
+        // by zero, which would otherwise turn an empty curve into a 46-hour charge.
+        if curve.isEmpty { return 0 }
         let derate = derateForTemp(packTempC: packTempC)
         var hours: Double = 0
         var soc = fromSocPercent

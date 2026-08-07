@@ -21,6 +21,10 @@ final class PaywallViewModel {
     private(set) var product: Product?
     private(set) var isLoading = false
     private(set) var purchaseInProgress: Product.ID?
+    /// Set while a purchase awaits approval (bank transfer / slow payment). The
+    /// `Transaction.updates` listener finishes it; this is the visible "not done
+    /// yet, don't tap again" signal.
+    private(set) var pendingApproval = false
     private(set) var errorMessage: String?
     private(set) var isPro = false
 
@@ -71,7 +75,9 @@ final class PaywallViewModel {
     // MARK: - Purchase
 
     func purchase(_ product: Product) async {
+        guard purchaseInProgress == nil else { return }
         purchaseInProgress = product.id
+        pendingApproval = false
         errorMessage = nil
         defer { purchaseInProgress = nil }
 
@@ -88,7 +94,9 @@ final class PaywallViewModel {
             case .userCancelled:
                 break
             case .pending:
-                errorMessage = "Purchase is pending approval."
+                // Not an error: the payment needs approval and will resolve through
+                // Transaction.updates. Surface it as a waiting state, not a warning.
+                pendingApproval = true
             @unknown default:
                 break
             }
@@ -99,7 +107,12 @@ final class PaywallViewModel {
     }
 
     func restore() async {
+        // A restore during an in-flight purchase would race StoreKit's transaction
+        // handling — AppStore.sync() while product.purchase() is awaiting the App
+        // Store sheet. Mutual exclusion, not just a disabled button.
+        guard purchaseInProgress == nil else { return }
         isLoading = true
+        pendingApproval = false
         defer { isLoading = false }
         do {
             try await AppStore.sync()
@@ -162,6 +175,8 @@ final class PaywallViewModel {
     /// follows from the repository's publisher rather than being assigned twice.
     @discardableResult
     private func refreshEntitlement() async -> Bool {
-        await entitlement.refreshEntitlements()
+        let entitled = await entitlement.refreshEntitlements()
+        if entitled { pendingApproval = false }
+        return entitled
     }
 }

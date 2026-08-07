@@ -138,6 +138,19 @@ final class ConnectedCarService {
 
         startSupervisor()
 
+        // Close any trip the OS killed the process with mid-drive: the persisted row
+        // has endTime == nil and would otherwise read "In progress" forever. This is
+        // the relaunch backstop — finalizeStaleTripIfNeeded below only covers the
+        // in-memory session from this launch.
+        let tripLog = services.tripLog
+        Task {
+            do {
+                try tripLog.finalizeOrphanedTrips()
+            } catch {
+                print("[ConnectedCarService] finalizeOrphanedTrips failed: \(error.localizedDescription)")
+            }
+        }
+
         // Defensive: an orphaned trip can only survive in memory across a
         // background/foreground cycle, not a relaunch, so this is usually a
         // no-op — but a re-entered start() with a stale session flagged should
@@ -295,6 +308,15 @@ final class ConnectedCarService {
     /// Resume hook, called from the SwiftUI scenePhase change when the app
     /// becomes active again.
     func appDidBecomeActive() {
+        // Relaunch backstop for trips the OS killed mid-drive (see start()).
+        let tripLog = services.tripLog
+        Task {
+            do {
+                try tripLog.finalizeOrphanedTrips()
+            } catch {
+                print("[ConnectedCarService] finalizeOrphanedTrips failed: \(error.localizedDescription)")
+            }
+        }
         finalizeStaleTripIfNeeded()
     }
 

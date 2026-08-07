@@ -242,11 +242,11 @@ public final class ObdManager {
         headers: [String] = PidSweeper.defaultHeaders,
         identifiers: [String] = PidSweeper.defaultIdentifiers,
         onFinding: @escaping @Sendable (PidSweeper.Finding) async -> Void = { _ in }
-    ) async -> [String] {
+    ) async throws -> [String] {
         let t = transport
-        return await withPollingPaused {
+        return try await withPollingPaused {
             guard let t else { return [] }
-            return await PidSweeper(transport: t, recorder: recorder).sweep(
+            return try await PidSweeper(transport: t, recorder: recorder).sweep(
                 headers: headers,
                 identifiers: identifiers,
                 onFinding: onFinding

@@ -128,6 +128,10 @@ public final class CalibrationUpdater: @unchecked Sendable {
         actualEnergyKwh: Double
     ) -> CalibrationFactors {
         if distanceKm < 1.0 || speedKph < 5.0 { return factors }
+        // Zero/near-zero measured energy (a bad trip log, or a regen-only segment)
+        // must not calibrate: it would drive the ratio to the 0.3 floor and ratchet
+        // the scales down on every trip. Reject it outright.
+        if actualEnergyKwh <= 0.05 { return factors }
         let seedModel = ConsumptionModel(
             calibration: CalibrationFactors(fittedSampleKm: 0.0)
         )

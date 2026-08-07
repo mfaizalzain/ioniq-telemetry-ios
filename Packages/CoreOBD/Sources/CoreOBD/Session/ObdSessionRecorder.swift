@@ -6,6 +6,7 @@ public final class ObdSessionRecorder: @unchecked Sendable {
     private let directory: URL
     private let fileLock = NSLock()
     private var _file: URL?
+    private var _handle: FileHandle?
 
     public var isRecording: Bool {
         fileLock.withLock { _file != nil }
@@ -25,7 +26,16 @@ public final class ObdSessionRecorder: @unchecked Sendable {
         let f = directory.appendingPathComponent("obd-session-\(stamp).txt")
         try? "# Ioniq 5 OBD session capture \(stamp)\n".write(to: f, atomically: true, encoding: .utf8)
         protect(f)
-        fileLock.withLock { _file = f }
+        // Keep one handle open for the session instead of open+seek+write+close per
+        // record — at the FAST poll tier that is a syscall per second all drive.
+        // FileHandle opens at offset 0 (the header was just written), so seek to the
+        // end once; the retained handle then appends naturally.
+        let handle = try? FileHandle(forWritingTo: f)
+        try? handle?.seekToEndOfFile()
+        fileLock.withLock {
+            _file = f
+            _handle = handle
+        }
         return f
     }
 
@@ -47,21 +57,19 @@ public final class ObdSessionRecorder: @unchecked Sendable {
     }
 
     public func record(command: String, rawResponse: String) {
-        guard let f = fileLock.withLock({ _file }) else { return }
+        guard let handle = fileLock.withLock({ _handle }) else { return }
         let line = ">\(command)\n\(rawResponse.trimmingCharacters(in: .whitespacesAndNewlines))\n"
-        if let handle = try? FileHandle(forWritingTo: f) {
-            handle.seekToEndOfFile()
-            if let data = line.data(using: .utf8) {
-                handle.write(data)
-            }
-            try? handle.close()
-        }
+        guard let data = line.data(using: .utf8) else { return }
+        // The handle is positioned at EOF when opened and advanced by each write.
+        try? handle.write(contentsOf: data)
     }
 
     @discardableResult
     public func stop() -> URL? {
         fileLock.withLock {
             let f = _file
+            try? _handle?.close()
+            _handle = nil
             _file = nil
             return f
         }

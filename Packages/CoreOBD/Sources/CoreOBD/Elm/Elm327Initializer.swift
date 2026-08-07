@@ -20,8 +20,6 @@ public final class Elm327Initializer {
     }
 
     public func initialize() async throws -> InitResult {
-        var failures = 0
-
         let reset = try await sendWithRetry("ATZ", timeoutMs: 2_000)
         try await Task.sleep(nanoseconds: 1_000_000_000)
         let adapterId = reset.replacingOccurrences(of: ">", with: "")
@@ -31,15 +29,12 @@ public final class Elm327Initializer {
 
         for cmd in sequence {
             try await Task.sleep(nanoseconds: 200_000_000)
-            do {
-                _ = try await sendWithRetry(cmd, timeoutMs: 1_000)
-                failures = 0
-            } catch {
-                failures += 1
-                if failures >= 3 {
-                    throw Elm327Error.initFailed(cmd: cmd)
-                }
-            }
+            // sendWithRetry already tolerates one miss per command. A command that
+            // fails both attempts (or answers `?`) is not being applied — abort
+            // rather than "succeeding" with ATH1/ATCAF0 unset and garbage telemetry
+            // downstream. The old counter reset on every success, so an adapter
+            // failing alternating commands never reached the abort.
+            _ = try await sendWithRetry(cmd, timeoutMs: 1_000)
         }
 
         return InitResult(adapterId: adapterId)
@@ -49,7 +44,14 @@ public final class Elm327Initializer {
         var lastError: Error?
         for _ in 0..<2 {
             do {
-                return try await transport.send(command: cmd, timeoutMs: timeoutMs)
+                let raw = try await transport.send(command: cmd, timeoutMs: timeoutMs)
+                // A '?' reply means the clone adapter did NOT apply the command —
+                // count it as a failed attempt, not a pass.
+                guard !isErrorResponse(raw) else {
+                    lastError = Elm327Error.timeout(cmd: cmd)
+                    continue
+                }
+                return raw
             } catch {
                 lastError = error
             }

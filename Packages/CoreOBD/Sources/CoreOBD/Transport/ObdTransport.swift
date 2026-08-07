@@ -64,6 +64,18 @@ public func parseResponse(_ data: Data, sentCommand: String? = nil) -> [String] 
     return cleanResponse(raw: raw, sentCommand: sentCommand)
 }
 
+/// ELM327 error responses: the bare `?` for an unknown/invalid command, plus the
+/// text forms for link failures. A `?` means the adapter did NOT apply the
+/// command — init and header-config call sites must treat it as a failure or the
+/// adapter is left in the wrong protocol and every PID comes back NO DATA later.
+public func isErrorResponse(_ raw: String) -> Bool {
+    cleanResponse(raw: raw).contains {
+        $0 == "?" ||
+            $0.localizedCaseInsensitiveContains("ERROR") ||
+            $0.localizedCaseInsensitiveContains("UNABLE TO CONNECT")
+    }
+}
+
 // MARK: - Default isConnected
 
 extension ObdTransport {

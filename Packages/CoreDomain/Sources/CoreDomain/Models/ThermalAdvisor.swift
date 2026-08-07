@@ -12,8 +12,10 @@ public struct ThermalAdvisor: Sendable {
         let minTemp = temps.min() ?? 0
 
         if maxTemp > 45 { return "Battery temperature high (\(maxTemp)°C). Performance may be limited." }
-        if minTemp < 10 { return "Battery is cold (\(minTemp)°C). Range and charging speed reduced." }
+        // Most specific first: the freezing branch must be checked before the cold
+        // one, or minTemp < 10 returns first and "freezing" can never fire.
         if minTemp < 0 { return "Battery is freezing (\(minTemp)°C). Precondition before driving." }
+        if minTemp < 10 { return "Battery is cold (\(minTemp)°C). Range and charging speed reduced." }
         return nil
     }
 }

@@ -16,14 +16,18 @@ public enum Ioniq5RoutingConstants {
     public static let gravity: Double = 9.81
 
     // MARK: - Legacy OBD profile → vehicle ID mapping
+    //
+    // These resolve to CoreDomain catalog ids, which is what obdProfileIdFor
+    // matches against. The older values ("ioniq5_77" etc.) were from the Android
+    // catalog's id scheme and silently fell through to defaults here.
 
     private static let legacyToVehicle: [String: String] = [
         "ioniq5_84kwh":      "ioniq5_84",
-        "ioniq5_2022_77kwh": "ioniq5_77",
-        "ioniq5_2021_72kwh": "ioniq5_72",
-        "ioniq5_2021_68kwh": "ioniq5_72",
-        "ioniq5_63kwh":      "ioniq5_63",
-        "ioniq5_2022_58kwh": "ioniq5_58",
+        "ioniq5_2022_77kwh": "ioniq5_2022_77",
+        "ioniq5_2021_72kwh": "ioniq5_2022_72",
+        "ioniq5_2021_68kwh": "ioniq5_2022_72",
+        "ioniq5_63kwh":      "ioniq6_2022_63",
+        "ioniq5_2022_58kwh": "ioniq5_2022_58",
     ]
 
     /// Resolve a profile/vehicle ID to a vehicle catalog ID.

@@ -25,7 +25,9 @@ public enum IsoTpReassembler {
         switch pciType {
         case 0: // single frame
             let len = Int(firstBytes[0]) & 0x0F
-            guard firstBytes.count >= 1 + len else { return nil }
+            // A zero-length frame carries no payload — reject it as corrupt rather
+            // than handing callers empty "success" data.
+            guard len > 0, firstBytes.count >= 1 + len else { return nil }
             return Data(firstBytes[1..<1 + len])
         case 1: // multi-frame
             return reassembleMultiFrame(frames: frames)
@@ -60,13 +62,16 @@ public enum IsoTpReassembler {
     }
 
     private static func hexToBytes(_ hex: String) -> [UInt8]? {
-        let s = hex.count % 2 == 0 ? hex : String(hex.dropLast())
-        guard !s.isEmpty else { return nil }
+        // An odd-length hex line means a dropped or misaligned nibble. The
+        // reassembler exists to refuse corrupt data, so reject it outright — a
+        // silently-truncated trailing nibble can decode to a plausible-but-wrong
+        // reading (e.g. "7EC213" -> [0x21]) that would reach the dashboard.
+        guard hex.count % 2 == 0, !hex.isEmpty else { return nil }
         var bytes = [UInt8]()
-        var index = s.startIndex
-        while index < s.endIndex {
-            let nextIndex = s.index(index, offsetBy: 2)
-            let byteStr = String(s[index..<nextIndex])
+        var index = hex.startIndex
+        while index < hex.endIndex {
+            let nextIndex = hex.index(index, offsetBy: 2)
+            let byteStr = String(hex[index..<nextIndex])
             guard let byte = UInt8(byteStr, radix: 16) else { return nil }
             bytes.append(byte)
             index = nextIndex

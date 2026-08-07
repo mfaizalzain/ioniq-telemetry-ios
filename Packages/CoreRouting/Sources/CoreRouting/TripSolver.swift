@@ -172,27 +172,45 @@ public final class TripSolver: Sendable {
 
         var goal: Node? = nil
         var goalArrivalSoc: Float = 0
+        // The true cost of finishing from a node is cost + the remaining drive time,
+        // which differs per node — so "first node that can reach the destination" is
+        // not the optimum. Track the best total found and only stop when every node
+        // still queued costs at least that much.
+        var bestGoalTotal = Double.greatestFiniteMagnitude
 
         while let (node, cost) = queue.pop() {
+            // Nodes pop in cost order. If the cheapest unsettled node already costs
+            // more than the best goal total, no later node can beat it.
+            if cost >= bestGoalTotal { break }
             if cost > (best[node] ?? .greatestFiniteMagnitude) { continue }
 
             let fromKm: Float = node.chargerIdx < 0 ? 0 : sorted[node.chargerIdx].distanceAlongRouteKm
             guard let arrival = arrivals[node] else { continue }
             let socHere = arrival.stop?.departureSoc ?? arrival.arrivalSoc
 
-            // Try finishing the trip from here.
+            // Try finishing the trip from here. A node that reaches the destination
+            // is terminal for its path (a further stop could only add time), so
+            // record it as a goal candidate but keep searching for a cheaper one.
             let destSoc = socHere - socUsed(totalRouteKm - fromKm)
             if destSoc >= params.arrivalReservePercent {
-                goal = node
-                goalArrivalSoc = destSoc
-                break   // Dijkstra: first settled goal is optimal
+                let total = cost + driveMinutes(totalRouteKm - fromKm)
+                if total < bestGoalTotal {
+                    bestGoalTotal = total
+                    goal = node
+                    goalArrivalSoc = destSoc
+                }
+                continue
             }
 
             // Expand to chargers further along the route.
             for i in sorted.indices {
                 let next = sorted[i]
                 if next.distanceAlongRouteKm <= fromKm { continue }
-                let legKm = next.distanceAlongRouteKm - fromKm + next.detourKm
+                // Reaching a charger means leaving the route and rejoining it, so the
+                // detour is covered twice. Using it once under-counted the energy and
+                // marked stops near the range edge as reachable when the round trip
+                // would not be.
+                let legKm = next.distanceAlongRouteKm - fromKm + next.detourKm * 2
                 let arrivalSoc = socHere - socUsed(legKm)
                 if arrivalSoc < params.reserveSocPercent { continue }   // unreachable
 
@@ -228,7 +246,8 @@ public final class TripSolver: Sendable {
                                 departureSoc: departSoc,
                                 chargeMinutes: chargeMin,
                                 energyAddedKwh: energy,
-                                distanceFromOriginKm: next.distanceAlongRouteKm
+                                distanceFromOriginKm: next.distanceAlongRouteKm,
+                                detourKm: next.detourKm
                             ),
                             prev: node,
                             arrivalSoc: arrivalSoc
@@ -284,7 +303,9 @@ public final class TripSolver: Sendable {
                         toSocPercent: stop.departureSoc,
                         usableKwh: params.usableKwh
                     ),
-                    distanceFromOriginKm: last.distanceFromOriginKm
+                    distanceFromOriginKm: last.distanceFromOriginKm,
+                    // The merged stop is at the earlier charger, so its detour stands.
+                    detourKm: last.detourKm
                 )
                 merged[merged.count - 1] = combined
             } else {
@@ -349,7 +370,10 @@ public final class TripSolver: Sendable {
             legs: legs,
             stops: stops,
             userWaypoints: userWaypoints,
-            totalDistanceKm: totalRouteKm,
+            // The legs lie along the base route, but the driver actually covers each
+            // stop's detour; the SOC math already charges that energy, so the headline
+            // distance must agree.
+            totalDistanceKm: totalRouteKm + stops.map(\.detourKm).reduce(0, +),
             totalDriveMinutes: legs.map(\.driveMinutes).reduce(0, +),
             totalChargeMinutes: stops.map(\.chargeMinutes).reduce(0, +),
             arrivalSoc: arrivalSoc,

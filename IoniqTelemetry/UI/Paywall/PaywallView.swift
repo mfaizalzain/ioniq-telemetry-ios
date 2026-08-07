@@ -24,7 +24,12 @@ struct PaywallView: View {
                             ProgressView()
                         }
 
-                        if let error = viewModel.errorMessage {
+                        if viewModel.pendingApproval {
+                            Label("Purchase is pending approval. You'll have Pro as soon as it's confirmed.", systemImage: "hourglass")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        } else if let error = viewModel.errorMessage {
                             Label(error, systemImage: "exclamationmark.triangle.fill")
                                 .font(.caption)
                                 .foregroundStyle(Color.appAmber)
@@ -36,7 +41,7 @@ struct PaywallView: View {
                         }
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                        .disabled(viewModel.isLoading)
+                        .disabled(viewModel.isLoading || viewModel.purchaseInProgress != nil)
 
                         LegalLinks()
                     } else {
@@ -156,7 +161,7 @@ private struct ProductButton: View {
             .background(Color.appSurfaceVariant, in: RoundedRectangle(cornerRadius: 12))
         }
         .tint(.primary)
-        .disabled(viewModel.purchaseInProgress != nil)
+        .disabled(viewModel.purchaseInProgress != nil || viewModel.pendingApproval)
         .accessibilityElement(children: .combine)
     }
 }

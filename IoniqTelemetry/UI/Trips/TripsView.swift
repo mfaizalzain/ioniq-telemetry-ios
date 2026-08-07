@@ -6,10 +6,25 @@ import SwiftUI
 struct TripsView: View {
     private enum HistoryTab: Hashable { case trips, charging }
 
+    /// Single delete target so the two confirmation dialogs share one `.alert`.
+    /// SwiftUI only honors the last `.alert` attached to a view — the two chained
+    /// alerts used to leave the trip-delete one silently dead while the
+    /// charge-session one worked.
+    private enum DeleteTarget: Identifiable {
+        case trip(TripEntity)
+        case session(ChargeSessionEntity)
+
+        var id: String {
+            switch self {
+            case .trip(let t): t.id
+            case .session(let s): s.id
+            }
+        }
+    }
+
     @Environment(AppServices.self) private var services
     @State private var viewModel: TripsViewModel?
-    @State private var pendingDelete: TripEntity?
-    @State private var pendingSessionDelete: ChargeSessionEntity?
+    @State private var pendingDelete: DeleteTarget?
     @State private var tab: HistoryTab = .trips
 
     var body: some View {
@@ -60,23 +75,27 @@ struct TripsView: View {
                 }
             }
             .animation(.easeInOut(duration: 0.2), value: viewModel?.recentlyDeleted?.id)
-            .alert("Delete this trip?", isPresented: .constant(pendingDelete != nil)) {
-                Button("Cancel", role: .cancel) { pendingDelete = nil }
-                Button("Delete", role: .destructive) {
-                    if let trip = pendingDelete { viewModel?.delete(trip) }
-                    pendingDelete = nil
+            .alert(item: $pendingDelete) { target in
+                switch target {
+                case .trip:
+                    Alert(
+                        title: Text("Delete this trip?"),
+                        message: Text("You can undo this right after."),
+                        primaryButton: .destructive(Text("Delete")) {
+                            if case .trip(let trip) = target { viewModel?.delete(trip) }
+                        },
+                        secondaryButton: .cancel()
+                    )
+                case .session:
+                    Alert(
+                        title: Text("Delete this charge session?"),
+                        message: Text("This can't be undone."),
+                        primaryButton: .destructive(Text("Delete")) {
+                            if case .session(let session) = target { viewModel?.deleteChargeSession(session) }
+                        },
+                        secondaryButton: .cancel()
+                    )
                 }
-            } message: {
-                Text("You can undo this right after.")
-            }
-            .alert("Delete this charge session?", isPresented: .constant(pendingSessionDelete != nil)) {
-                Button("Cancel", role: .cancel) { pendingSessionDelete = nil }
-                Button("Delete", role: .destructive) {
-                    if let session = pendingSessionDelete { viewModel?.deleteChargeSession(session) }
-                    pendingSessionDelete = nil
-                }
-            } message: {
-                Text("This can't be undone.")
             }
         }
         .task {
@@ -104,7 +123,7 @@ struct TripsView: View {
                         }
                         .swipeActions(edge: .trailing) {
                             Button(role: .destructive) {
-                                pendingDelete = trip
+                                pendingDelete = .trip(trip)
                             } label: {
                                 Label("Delete", systemImage: "trash")
                             }
@@ -125,7 +144,7 @@ struct TripsView: View {
                 ChargeSessionCard(session: session, viewModel: viewModel)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
-                            pendingSessionDelete = session
+                            pendingDelete = .session(session)
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }

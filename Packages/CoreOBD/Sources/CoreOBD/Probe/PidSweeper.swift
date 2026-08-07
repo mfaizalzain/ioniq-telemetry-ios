@@ -19,6 +19,11 @@ public final class PidSweeper: @unchecked Sendable {
         }
     }
 
+    public enum SweepError: Error, Equatable {
+        case invalidProbe(String)
+        case invalidIdentifier(String)
+    }
+
     private let transport: any ObdTransport
     private let recorder: ObdSessionRecorder?
 
@@ -41,9 +46,11 @@ public final class PidSweeper: @unchecked Sendable {
         headers: [String], identifiers: [String],
         probeRequest: String = "22FFFF",
         onFinding: @Sendable (Finding) async -> Void = { _ in }
-    ) async -> [String] {
-        guard isReadOnly(probeRequest) else { fatalError("Probe must be 0x22: \(probeRequest)") }
-        for id in identifiers { guard isReadOnly(id) else { fatalError("Refusing non-0x22: \(id)") } }
+    ) async throws -> [String] {
+        // A public API taking arbitrary strings must not crash the app on bad input —
+        // return an error the caller can surface.
+        guard isReadOnly(probeRequest) else { throw SweepError.invalidProbe(probeRequest) }
+        for id in identifiers where !isReadOnly(id) { throw SweepError.invalidIdentifier(id) }
 
         var live: [String] = []
         for header in headers {
@@ -60,7 +67,11 @@ public final class PidSweeper: @unchecked Sendable {
     }
 
     private func requestFind(header: String, requestHex: String) async -> Finding {
-        let framed = isoTpSingleFrame(requestHex: requestHex)
+        // isReadOnly already rejects non-0x22; a frame that can't be framed is
+        // invalid input — treat as silent.
+        guard let framed = try? isoTpSingleFrame(requestHex: requestHex) else {
+            return Finding(header: header, request: requestHex, outcome: .silent, raw: nil)
+        }
         let raw = try? await transport.send(command: framed, timeoutMs: 600)
         recorder?.record(command: framed, rawResponse: raw ?? "")
 
@@ -70,18 +81,38 @@ public final class PidSweeper: @unchecked Sendable {
         let joined = lines.joined(separator: "|")
         let joinedOrNil = joined.isEmpty ? nil : joined
 
+        let responseHeader = IsoTpReassembler.responseHeaderFor(requestHeader: header)
         let outcome: Outcome
         if joinedOrNil == nil { outcome = .silent }
-        else if lines.contains(where: { $0.replacingOccurrences(of: " ", with: "").localizedCaseInsensitiveContains("7F") }) { outcome = .notSupported }
+        // 0x7F as the first payload byte (after the response header + the ISO-TP
+        // PCI byte) is a negative response — the module is alive but rejects the
+        // identifier. A positive response can carry 0x7F as a data byte, so a
+        // substring match would misfire.
+        else if lines.contains(where: { Self.isNegativeResponse($0, responseHeader: responseHeader) }) {
+            outcome = .notSupported
+        }
         else { outcome = .supported }
 
         return Finding(header: header, request: requestHex, outcome: outcome, raw: joinedOrNil)
     }
 
+    /// True when [hex] is a UDS negative response — the payload (one byte past the
+    /// header and the ISO-TP PCI byte) starts with 0x7F.
+    private static func isNegativeResponse(_ line: String, responseHeader: String) -> Bool {
+        let hex = line.replacingOccurrences(of: " ", with: "").uppercased()
+        return hex.hasPrefix(responseHeader)
+            && hex.count >= responseHeader.count + 4
+            && hex[hex.index(hex.startIndex, offsetBy: responseHeader.count + 2)...].hasPrefix("7F")
+    }
+
     private func configureHeader(header: String) async -> Bool {
         for cmd in ["ATSH\(header)", "ATFCSH\(header)", "ATFCSD300000", "ATFCSM1"] {
-            do { _ = try await transport.send(command: cmd, timeoutMs: 500) }
-            catch { return false }
+            do {
+                // A '?' reply means the command wasn't applied — treat it like a timeout.
+                if isErrorResponse(try await transport.send(command: cmd, timeoutMs: 500)) {
+                    return false
+                }
+            } catch { return false }
         }
         return true
     }
