@@ -20,6 +20,9 @@ final class DashboardViewModel {
     private(set) var aiKey: String?
     private(set) var aiProvider = AiProvider.gemini
     private(set) var aiFeaturesEnabled = true
+    /// Coulomb-counted pack SOH from charge-session integration (independent of
+    /// the BMS-reported [telemetry].soh). Nil until a big-enough swing is seen.
+    private(set) var estimatedSoh: Float?
     private(set) var recentTrips: [TripEntity] = []
 
     private let thermalAdvisor = ThermalAdvisor()
@@ -38,6 +41,7 @@ final class DashboardViewModel {
         self.aiKey = initialPrefs.aiKey
         self.aiProvider = initialPrefs.aiProvider
         self.aiFeaturesEnabled = initialPrefs.aiFeaturesEnabled
+        self.estimatedSoh = initialPrefs.estimatedSohPercent
         services.telemetry.state
             .receive(on: DispatchQueue.main)
             .sink { [weak self] sample in
@@ -63,6 +67,7 @@ final class DashboardViewModel {
                 self.aiKey = prefs.aiKey
                 self.aiProvider = prefs.aiProvider
                 self.aiFeaturesEnabled = prefs.aiFeaturesEnabled
+                self.estimatedSoh = prefs.estimatedSohPercent
             }
             .store(in: &cancellables)
 

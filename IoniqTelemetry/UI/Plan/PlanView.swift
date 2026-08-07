@@ -514,7 +514,10 @@ private struct ItineraryTimeline: View {
                 HStack {
                     Image(systemName: "battery.100.bolt")
                         .foregroundStyle(Color.appAccent)
-                    Text("\(Int(plan.stops.reduce(0) { $0 + $1.energyAddedKwh })) kWh · \(plan.stops.count) stop(s)")
+                    Text("\(Int(plan.stops.reduce(0) { $0 + $1.energyAddedKwh })) kWh · \(plan.stops.count) stop(s)"
+                        + (plan.totalChargingCost.map {
+                            " · ~\(currencySymbol(from: plan.stops.first?.charger.usageCost))\(String(format: "%.2f", $0)) charging"
+                        } ?? ""))
                         .font(.subheadline.weight(.medium))
                     Spacer()
                     Button { showSaveTrip = true } label: {
@@ -547,6 +550,14 @@ private struct ItineraryTimeline: View {
         }
         .backgroundStyle(.ultraThinMaterial)
     }
+}
+
+/// The currency symbol implied by a raw OCM cost string ("£0.45/kWh" → "£").
+private func currencySymbol(from raw: String?) -> String {
+    guard let raw else { return "" }
+    let codes = [("USD", "$"), ("EUR", "€"), ("GBP", "£"), ("AUD", "$"), ("CAD", "$")]
+    for (code, symbol) in codes where raw.uppercased().contains(code) { return symbol }
+    return raw.first { "$€£¥".contains($0) }.map(String.init) ?? ""
 }
 
 private struct LegRow: View {

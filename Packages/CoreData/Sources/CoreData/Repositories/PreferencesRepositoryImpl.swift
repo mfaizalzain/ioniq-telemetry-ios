@@ -112,6 +112,13 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         if let interval = defaults.object(forKey: "lastAutoBackupDate") as? TimeInterval {
             prefs.lastAutoBackupDate = Date(timeIntervalSince1970: interval)
         }
+        prefs.departureReminderEnabled = defaults.bool(forKey: "departureReminderEnabled", default: false)
+        // UserDefaults has no "default" parameter for integers — 0 means unset,
+        // and 0:00 is the natural minute default but not the hour default.
+        let hour = defaults.integer(forKey: "departureReminderHour")
+        prefs.departureReminderHour = hour != 0 ? hour : 7
+        prefs.departureReminderMinute = defaults.integer(forKey: "departureReminderMinute")
+        prefs.offPeakReminderEnabled = defaults.bool(forKey: "offPeakReminderEnabled", default: false)
 
         return prefs
     }
@@ -163,6 +170,10 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         } else {
             defaults.removeObject(forKey: "lastAutoBackupDate")
         }
+        defaults.set(prefs.departureReminderEnabled, forKey: "departureReminderEnabled")
+        defaults.set(prefs.departureReminderHour, forKey: "departureReminderHour")
+        defaults.set(prefs.departureReminderMinute, forKey: "departureReminderMinute")
+        defaults.set(prefs.offPeakReminderEnabled, forKey: "offPeakReminderEnabled")
     }
 
     private static func setFloatOrNil(_ value: Float?, forKey key: String, in defaults: UserDefaults) {

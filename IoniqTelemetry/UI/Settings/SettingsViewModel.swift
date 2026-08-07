@@ -263,4 +263,36 @@ final class SettingsViewModel {
             }
         }
     }
+
+    // MARK: - Reminders (feature suggestions #5/#7)
+
+    func setDepartureReminder(enabled: Bool) {
+        update { $0.departureReminderEnabled = enabled }
+        ReminderScheduler.scheduleDeparture(
+            hour: preferences.departureReminderHour,
+            minute: preferences.departureReminderMinute,
+            enabled: enabled
+        )
+    }
+
+    func setDepartureTime(hour: Int, minute: Int) {
+        update {
+            $0.departureReminderHour = hour
+            $0.departureReminderMinute = minute
+        }
+        ReminderScheduler.scheduleDeparture(
+            hour: hour, minute: minute, enabled: preferences.departureReminderEnabled
+        )
+    }
+
+    func setOffPeakReminder(enabled: Bool) {
+        update { $0.offPeakReminderEnabled = enabled }
+        // Recompute the habit now so the nudge only fires when it would be useful.
+        Task {
+            let sessions = (try? services.tripLog.chargeSessions()) ?? []
+            ReminderScheduler.scheduleOffPeak(
+                enabled: enabled, modalChargeHour: ReminderScheduler.modalChargeHour(from: sessions)
+            )
+        }
+    }
 }

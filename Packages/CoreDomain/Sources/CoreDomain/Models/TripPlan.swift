@@ -25,6 +25,10 @@ public struct TripPlan: Sendable, Equatable {
     public var arrivalSoc: Float
     public var generatedAt: Date
     public var elevation: RouteElevation?
+    /// Planned charging bill: Σ energyAddedKwh × pricePerKwh across stops. Nil
+    /// when any stop has no price — the network fee would be unknown, so quoting
+    /// a total would understate the real cost.
+    public var totalChargingCost: Float?
 
     public init(
         origin: LatLon,
@@ -37,7 +41,8 @@ public struct TripPlan: Sendable, Equatable {
         totalChargeMinutes: Int = 0,
         arrivalSoc: Float,
         generatedAt: Date = Date(),
-        elevation: RouteElevation? = nil
+        elevation: RouteElevation? = nil,
+        totalChargingCost: Float? = nil
     ) {
         self.origin = origin
         self.destination = destination
@@ -50,6 +55,7 @@ public struct TripPlan: Sendable, Equatable {
         self.arrivalSoc = arrivalSoc
         self.generatedAt = generatedAt
         self.elevation = elevation
+        self.totalChargingCost = totalChargingCost
     }
 }
 

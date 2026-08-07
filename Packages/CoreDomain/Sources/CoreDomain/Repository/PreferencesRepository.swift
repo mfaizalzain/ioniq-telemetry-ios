@@ -136,6 +136,14 @@ public struct UserPreferences: Sendable {
     public var autoBackupFrequency: AutoBackupFrequency
     /// When the last automatic backup was completed (nil = never).
     public var lastAutoBackupDate: Date?
+    /// Daily preconditioning reminder at a driver-set departure time.
+    public var departureReminderEnabled: Bool
+    /// Departure time (24 h) for the preconditioning reminder.
+    public var departureReminderHour: Int
+    public var departureReminderMinute: Int
+    /// Evening nudge when the driver's usual charging hour falls outside the
+    /// off-peak window (23:00–06:00).
+    public var offPeakReminderEnabled: Bool
 
     public init(
         unitSystem: UnitSystem = .metric,
@@ -168,7 +176,11 @@ public struct UserPreferences: Sendable {
         chargerSource: ChargerSource = .openChargeMap,
         autoBackupEnabled: Bool = false,
         autoBackupFrequency: AutoBackupFrequency = .weekly,
-        lastAutoBackupDate: Date? = nil
+        lastAutoBackupDate: Date? = nil,
+        departureReminderEnabled: Bool = false,
+        departureReminderHour: Int = 7,
+        departureReminderMinute: Int = 0,
+        offPeakReminderEnabled: Bool = false
     ) {
         self.unitSystem = unitSystem
         self.connectorTypes = connectorTypes
@@ -201,6 +213,10 @@ public struct UserPreferences: Sendable {
         self.autoBackupEnabled = autoBackupEnabled
         self.autoBackupFrequency = autoBackupFrequency
         self.lastAutoBackupDate = lastAutoBackupDate
+        self.departureReminderEnabled = departureReminderEnabled
+        self.departureReminderHour = departureReminderHour
+        self.departureReminderMinute = departureReminderMinute
+        self.offPeakReminderEnabled = offPeakReminderEnabled
     }
 
     /// The API key for [provider], or null when the user hasn't supplied one yet.

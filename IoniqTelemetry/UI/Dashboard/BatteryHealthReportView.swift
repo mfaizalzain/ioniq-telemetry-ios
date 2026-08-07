@@ -1,5 +1,6 @@
 import CoreData
 import CoreDomain
+import Charts
 import SwiftUI
 
 /// A card/sheet view that displays an AI-generated battery health report including
@@ -13,6 +14,7 @@ struct BatteryHealthReportView: View {
     @State private var report: String?
     @State private var isLoading = false
     @State private var errorMessage: String?
+    @State private var trend: [(date: Date, peakKw: Float)] = []
 
     private let aiService = AiService()
 
@@ -26,6 +28,16 @@ struct BatteryHealthReportView: View {
                     // Auto-fetch on first expand
                     if expanded && report == nil && errorMessage == nil && canUseAi {
                         Task { await generateReport() }
+                    }
+                    if expanded && trend.isEmpty {
+                        Task {
+                            let sessions = (try? services.tripLog.chargeSessions()) ?? []
+                            trend = sessions
+                                .filter { $0.peakPowerKw >= 20 }
+                                .sorted { $0.startTime < $1.startTime }
+                                .suffix(40)
+                                .map { (date: $0.startTime, peakKw: $0.peakPowerKw) }
+                        }
                     }
                 } label: {
                     HStack(spacing: 8) {
@@ -51,6 +63,35 @@ struct BatteryHealthReportView: View {
                 .buttonStyle(.plain)
 
                 if expanded {
+                    // Measured degradation trend — peak DC power per session.
+                    // Data-driven, so it renders even when the AI report can't.
+                    if !trend.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Charge Acceptance Trend")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            let peak = trend.map(\.peakKw).max() ?? 1
+                            Chart(trend, id: \.date) { point in
+                                BarMark(
+                                    x: .value("Date", point.date, unit: .day),
+                                    y: .value("Peak kW", point.peakKw)
+                                )
+                                .foregroundStyle(
+                                    point.peakKw >= 0.8 * peak
+                                        ? Color.appGreen
+                                        : point.peakKw >= 0.55 * peak
+                                            ? Color.appAmber
+                                            : Color.appRed
+                                )
+                            }
+                            .chartYAxisLabel("Peak kW")
+                            .frame(height: 120)
+                            Text("Peak DC power per session — a sustained slide suggests degradation.")
+                                .font(.caption2)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+
                     // Current SOH display
                     if let soh = viewModel.telemetry.soh {
                         HStack(spacing: 8) {

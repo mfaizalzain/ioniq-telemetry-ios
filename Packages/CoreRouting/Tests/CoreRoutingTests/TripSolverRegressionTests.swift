@@ -84,4 +84,52 @@ struct TripSolverRegressionTests {
             ) != nil
         )
     }
+
+    @Test("charging cost totals price times energy across stops")
+    func chargingCost() throws {
+        func priced(_ id: String, _ alongKm: Float) -> RouteCharger {
+            // RouteCharger.charger is a let — rebuild the charger with the price.
+            return RouteCharger(
+                charger: Charger(
+                    id: id, name: id, lat: 50.0, lon: 12.0,
+                    connectors: [Connector(type: .ccs2, powerKw: 350, count: 2)],
+                    maxPowerKw: 350, isOperational: true, pricePerKwh: 0.5
+                ),
+                distanceAlongRouteKm: alongKm,
+                detourKm: 1
+            )
+        }
+        let plan = try #require(
+            TripSolver().solve(
+                origin: origin, destination: destination, totalRouteKm: 700,
+                chargers: [priced("a", 150), priced("b", 300), priced("c", 450)],
+                params: params
+            )
+        )
+        let expected = plan.stops.reduce(Float(0)) { $0 + $1.energyAddedKwh * 0.5 }
+        #expect(plan.totalChargingCost == expected)
+    }
+
+    @Test("charging cost is nil when any stop lacks a price")
+    func chargingCostNilWithoutPrice() throws {
+        func unpriced(_ id: String, _ alongKm: Float) -> RouteCharger {
+            return RouteCharger(
+                charger: Charger(
+                    id: id, name: id, lat: 50.0, lon: 12.0,
+                    connectors: [Connector(type: .ccs2, powerKw: 350, count: 2)],
+                    maxPowerKw: 350, isOperational: true
+                ),
+                distanceAlongRouteKm: alongKm,
+                detourKm: 1
+            )
+        }
+        let plan = try #require(
+            TripSolver().solve(
+                origin: origin, destination: destination, totalRouteKm: 500,
+                chargers: [unpriced("a", 200), unpriced("b", 400)],
+                params: params
+            )
+        )
+        #expect(plan.totalChargingCost == nil)
+    }
 }

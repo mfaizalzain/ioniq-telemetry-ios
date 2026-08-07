@@ -20,6 +20,9 @@
 		3729A76F447A55EA00F35DAE /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5CD51D249AA7A6761D98B76D /* CarPlay.framework */; };
 		38618D9EAA1DD709A42A9D35 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */; };
 		8A1B2C3D4E5F60718293A4B5 /* CarPlayConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF02 /* CarPlayConnectionMonitor.swift */; };
+		A10000000000000000000001 /* ReminderScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* ReminderScheduler.swift */; };
+		A20000000000000000000002 /* TelemetryLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20000000000000000000002 /* TelemetryLiveActivity.swift */; };
+		A30000000000000000000003 /* RemindersSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30000000000000000000003 /* RemindersSection.swift */; };
 		3C30C239DD74918E41A5034F /* DataSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDF516A468A77CCD6985D3A /* DataSection.swift */; };
 		449483518D023F014ABE7E73 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6ECC04918055FCDD1B2BFB /* SettingsView.swift */; };
 		488D648D249927D9FC127D94 /* TripDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D3784E71C842EED4005A96 /* TripDetailView.swift */; };
@@ -108,6 +111,9 @@
 		C8897BD5040316FAF28912DC /* PostTripBriefingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTripBriefingView.swift; sourceTree = "<group>"; };
 		C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
 		C0FFEE1234567890ABCDEF02 /* CarPlayConnectionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayConnectionMonitor.swift; sourceTree = "<group>"; };
+		B10000000000000000000001 /* ReminderScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReminderScheduler.swift; sourceTree = "<group>"; };
+		B20000000000000000000002 /* TelemetryLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TelemetryLiveActivity.swift; sourceTree = "<group>"; };
+		B30000000000000000000003 /* RemindersSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemindersSection.swift; sourceTree = "<group>"; };
 		CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		CDF661EBC86597CE9E53BC93 /* NotificationActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationActionHandler.swift; sourceTree = "<group>"; };
 		CEE9272FAB694E0E7A2E71E6 /* CarPlayCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayCoordinator.swift; sourceTree = "<group>"; };
@@ -160,6 +166,8 @@
 				D76ACB924B36FF8C171B52B1 /* AlertNotifier.swift */,
 				D0F20D65CD1E45F443D1A915 /* ConnectedCarService.swift */,
 				CDF661EBC86597CE9E53BC93 /* NotificationActionHandler.swift */,
+				B10000000000000000000001 /* ReminderScheduler.swift */,
+				B20000000000000000000002 /* TelemetryLiveActivity.swift */,
 				27EDF8359710AED96EF1DC16 /* VehicleLocationProvider.swift */,
 			);
 			path = Service;
@@ -275,6 +283,7 @@
 				133D14427B0062FE116986F1 /* AiAndRoutingSections.swift */,
 				CFDF516A468A77CCD6985D3A /* DataSection.swift */,
 				E00DDEEE5BD92E6BA7A37535 /* DisplaySection.swift */,
+				B30000000000000000000003 /* RemindersSection.swift */,
 				89B30D3916F39057886D6B58 /* VehiclePickerSheet.swift */,
 			);
 			path = Components;
@@ -503,6 +512,9 @@
 				924A7A2F61DB93DA55F9B4F8 /* PostTripBriefingView.swift in Sources */,
 				449483518D023F014ABE7E73 /* SettingsView.swift in Sources */,
 				7BFD7C815E57122C9FA9009A /* SettingsViewModel.swift in Sources */,
+				A30000000000000000000003 /* RemindersSection.swift in Sources */,
+				A10000000000000000000001 /* ReminderScheduler.swift in Sources */,
+				A20000000000000000000002 /* TelemetryLiveActivity.swift in Sources */,
 				488D648D249927D9FC127D94 /* TripDetailView.swift in Sources */,
 				F5358B51092E6DF7F0F23662 /* TripsView.swift in Sources */,
 				CD14EF3A45BD2BABB770F360 /* TripsViewModel.swift in Sources */,

@@ -125,6 +125,7 @@ final class ConnectedCarService {
                 if state == .connected {
                     self.reconnectAttempt = 0
                     self.location.start()
+                    self.startLiveActivity()
                 } else if state == .disconnected || state == .error {
                     self.location.stop()
                     self.finalizeActiveTrip()
@@ -132,6 +133,7 @@ final class ConnectedCarService {
                     self.parkedEvaluator.reset()
                     self.parkedState = .unknown
                     self.lastFrameAt = nil
+                    TelemetryLiveActivity.stop()
                 }
             }
             .store(in: &cancellables)
@@ -378,7 +380,52 @@ final class ConnectedCarService {
         chargeAlerts.onTelemetry(telemetry)
         tirePressure.onTelemetry(telemetry)
         updateHealthEstimate(telemetry)
+        updateLiveActivity(telemetry)
         checkPlanProgress(telemetry, fix: frame.fix)
+    }
+
+    // MARK: - Live Activity (lock screen / Dynamic Island)
+
+    private var lastLiveActivityAt: Date = .distantPast
+    private var lastLiveActivitySoc: Float?
+    private var lastLiveActivityCharging = false
+
+    private func startLiveActivity() {
+        lastLiveActivityAt = .distantPast
+        let soc = lastTelemetry.socDisplay ?? lastTelemetry.socBms
+        TelemetryLiveActivity.start(
+            vehicleName: services.userPreferences.customVehicleName ?? "IONIQ 5",
+            soc: Double(soc ?? 0),
+            rangeKm: nominalRange(soc: soc),
+            isCharging: lastTelemetry.isCharging
+        )
+    }
+
+    /// Updates the Live Activity on a SOC or charging change, or every 30 s —
+    /// not on every 1 Hz frame (ActivityKit updates are not free).
+    private func updateLiveActivity(_ telemetry: VehicleTelemetry) {
+        let soc = telemetry.socDisplay ?? telemetry.socBms
+        guard soc != lastLiveActivitySoc || telemetry.isCharging != lastLiveActivityCharging
+            || Date().timeIntervalSince(lastLiveActivityAt) > 30 else { return }
+        lastLiveActivitySoc = soc
+        lastLiveActivityCharging = telemetry.isCharging
+        lastLiveActivityAt = Date()
+        TelemetryLiveActivity.update(
+            soc: Double(soc ?? 0),
+            rangeKm: nominalRange(soc: soc),
+            isCharging: telemetry.isCharging
+        )
+    }
+
+    /// Nominal mixed-driving range from the current SOC — the same figure the
+    /// dashboard shows before enough trips are logged to calibrate.
+    private func nominalRange(soc: Float?) -> Double {
+        guard let soc else { return 0 }
+        let usable = Ioniq5RoutingConstants.usableKwhForProfile(
+            services.userPreferences.activeProfileId,
+            customKwh: services.userPreferences.customUsableBatteryKwh
+        )
+        return Double(soc) / 100.0 * usable / 18.0 * 100.0
     }
 
     // MARK: - Active plan

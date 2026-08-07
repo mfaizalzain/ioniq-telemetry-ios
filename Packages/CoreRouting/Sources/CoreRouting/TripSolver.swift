@@ -364,6 +364,13 @@ public final class TripSolver: Sendable {
             geometry: ""
         ))
 
+        // Every stop's price comes from the same source (OCM usageCost or Places),
+        // so either all stops carry one or none do. Only quote a total when the
+        // whole route is priced — a partial sum would quietly understate the bill.
+        let chargingCost: Float? = stops.isEmpty || stops.contains { $0.charger.pricePerKwh == nil }
+            ? nil
+            : stops.reduce(0) { $0 + $1.energyAddedKwh * ($1.charger.pricePerKwh ?? 0) }
+
         return TripPlan(
             origin: origin,
             destination: destination,
@@ -378,7 +385,8 @@ public final class TripSolver: Sendable {
             totalChargeMinutes: stops.map(\.chargeMinutes).reduce(0, +),
             arrivalSoc: arrivalSoc,
             generatedAt: Date(),
-            elevation: elevation
+            elevation: elevation,
+            totalChargingCost: chargingCost
         )
     }
 }

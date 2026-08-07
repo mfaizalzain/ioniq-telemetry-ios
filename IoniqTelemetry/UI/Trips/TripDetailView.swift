@@ -15,6 +15,8 @@ struct TripDetailView: View {
     @State private var note: String = ""
     @State private var isEditingNote = false
     @State private var selectedTimestamp: Date? = nil
+    @State private var showShareSheet = false
+    @State private var shareImage: UIImage?
 
     private var routePoints: [CLLocationCoordinate2D] {
         samples.compactMap { sample in
@@ -76,9 +78,72 @@ struct TripDetailView: View {
         .background(Color.appBackground)
         .navigationTitle(trip.startTime.formatted(date: .abbreviated, time: .shortened))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    let renderer = ImageRenderer(content: TripShareImageCard(trip: trip, viewModel: viewModel))
+                    renderer.scale = UIScreen.main.scale
+                    shareImage = renderer.uiImage
+                    showShareSheet = shareImage != nil
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+        }
+        .sheet(isPresented: $showShareSheet) {
+            if let shareImage {
+                ShareSheet(items: [shareImage])
+            }
+        }
         .task {
             samples = viewModel.samples(for: trip)
             note = trip.note ?? ""
+        }
+    }
+
+    /// Compact summary card rendered to a PNG for the share sheet — the classic
+    /// "look at my efficiency" share.
+    private struct TripShareImageCard: View {
+        let trip: TripEntity
+        let viewModel: TripsViewModel
+
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "car.fill")
+                        .foregroundStyle(Color.appAccent)
+                    Text("IONIQ TELEMETRY — TRIP")
+                        .font(.headline)
+                    Spacer()
+                }
+                Text(trip.startTime.formatted(date: .abbreviated, time: .shortened))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                Divider()
+                Grid(horizontalSpacing: 24, verticalSpacing: 8) {
+                    GridRow {
+                        stat("DISTANCE", viewModel.distance(trip.distanceKm))
+                        stat("ENERGY", String(format: "%.1f kWh", trip.energyUsedKwh))
+                    }
+                    GridRow {
+                        stat("DURATION", viewModel.duration(trip))
+                        stat("EFFICIENCY", viewModel.efficiency(trip.avgConsumptionKwhPer100km))
+                    }
+                }
+                if let note = trip.note, !note.isEmpty {
+                    Text(note).font(.footnote).foregroundStyle(.secondary)
+                }
+            }
+            .padding(20)
+            .frame(width: 360)
+            .background(Color.appBackground)
+        }
+
+        private func stat(_ label: String, _ value: String) -> some View {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(label).font(.caption2).foregroundStyle(.secondary)
+                Text(value).font(.subheadline.weight(.semibold))
+            }
         }
     }
 
@@ -319,4 +384,15 @@ private struct NoRouteCard: View {
         .padding(.horizontal)
         .backgroundStyle(.ultraThinMaterial)
     }
+}
+
+/// Wraps UIActivityViewController for the rendered trip-summary image.
+private struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }

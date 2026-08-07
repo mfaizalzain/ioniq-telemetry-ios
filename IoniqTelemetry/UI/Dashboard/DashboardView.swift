@@ -688,7 +688,9 @@ struct MetricTilesGrid: View {
                     icon: "heart.text.clipboard",
                     label: "SOH",
                     value: telemetry.soh.map { String(format: "%.0f%%", $0) } ?? "—",
-                    valueColor: .appGreen
+                    valueColor: .appGreen,
+                    // Independent coulomb-counted estimate (see BatteryHealthEstimator)
+                    badge: viewModel.estimatedSoh.map { String(format: "Est %.0f%%", $0) }
                 )
 
                 // Row 4
