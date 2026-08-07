@@ -19,6 +19,7 @@
 		2B0F7DBB540A6AC24475378A /* SwiftData.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54C12EF4A0F03A94394B3443 /* SwiftData.framework */; };
 		3729A76F447A55EA00F35DAE /* CarPlay.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5CD51D249AA7A6761D98B76D /* CarPlay.framework */; };
 		38618D9EAA1DD709A42A9D35 /* CarPlaySceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */; };
+		8A1B2C3D4E5F60718293A4B5 /* CarPlayConnectionMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0FFEE1234567890ABCDEF02 /* CarPlayConnectionMonitor.swift */; };
 		3C30C239DD74918E41A5034F /* DataSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFDF516A468A77CCD6985D3A /* DataSection.swift */; };
 		449483518D023F014ABE7E73 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B6ECC04918055FCDD1B2BFB /* SettingsView.swift */; };
 		488D648D249927D9FC127D94 /* TripDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D3784E71C842EED4005A96 /* TripDetailView.swift */; };
@@ -106,6 +107,7 @@
 		C2E780AE209C0CDA7D504DD2 /* Charts.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Charts.framework; path = System/Library/Frameworks/Charts.framework; sourceTree = SDKROOT; };
 		C8897BD5040316FAF28912DC /* PostTripBriefingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostTripBriefingView.swift; sourceTree = "<group>"; };
 		C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlaySceneDelegate.swift; sourceTree = "<group>"; };
+		C0FFEE1234567890ABCDEF02 /* CarPlayConnectionMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayConnectionMonitor.swift; sourceTree = "<group>"; };
 		CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 		CDF661EBC86597CE9E53BC93 /* NotificationActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationActionHandler.swift; sourceTree = "<group>"; };
 		CEE9272FAB694E0E7A2E71E6 /* CarPlayCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarPlayCoordinator.swift; sourceTree = "<group>"; };
@@ -195,6 +197,7 @@
 				CEE9272FAB694E0E7A2E71E6 /* CarPlayCoordinator.swift */,
 				9A602CFDC8597B98B79771BF /* CarPlayPointOfInterest.swift */,
 				C957AE90FEEF961928BE8F4A /* CarPlaySceneDelegate.swift */,
+				C0FFEE1234567890ABCDEF02 /* CarPlayConnectionMonitor.swift */,
 			);
 			path = CarPlay;
 			sourceTree = "<group>";
@@ -484,6 +487,7 @@
 				BABC7C03FA75D309033AE7FC /* CarPlayCoordinator.swift in Sources */,
 				69F5F70B3E2F96A762AA0C92 /* CarPlayPointOfInterest.swift in Sources */,
 				38618D9EAA1DD709A42A9D35 /* CarPlaySceneDelegate.swift in Sources */,
+				8A1B2C3D4E5F60718293A4B5 /* CarPlayConnectionMonitor.swift in Sources */,
 				1592D3CA6415713CFB3D725E /* ConnectedCarService.swift in Sources */,
 				679881A44DC2201BC2416EB3 /* DashboardView.swift in Sources */,
 				713585F39A0A3E6CD1C7C39A /* DashboardViewModel.swift in Sources */,
