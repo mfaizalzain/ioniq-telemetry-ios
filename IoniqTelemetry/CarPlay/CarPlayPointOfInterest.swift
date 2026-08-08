@@ -149,18 +149,19 @@ final class CarPlayLocation: NSObject, CLLocationManagerDelegate {
             return LatLon(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
         }
         // CarPlay must not be the surface that first asks for permission — there is
-        // no good way to answer a prompt while driving. If it isn't already granted,
-        // fall back to the cached position (even if stale) rather than an empty list.
+        // no good way to answer a prompt while driving. An ungranted permission is
+        // therefore a missing location, not permission to use an arbitrary cached
+        // position from another drive.
         guard manager.authorizationStatus == .authorizedAlways
             || manager.authorizationStatus == .authorizedWhenInUse else {
-            return manager.location.map { LatLon(lat: $0.coordinate.latitude, lon: $0.coordinate.longitude) }
+            return nil
         }
 
         let fresh = await withCheckedContinuation { continuation in
             continuations.append(continuation)
             manager.requestLocation()
         }
-        return fresh ?? manager.location.map { LatLon(lat: $0.coordinate.latitude, lon: $0.coordinate.longitude) }
+        return fresh
     }
 
     /// The latest fresh fix, synchronously — for surfaces that render on a

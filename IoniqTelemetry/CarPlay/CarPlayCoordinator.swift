@@ -80,6 +80,13 @@ final class CarPlayCoordinator {
 
     /// Sparse occupancy poller — Places bills per request against the user's key.
     private var occupancyTimer: Timer?
+    /// Nearby chargers and their live status are refreshed periodically while
+    /// CarPlay stays connected. The list is also re-centered after the car has
+    /// moved far enough that the original search area is no longer "nearby".
+    private var nearbyRefreshTimer: Timer?
+    private var nearbyRefreshInFlight = false
+    private static let nearbyRefreshInterval: TimeInterval = 4 * 60
+    private static let nearbyMoveRefreshDistanceKm = 5.0
 
     /// Rolling live consumption measured from OBD power and speed.
     private let consumptionEstimator = LiveConsumptionEstimator()
@@ -168,15 +175,18 @@ final class CarPlayCoordinator {
             .store(in: &cancellables)
 
         startOccupancyTimer()
+        startNearbyRefreshTimer()
         startRangeTimer()
 
-        Task { await loadChargers() }
+        refreshNearbyData()
     }
 
     func stop() {
         cancellables.removeAll()
         occupancyTimer?.invalidate()
         occupancyTimer = nil
+        nearbyRefreshTimer?.invalidate()
+        nearbyRefreshTimer = nil
         rangeCheckTimer?.invalidate()
         rangeCheckTimer = nil
     }
@@ -193,6 +203,7 @@ final class CarPlayCoordinator {
         refreshCharging()
         refreshChargers()
         refreshLiveOverlay()
+        refreshNearbyIfCarMoved()
     }
 
     // MARK: - Status
@@ -305,56 +316,67 @@ final class CarPlayCoordinator {
 
     // MARK: - Chargers
 
-    private func loadChargers() async {
-        guard let center = await CarPlayLocation.shared.currentLocation() else { return }
+    private func loadChargers(center: LatLon) async {
         guard let chargers = try? await services.chargers.chargersNear(center: center, radiusKm: 30) else {
             return
         }
 
-        let soc = telemetry.socDisplay ?? telemetry.socBms
-        let usableKwh = Ioniq5RoutingConstants.usableKwhForProfile(
-            services.userPreferences.activeProfileId,
-            customKwh: services.userPreferences.customUsableBatteryKwh
-        )
-        let ambient = telemetry.ambientTempC
-
-        let candidates = rankChargers(
-            chargers: chargers,
-            origin: center,
-            socPercent: soc,
-            usableKwh: Float(usableKwh),
-            ambientTempC: ambient,
-            learnedKwhPer100Km: learnedConsumption,
-            liveKwhPer100Km: consumptionEstimator.kwhPer100Km
-        )
-
-        // CarPlay caps a POI template at 12 entries; sending more is dropped
-        // silently, so trim to the nearest within comfort/tight bounds first.
-        let visible = candidates.prefix(12)
-        // Cache for re-ranking on telemetry updates — the live status rides
-        // along so refreshChargers doesn't re-bill a Places call per frame.
         let liveStatus = await loadLiveStatus(for: chargers, center: center)
         fetchedChargers = chargers
         lastLiveStatus = liveStatus
         lastOrigin = center
-        chargersTemplate.setPointsOfInterest(
-            visible.map {
-                CarPlayPointOfInterest.make(
-                    from: $0,
-                    origin: center,
-                    liveStatus: liveStatus?[$0.charger.id],
-                    liveConsumption: consumptionEstimator.kwhPer100Km,
-                    onSetDestination: { [weak self] charger in
-                        self?.setPoiDestination(charger)
-                    }
-                )
-            },
-            selectedIndex: NSNotFound
-        )
+        renderChargers(at: center)
         // The candidate pool exists now — don't wait out the range timer for
         // the first meaningful check.
         chargersLoaded = true
         scheduleRangeCheck()
+    }
+
+    /// Gets a current fix before every nearby refresh. If the car is still in the
+    /// same search area, only occupancy is refreshed; moving to a new area fetches
+    /// a new charger set and status snapshot around the new position.
+    private func refreshNearbyData() {
+        guard !nearbyRefreshInFlight else { return }
+        nearbyRefreshInFlight = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.nearbyRefreshInFlight = false }
+            guard let center = await CarPlayLocation.shared.currentLocation() else { return }
+
+            let moved = self.lastOrigin.map {
+                approxDistanceKm($0, center) >= Self.nearbyMoveRefreshDistanceKm
+            } ?? true
+            if moved || self.fetchedChargers.isEmpty {
+                await self.loadChargers(center: center)
+                return
+            }
+
+            // Keep the distance labels and SOC-aware ordering based on the
+            // driver's current position even when the charger search area is
+            // reused. The status request is still centered on this fresh fix.
+            self.lastOrigin = center
+            self.lastLiveStatus = await self.loadLiveStatus(
+                for: self.fetchedChargers,
+                center: center
+            )
+            self.renderChargers(at: center)
+        }
+    }
+
+    private func refreshNearbyIfCarMoved() {
+        guard let current = CarPlayLocation.shared.freshFix,
+              let origin = lastOrigin,
+              approxDistanceKm(origin, current) >= Self.nearbyMoveRefreshDistanceKm else { return }
+        refreshNearbyData()
+    }
+
+    private func startNearbyRefreshTimer() {
+        nearbyRefreshTimer = Timer.scheduledTimer(
+            withTimeInterval: Self.nearbyRefreshInterval,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor in self?.refreshNearbyData() }
+        }
     }
 
     /// Live occupancy for the listed chargers, when the requirements are met
@@ -368,6 +390,7 @@ final class CarPlayCoordinator {
         center: LatLon
     ) async -> [String: CarPlayPointOfInterest.ChargerLiveStatus]? {
         guard services.isPro,
+              services.userPreferences.chargerOccupancyAlerts,
               let key = services.userPreferences.googleMapsApiKey,
               !key.isEmpty else { return nil }
         guard let snapshot = try? await services.occupancy.occupancyNear(
@@ -388,6 +411,11 @@ final class CarPlayCoordinator {
     /// Re-rank cached chargers with fresh telemetry data — no API fetch needed.
     private func refreshChargers() {
         guard let origin = lastOrigin, !fetchedChargers.isEmpty else { return }
+        renderChargers(at: origin)
+    }
+
+    private func renderChargers(at origin: LatLon) {
+        guard !fetchedChargers.isEmpty else { return }
         let soc = telemetry.socDisplay ?? telemetry.socBms
         let usableKwh = Ioniq5RoutingConstants.usableKwhForProfile(
             services.userPreferences.activeProfileId,
@@ -402,6 +430,8 @@ final class CarPlayCoordinator {
             learnedKwhPer100Km: learnedConsumption,
             liveKwhPer100Km: consumptionEstimator.kwhPer100Km
         )
+        // CarPlay caps a POI template at 12 entries; sending more is dropped
+        // silently, so trim to the nearest within comfort/tight bounds first.
         let visible = candidates.prefix(12)
         chargersTemplate.setPointsOfInterest(
             visible.map {
