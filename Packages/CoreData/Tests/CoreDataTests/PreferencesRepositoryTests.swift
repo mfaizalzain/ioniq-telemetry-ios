@@ -58,4 +58,13 @@ struct PreferencesRepositoryTests {
         #expect(repo.currentPreferences.calibration == .unset)
         #expect(!repo.currentPreferences.calibration.isSet)
     }
+
+    @Test("Google charger source falls back to OCM without a Maps key")
+    func googleChargerSourceRequiresMapsKey() {
+        let withoutKey = UserPreferences(googleMapsApiKey: " \n", chargerSource: .googlePlaces)
+        #expect(withoutKey.chargerSourceOrDefault == .openChargeMap)
+
+        let withKey = UserPreferences(googleMapsApiKey: "maps-key", chargerSource: .googlePlaces)
+        #expect(withKey.chargerSourceOrDefault == .googlePlaces)
+    }
 }

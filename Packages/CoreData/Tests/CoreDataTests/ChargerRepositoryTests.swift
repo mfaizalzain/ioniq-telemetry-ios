@@ -159,6 +159,31 @@ struct ChargerRepositoryTests {
         #expect(StubProtocol.requestCount == 1)
     }
 
+    @Test("an old row makes the whole source area stale, matching Android")
+    func oldestRowControlsFreshness() async throws {
+        StubProtocol.requestCount = 0
+        StubProtocol.responseBody = ocmResponse(id: 3, title: "Fresh OCM Result")
+        let context = ModelContext(makeContainer())
+        context.insert(entity(
+            id: "ocm-old",
+            name: "Old OCM Row",
+            cachedAt: Date(timeIntervalSinceNow: -8 * 24 * 60 * 60)
+        ))
+        context.insert(entity(id: "ocm-fresh", name: "Fresh Cached Row"))
+        try context.save()
+
+        let repo = ChargerRepository(
+            modelContext: context,
+            apiKey: { "ocm-key" },
+            source: { .openChargeMap },
+            session: makeSession()
+        )
+
+        _ = try await repo.chargersNearby(center: center)
+
+        #expect(StubProtocol.requestCount == 1)
+    }
+
     @Test("rows from another source are hidden once the current source has fresh data")
     func hidesOtherSources() async throws {
         StubProtocol.requestCount = 0

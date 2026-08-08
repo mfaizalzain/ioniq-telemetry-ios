@@ -163,10 +163,12 @@ public final class ChargerRepository: @unchecked Sendable {
         let currentSourceRows = cached.filter { entity in
             wantedPrefixes.contains { entity.id.hasPrefix($0) }
         }
-        let freshest = currentSourceRows.map(\.cachedAt).max()
+        // Match Android: one old row means the covered area is stale. Using the
+        // newest row can leave a partially stale Plan result on screen.
+        let oldest = currentSourceRows.map(\.cachedAt).min()
         let stale = sourceChanged ||
-            freshest == nil ||
-            now.timeIntervalSince(freshest!) > Self.cacheTTL
+            oldest == nil ||
+            now.timeIntervalSince(oldest!) > Self.cacheTTL
 
         var refreshError: (any Error)?
         if stale {

@@ -30,8 +30,6 @@ final class PaywallViewModel {
 
     private let entitlement: EntitlementRepository
     private var cancellables = Set<AnyCancellable>()
-    /// nonisolated so `deinit` can cancel it without hopping to the main actor.
-    private nonisolated(unsafe) var updateListener: Task<Void, Never>?
 
     init(entitlement: EntitlementRepository) {
         self.entitlement = entitlement
@@ -41,19 +39,7 @@ final class PaywallViewModel {
             .sink { [weak self] in self?.isPro = $0 }
             .store(in: &cancellables)
 
-        // Catches renewals, refunds, and purchases completed outside the app.
-        updateListener = Task { [weak self] in
-            for await update in Transaction.updates {
-                guard let self else { return }
-                if case .verified(let transaction) = update {
-                    await transaction.finish()
-                }
-                await self.refreshEntitlement()
-            }
-        }
     }
-
-    deinit { updateListener?.cancel() }
 
     // MARK: - Loading
 

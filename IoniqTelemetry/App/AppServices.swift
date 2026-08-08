@@ -83,7 +83,7 @@ final class AppServices {
                 let userKey = preferencesRef.currentPreferences.openChargeMapApiKey ?? ""
                 return userKey.isEmpty ? Secrets.openChargeMapKey : userKey
             },
-            source: { preferencesRef.currentPreferences.chargerSource },
+            source: { preferencesRef.currentPreferences.chargerSourceOrDefault },
             googleApiKey: { preferencesRef.currentPreferences.googleMapsApiKey ?? "" }
         )
         savedTrips = SavedTripRepository(modelContext: modelContext)
@@ -137,6 +137,13 @@ final class AppServices {
         await autoConnectLastAdapter()
 
         registerAutoBackupTask()
+    }
+
+    /// Recheck StoreKit when the app returns to the foreground. This catches a
+    /// purchase/refund completed outside the app and retries a StoreKit refresh
+    /// that was inconclusive during an app update.
+    func refreshEntitlements() async {
+        _ = await entitlement.refreshEntitlements()
     }
 
     /// Registers the alert action buttons and the delegate that handles them. The

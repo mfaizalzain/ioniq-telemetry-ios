@@ -29,6 +29,7 @@ struct IoniqTelemetryApp: App {
                 // Close it the moment we're back, before any new frames arrive.
                 Task { @MainActor in
                     appServices.connectedCar.appDidBecomeActive()
+                    await appServices.refreshEntitlements()
                 }
             }
         }

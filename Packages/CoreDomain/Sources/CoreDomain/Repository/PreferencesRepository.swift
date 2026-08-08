@@ -247,6 +247,14 @@ public struct UserPreferences: Sendable {
         }
     }
 
+    /// The source the charger repository can actually use with the configured credentials.
+    /// This mirrors Android: selecting Google Places without a Maps key falls back to OCM.
+    public var chargerSourceOrDefault: ChargerSource {
+        guard chargerSource == .googlePlaces else { return chargerSource }
+        let key = googleMapsApiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return key?.isEmpty == false ? .googlePlaces : .openChargeMap
+    }
+
     /// True when the selected AI provider has a usable key.
     public var canPlanRoutes: Bool {
         if routingProvider == .appleMaps { return true }
