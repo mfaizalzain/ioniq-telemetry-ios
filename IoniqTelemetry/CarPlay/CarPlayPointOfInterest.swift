@@ -18,29 +18,18 @@ enum CarPlayPointOfInterest {
         let total: Int
 
         var isFull: Bool { available <= 0 }
-
-        var label: String {
-            isFull ? "Full — no connectors free" : "\(available) of \(total) connectors free"
-        }
     }
 
     static func make(
         from candidate: ChargerCandidate,
         origin: LatLon,
-        liveStatus: ChargerLiveStatus? = nil,
-        liveConsumption: Float? = nil,
         onSetDestination: (@MainActor (Charger) -> Void)? = nil
     ) -> CPPointOfInterest {
         let charger = candidate.charger
         let coordinate = CLLocationCoordinate2D(latitude: charger.lat, longitude: charger.lon)
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = charger.name
-        let detail = subtitle(
-            for: candidate,
-            origin: origin,
-            liveStatus: liveStatus,
-            liveConsumption: liveConsumption
-        )
+        let detail = subtitle(for: candidate, origin: origin)
 
         let poi = CPPointOfInterest(
             location: mapItem,
@@ -82,9 +71,7 @@ enum CarPlayPointOfInterest {
 
     private static func subtitle(
         for candidate: ChargerCandidate,
-        origin: LatLon,
-        liveStatus: ChargerLiveStatus? = nil,
-        liveConsumption: Float? = nil
+        origin: LatLon
     ) -> String {
         let charger = candidate.charger
         var parts: [String] = []
@@ -93,9 +80,6 @@ enum CarPlayPointOfInterest {
             parts.append(String(format: "%.0f kW%@", charger.maxPowerKw, ultra))
         }
         parts.append(String(format: "%.1f km", distanceKm(origin, charger)))
-        if let liveConsumption {
-            parts.append(String(format: "%.1f kWh/100 km now", liveConsumption))
-        }
         if let arrival = candidate.arrivalSoc {
             switch candidate.reach {
             case .comfortable:
@@ -112,9 +96,6 @@ enum CarPlayPointOfInterest {
         }
         if !charger.isOperational {
             parts.append("Out of service")
-        }
-        if let liveStatus {
-            parts.append(liveStatus.label)
         }
         return parts.joined(separator: " · ")
     }

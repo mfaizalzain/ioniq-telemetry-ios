@@ -121,6 +121,9 @@ final class CarPlayCoordinator {
     /// The plan list's live-arrival row, updated in place on the telemetry tick
     /// (rebuilding the whole list every 2 s would flicker).
     private var lastPlanLiveItem: CPListItem?
+    /// The plan list's destination row, updated with the remaining route
+    /// distance as the driver's fresh location changes.
+    private var lastPlanDestinationItem: CPListItem?
     /// Cached so the status screen and the plan row agree within a tick.
     private var lastArrivalEstimate: LiveArrival?
 
@@ -438,8 +441,6 @@ final class CarPlayCoordinator {
                 CarPlayPointOfInterest.make(
                     from: $0,
                     origin: origin,
-                    liveStatus: lastLiveStatus?[$0.charger.id],
-                    liveConsumption: consumptionEstimator.kwhPer100Km,
                     onSetDestination: { [weak self] charger in
                         self?.setPoiDestination(charger)
                     }
@@ -477,6 +478,7 @@ final class CarPlayCoordinator {
     private func reloadPlan() {
         guard let plan = lastPlan else {
             lastPlanLiveItem = nil
+            lastPlanDestinationItem = nil
             lastArrivalEstimate = nil
             let placeholder = CPListItem(text: "Plan a trip on your phone", detailText: nil)
             placeholder.isEnabled = false
@@ -508,9 +510,10 @@ final class CarPlayCoordinator {
         }
         let destination = CPListItem(
             text: "Destination",
-            detailText: String(format: "%.1f km", plan.totalDistanceKm)
+            detailText: remainingDistanceText(for: plan)
         )
         destination.isEnabled = false
+        lastPlanDestinationItem = destination
         items.append(destination)
 
         planTemplate.updateSections([CPListSection(items: items)])
@@ -921,6 +924,10 @@ final class CarPlayCoordinator {
     /// Pushes the latest estimate onto the plan list's live row and caches it
     /// for the status screen. In-place update — no list rebuild, no flicker.
     private func refreshLiveOverlay() {
+        if let plan = lastPlan {
+            lastPlanDestinationItem?.setDetailText(remainingDistanceText(for: plan))
+        }
+
         let arrival = liveArrivalEstimate()
         lastArrivalEstimate = arrival
 
@@ -948,6 +955,25 @@ final class CarPlayCoordinator {
         } else {
             liveItem.setDetailText("—")
         }
+    }
+
+    /// Formats the distance still left on the active route. The plan's total
+    /// distance is used until a fresh CarPlay location is available.
+    private func remainingDistanceText(for plan: TripPlan) -> String {
+        guard let position = CarPlayLocation.shared.freshFix else {
+            return String(format: "%.1f km remaining", plan.totalDistanceKm)
+        }
+        let routePoints = services.activePlan.currentRoutePoints
+        guard !routePoints.isEmpty else {
+            return String(format: "%.1f km remaining", plan.totalDistanceKm)
+        }
+        let (alongKm, _) = RouteGeo.projectOntoRoute(
+            points: routePoints,
+            lat: position.lat,
+            lon: position.lon,
+            totalKm: plan.totalDistanceKm
+        )
+        return String(format: "%.1f km remaining", max(plan.totalDistanceKm - alongKm, 0))
     }
 
     // MARK: - Occupancy
