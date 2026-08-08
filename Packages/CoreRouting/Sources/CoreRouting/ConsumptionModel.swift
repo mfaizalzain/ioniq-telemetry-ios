@@ -1,3 +1,4 @@
+import CoreDomain
 import Foundation
 
 // MARK: - CalibrationFactors
@@ -28,6 +29,28 @@ public struct CalibrationFactors: Sendable {
 
     public static func clamp(_ v: Double) -> Double {
         min(max(v, 0.7), 1.3)
+    }
+
+    /// Loads persisted calibration from the preferences snapshot. An unset or
+    /// immature snapshot (below `minCalibrationKm`) degrades to neutral scales
+    /// inside `ConsumptionModel`, so it is safe to apply unconditionally.
+    public init(snapshot: CalibrationSnapshot) {
+        self.init(
+            crrScale: Double(snapshot.crrScale),
+            cdaScale: Double(snapshot.cdaScale),
+            auxScale: Double(snapshot.auxScale),
+            fittedSampleKm: Double(snapshot.fittedSampleKm)
+        )
+    }
+
+    /// The persisted form of the current factors.
+    public var snapshot: CalibrationSnapshot {
+        CalibrationSnapshot(
+            crrScale: Float(crrScale),
+            cdaScale: Float(cdaScale),
+            auxScale: Float(auxScale),
+            fittedSampleKm: Float(fittedSampleKm)
+        )
     }
 }
 

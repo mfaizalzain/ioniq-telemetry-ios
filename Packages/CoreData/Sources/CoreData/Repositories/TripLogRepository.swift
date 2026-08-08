@@ -133,6 +133,16 @@ public final class TripLogRepository: @unchecked Sendable {
         return try modelContext.fetch(descriptor)
     }
 
+    /// Net elevation change across a trip's samples (last minus first GPS
+    /// altitude), in the chronological order `samplesForTrip` returns. Used by
+    /// the calibration fit so a mountainous drive is credited as a climb rather
+    /// than misread as a car that suddenly burns 30 kWh/100 km.
+    public func netElevationGainM(tripId: String) throws -> Float? {
+        let elevations = try samplesForTrip(tripId: tripId).compactMap(\.elevationM)
+        guard let first = elevations.first, let last = elevations.last else { return nil }
+        return last - first
+    }
+
     public func tripById(_ id: String) throws -> TripEntity? {
         let descriptor = FetchDescriptor<TripEntity>(predicate: #Predicate { $0.id == id })
         return try modelContext.fetch(descriptor).first

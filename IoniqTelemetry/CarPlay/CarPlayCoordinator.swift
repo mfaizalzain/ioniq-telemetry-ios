@@ -19,6 +19,12 @@ final class CarPlayCoordinator {
 
     /// Slow enough to be readable and cheap, fast enough to feel live.
     private static let refreshInterval: TimeInterval = 2
+    /// How often the range guard looks at the destination, independent of the
+    /// 2 s telemetry refresh — the alert is the rare event, not the frame rate.
+    private static let rangeCheckInterval: TimeInterval = 2 * 60
+    /// One alert per destination, then this cooldown before the same destination
+    /// can raise another. The driver has seen it; repeating it adds noise.
+    private static let rangeAlertCooldown: TimeInterval = 5 * 60
 
     private let interfaceController: CPInterfaceController
     private let services: AppServices
@@ -63,12 +69,53 @@ final class CarPlayCoordinator {
     /// subscription without re-subscribing.
     private var lastPlan: TripPlan?
 
+    /// True once the initial charger fetch has populated the map at least once.
+    /// Range alerts before that would be judging against an empty candidate
+    /// pool and could cry wolf.
+    private var chargersLoaded = false
+
     /// First plan stop's charger id that already got a "may be full" alert.
     /// Guards against re-alerting on every poll cycle.
     private var lastAlertedStopId: String?
 
     /// Sparse occupancy poller — Places bills per request against the user's key.
     private var occupancyTimer: Timer?
+
+    /// Rolling live consumption measured from OBD power and speed.
+    private let consumptionEstimator = LiveConsumptionEstimator()
+    /// Predicts arrival SOC from live behavior rescaled over the plan's
+    /// per-leg elevation — the ABRP-style "model the road, calibrate to the
+    /// driver" estimate. Rebuilt on demand so a calibration change made on the
+    /// phone shows up here without a reconnect.
+    private var arrivalEstimator: LiveArrivalEstimator {
+        LiveArrivalEstimator(consumption: ConsumptionModel(
+            calibration: CalibrationFactors(snapshot: services.userPreferences.calibration)
+        ))
+    }
+    /// Decides whether the next destination is reachable, and which charger best
+    /// extends range when it is not.
+    private let rangeAdvisor = DestinationRangeAdvisor()
+    private var rangeCheckTimer: Timer?
+    /// Destination chosen from a charger pin. The plan's own destination takes
+    /// precedence while a plan is active.
+    private var poiDestination: LatLon?
+    private var poiDestinationName: String?
+    /// Chargers around the chosen destination, fetched once per destination so
+    /// the suggestion pool covers the far end of the trip without re-billing.
+    private var destinationPool: [Charger] = []
+    /// In-memory cache of far-end pools keyed by rounded destination
+    /// coordinate. Tapping the same charger twice reuses the pool instead of
+    /// re-billing the charger API (Google Places users pay per request).
+    private var destinationPoolCache: [String: [Charger]] = [:]
+    /// Guards against overlapping async range checks.
+    private var rangeCheckInFlight = false
+    private var lastRangeAlertKey: String?
+    private var lastRangeAlertAt = Date.distantPast
+    /// The plan list's live-arrival row, updated in place on the telemetry tick
+    /// (rebuilding the whole list every 2 s would flicker).
+    private var lastPlanLiveItem: CPListItem?
+    /// Cached so the status screen and the plan row agree within a tick.
+    private var lastArrivalEstimate: LiveArrival?
 
     init(interfaceController: CPInterfaceController, services: AppServices) {
         self.interfaceController = interfaceController
@@ -114,10 +161,14 @@ final class CarPlayCoordinator {
                 // the same charger, and it deserves its own alert.
                 if plan == nil { self.lastAlertedStopId = nil }
                 self.reloadPlan()
+                // A new plan moves the destination; look at it immediately rather
+                // than waiting out the range timer.
+                self.scheduleRangeCheck()
             }
             .store(in: &cancellables)
 
         startOccupancyTimer()
+        startRangeTimer()
 
         Task { await loadChargers() }
     }
@@ -126,16 +177,22 @@ final class CarPlayCoordinator {
         cancellables.removeAll()
         occupancyTimer?.invalidate()
         occupancyTimer = nil
+        rangeCheckTimer?.invalidate()
+        rangeCheckTimer = nil
     }
 
     private func onTelemetry(_ sample: VehicleTelemetry) {
         telemetry = sample
+        // Feed the live consumption estimate on every frame — it is an EMA, so
+        // the cost is trivial and a 2 s throttle would just blur the window.
+        consumptionEstimator.update(sample)
         let now = Date()
         guard now.timeIntervalSince(lastRefresh) >= Self.refreshInterval else { return }
         lastRefresh = now
         refreshStatus()
         refreshCharging()
         refreshChargers()
+        refreshLiveOverlay()
     }
 
     // MARK: - Status
@@ -155,6 +212,19 @@ final class CarPlayCoordinator {
             CPInformationItem(title: "Pack temp", detail: packTempText),
             CPInformationItem(title: "Adapter", detail: ConnectionLabel.text(for: connectionState))
         ]
+        if let live = consumptionEstimator.kwhPer100Km {
+            items.append(CPInformationItem(
+                title: "Live use",
+                detail: String(format: "%.1f kWh/100 km", live)
+            ))
+        }
+        if let arrival = lastArrivalEstimate?.destination {
+            var detail = String(format: "~%.0f%%", arrival.predictedArrivalSocPercent)
+            if let planned = lastArrivalEstimate?.destinationPlannedSoc {
+                detail += String(format: " (plan %.0f%%)", planned)
+            }
+            items.append(CPInformationItem(title: "Arrive", detail: detail))
+        }
         if let low = lowTyres, !low.isEmpty {
             items.append(CPInformationItem(title: "Low tyre", detail: low))
         }
@@ -254,7 +324,8 @@ final class CarPlayCoordinator {
             socPercent: soc,
             usableKwh: Float(usableKwh),
             ambientTempC: ambient,
-            learnedKwhPer100Km: learnedConsumption
+            learnedKwhPer100Km: learnedConsumption,
+            liveKwhPer100Km: consumptionEstimator.kwhPer100Km
         )
 
         // CarPlay caps a POI template at 12 entries; sending more is dropped
@@ -269,11 +340,21 @@ final class CarPlayCoordinator {
         chargersTemplate.setPointsOfInterest(
             visible.map {
                 CarPlayPointOfInterest.make(
-                    from: $0, origin: center, liveStatus: liveStatus?[$0.charger.id]
+                    from: $0,
+                    origin: center,
+                    liveStatus: liveStatus?[$0.charger.id],
+                    liveConsumption: consumptionEstimator.kwhPer100Km,
+                    onSetDestination: { [weak self] charger in
+                        self?.setPoiDestination(charger)
+                    }
                 )
             },
             selectedIndex: NSNotFound
         )
+        // The candidate pool exists now — don't wait out the range timer for
+        // the first meaningful check.
+        chargersLoaded = true
+        scheduleRangeCheck()
     }
 
     /// Live occupancy for the listed chargers, when the requirements are met
@@ -318,13 +399,20 @@ final class CarPlayCoordinator {
             socPercent: soc,
             usableKwh: Float(usableKwh),
             ambientTempC: telemetry.ambientTempC,
-            learnedKwhPer100Km: learnedConsumption
+            learnedKwhPer100Km: learnedConsumption,
+            liveKwhPer100Km: consumptionEstimator.kwhPer100Km
         )
         let visible = candidates.prefix(12)
         chargersTemplate.setPointsOfInterest(
             visible.map {
                 CarPlayPointOfInterest.make(
-                    from: $0, origin: origin, liveStatus: lastLiveStatus?[$0.charger.id]
+                    from: $0,
+                    origin: origin,
+                    liveStatus: lastLiveStatus?[$0.charger.id],
+                    liveConsumption: consumptionEstimator.kwhPer100Km,
+                    onSetDestination: { [weak self] charger in
+                        self?.setPoiDestination(charger)
+                    }
                 )
             },
             selectedIndex: NSNotFound
@@ -358,13 +446,21 @@ final class CarPlayCoordinator {
 
     private func reloadPlan() {
         guard let plan = lastPlan else {
+            lastPlanLiveItem = nil
+            lastArrivalEstimate = nil
             let placeholder = CPListItem(text: "Plan a trip on your phone", detailText: nil)
             placeholder.isEnabled = false
             planTemplate.updateSections([CPListSection(items: [placeholder])])
             return
         }
 
-        var items: [CPListItem] = []
+        // Live arrival — the estimate refreshes in place on the telemetry tick;
+        // the "—" placeholder is replaced as soon as SOC, position and a
+        // consumption figure all exist.
+        let liveItem = CPListItem(text: "Live arrival", detailText: "—")
+        liveItem.isEnabled = false
+        lastPlanLiveItem = liveItem
+        var items: [CPListItem] = [liveItem]
         for (index, stop) in plan.stops.enumerated() {
             let item = CPListItem(
                 text: "\(index + 1). \(stop.charger.name)",
@@ -388,6 +484,440 @@ final class CarPlayCoordinator {
         items.append(destination)
 
         planTemplate.updateSections([CPListSection(items: items)])
+        refreshLiveOverlay()
+    }
+
+    // MARK: - Live range guard
+
+    /// A destination the range guard is watching, with the road distance to it
+    /// from the driver's current position.
+    private struct NextDestination {
+        let name: String
+        let location: LatLon
+        let distanceKm: Float
+        /// True when this is the plan's next charging stop, not the final
+        /// destination — the live estimate must slice legs to the stop.
+        let isStop: Bool
+    }
+
+    /// Elevation- and behavior-aware arrival estimates for the road ahead.
+    private struct LiveArrival {
+        let nextStop: ArrivalEstimate?
+        let destination: ArrivalEstimate?
+        let nextStopName: String?
+        let nextStopPlannedSoc: Float?
+        let destinationPlannedSoc: Float?
+        let destinationName: String
+    }
+
+    private func startRangeTimer() {
+        rangeCheckTimer = Timer.scheduledTimer(
+            withTimeInterval: Self.rangeCheckInterval,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.scheduleRangeCheck()
+            }
+        }
+    }
+
+    /// Sets a charger pin as the range-guard destination. The plan's own
+    /// destination takes precedence while a plan is active.
+    @MainActor
+    func setPoiDestination(_ charger: Charger) {
+        poiDestination = LatLon(lat: charger.lat, lon: charger.lon)
+        poiDestinationName = charger.name
+        lastRangeAlertKey = nil
+        lastRangeAlertAt = .distantPast
+        // Judge with the near pool immediately; the far-end pool (cached or
+        // freshly fetched) triggers a second, better-informed check.
+        scheduleRangeCheck()
+        Task {
+            guard let dest = poiDestination else { return }
+            let key = String(format: "%.3f,%.3f", dest.lat, dest.lon)
+            if let cached = destinationPoolCache[key] {
+                destinationPool = cached
+                scheduleRangeCheck()
+                return
+            }
+            // Fetch the far end once, so the suggestion pool covers chargers
+            // between here and there, not just the 30 km ring already loaded.
+            let pool = (try? await services.chargers.chargersNear(center: dest, radiusKm: 35)) ?? []
+            destinationPoolCache[key] = pool
+            destinationPool = pool
+            scheduleRangeCheck()
+        }
+    }
+
+    /// Fires the range check, never overlapping a check already in flight.
+    private func scheduleRangeCheck() {
+        guard !rangeCheckInFlight else { return }
+        rangeCheckInFlight = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.rangeCheckInFlight = false }
+            await self.checkRange()
+        }
+    }
+
+    private func checkRange() async {
+        guard let soc = telemetry.socDisplay ?? telemetry.socBms else { return }
+        guard let consumption = currentConsumption else { return }
+        guard let position = await CarPlayLocation.shared.currentLocation() else { return }
+        guard let next = resolveNextDestination(position: position) else { return }
+        guard let arrival = liveArrivalEstimate() else { return }
+        // No charger data yet — the candidate pool would be empty and any
+        // alert a lie. The initial load schedules its own check once it lands.
+        guard chargersLoaded else { return }
+
+        let usableKwh = Ioniq5RoutingConstants.usableKwhForProfile(
+            services.userPreferences.activeProfileId,
+            customKwh: services.userPreferences.customUsableBatteryKwh
+        )
+
+        // Elevation- and behavior-aware prediction for the road ahead. The
+        // advisor's flat math still ranks charger candidates below, but the
+        // headline number must reflect the climb ahead, not a flat average.
+        let predictedArrival: Float
+        if next.isStop, let stopEstimate = arrival.nextStop {
+            predictedArrival = stopEstimate.predictedArrivalSocPercent
+        } else if let destEstimate = arrival.destination {
+            predictedArrival = destEstimate.predictedArrivalSocPercent
+        } else {
+            predictedArrival = soc - Float(next.distanceKm) / Float(usableKwh) * consumption * 100
+        }
+        guard predictedArrival < services.userPreferences.targetArrivalSocPercent else { return }
+
+        // Candidate pool: the 30 km ring already fetched, chargers around the
+        // destination, and the plan's own stops — deduplicated by id.
+        var seen = Set<String>()
+        var pool: [Charger] = []
+        for charger in fetchedChargers + destinationPool + (lastPlan?.stops.map(\.charger) ?? []) {
+            guard seen.insert(charger.id).inserted else { continue }
+            pool.append(charger)
+        }
+
+        let candidates = pool
+            .filter { !$0.isRestricted && $0.isOperational }
+            .map { charger in
+                RouteChargerCandidate(
+                    charger: charger,
+                    driveKm: roadDistanceKm(position, LatLon(lat: charger.lat, lon: charger.lon))
+                )
+            }
+
+        // A charger that reported being full is not preferred, but it is not
+        // removed either — occupancy changes, and the tie-break only demotes it.
+        let availableIds = Set((lastLiveStatus ?? [:]).compactMap { key, status in
+            status.isFull ? nil : key
+        })
+
+        let advice = rangeAdvisor.advise(
+            currentSocPercent: soc,
+            usableKwh: usableKwh,
+            consumptionKwhPer100Km: Double(consumption),
+            distanceToDestinationKm: Double(next.distanceKm),
+            reserveSocPercent: services.userPreferences.targetArrivalSocPercent,
+            packTempC: packTempC,
+            availableChargerIds: availableIds,
+            predictedArrivalSocPercent: predictedArrival,
+            chargers: candidates
+        )
+
+        // One alert per destination, then a cooldown: the driver has seen it.
+        let key = "\(next.name)|\(next.location.lat),\(next.location.lon)"
+        if lastRangeAlertKey == key,
+           Date().timeIntervalSince(lastRangeAlertAt) < Self.rangeAlertCooldown {
+            return
+        }
+        lastRangeAlertKey = key
+        lastRangeAlertAt = Date()
+
+        await presentRangeAlert(
+            advice: advice,
+            destination: next,
+            predictedArrivalSocPercent: predictedArrival
+        )
+    }
+
+    /// The next destination on the active plan (first stop not yet passed, else
+    /// the final destination), or the driver's chosen charger pin. Distance is
+    /// route distance when a plan is active, road-scaled straight line otherwise.
+    private func resolveNextDestination(position: LatLon) -> NextDestination? {
+        if let plan = lastPlan {
+            let routePoints = services.activePlan.currentRoutePoints
+            if !routePoints.isEmpty {
+                let (alongKm, _) = RouteGeo.projectOntoRoute(
+                    points: routePoints,
+                    lat: position.lat,
+                    lon: position.lon,
+                    totalKm: plan.totalDistanceKm
+                )
+                if let stop = plan.stops.first(where: { $0.distanceFromOriginKm > alongKm }) {
+                    return NextDestination(
+                        name: stop.charger.name,
+                        location: LatLon(lat: stop.charger.lat, lon: stop.charger.lon),
+                        distanceKm: stop.distanceFromOriginKm - alongKm,
+                        isStop: true
+                    )
+                }
+                return NextDestination(
+                    name: "Destination",
+                    location: plan.destination,
+                    distanceKm: max(plan.totalDistanceKm - alongKm, 0),
+                    isStop: false
+                )
+            }
+        }
+        guard let dest = poiDestination else { return nil }
+        return NextDestination(
+            name: poiDestinationName ?? "Destination",
+            location: dest,
+            distanceKm: Float(roadDistanceKm(position, dest)),
+            isStop: false
+        )
+    }
+
+    private func presentRangeAlert(
+        advice: RangeAdvice,
+        destination: NextDestination,
+        predictedArrivalSocPercent: Float
+    ) async {
+        let arrival = Int(predictedArrivalSocPercent.rounded())
+        let label = destination.name
+        var lines: [String]
+        var navigateAction: CPAlertAction?
+
+        if let stop = advice.suggestedStop {
+            let chargerName = stop.charger.name
+            if stop.reachesDestination {
+                lines = [
+                    "\(label) is out of reach on this charge — arrive ~\(arrival)%.",
+                    "Charge at \(chargerName): arrive ~\(Int(stop.arriveSocPercent))%, \(stop.chargeMinutes) min, then arrive at \(Int(stop.arriveDestinationSocPercent))%."
+                ]
+            } else {
+                lines = [
+                    "\(label) is out of reach — arrive ~\(arrival)%.",
+                    "Even after \(chargerName) you'd arrive at \(Int(stop.arriveDestinationSocPercent))%. Consider another stop."
+                ]
+            }
+            let charger = stop.charger
+            navigateAction = CPAlertAction(title: "Navigate", style: .default, handler: { _ in
+                Task { @MainActor in
+                    MapsNavigation.navigate(
+                        to: LatLon(lat: charger.lat, lon: charger.lon),
+                        name: charger.name,
+                        preferGoogleMaps: false
+                    )
+                }
+            })
+        } else {
+            lines = [
+                "\(label) is out of reach on this charge — arrive ~\(arrival)%.",
+                "Nothing nearby can extend your range. Charge sooner."
+            ]
+        }
+
+        var actions = navigateAction.map { [$0] } ?? []
+        actions.append(CPAlertAction(title: "OK", style: .cancel, handler: { [weak self] _ in
+            self?.interfaceController.dismissTemplate(animated: true, completion: nil)
+        }))
+
+        let alert = CPAlertTemplate(titleVariants: lines, actions: actions)
+        _ = try? await interfaceController.presentTemplate(alert, animated: true)
+    }
+
+    /// Road distance between two points — straight line scaled by the same
+    /// detour factor the charger ranking uses.
+    private func roadDistanceKm(_ from: LatLon, _ to: LatLon) -> Double {
+        approxDistanceKm(from, to) * Double(roadDetourFactor)
+    }
+
+    /// Consumption to predict with: live OBD measurement once the estimator has
+    /// enough samples, otherwise learned history or the HVAC-adjusted baseline.
+    private var currentConsumption: Float? {
+        if let live = consumptionEstimator.kwhPer100Km { return live }
+        return effectiveConsumptionKwhPer100Km(
+            ambientTempC: telemetry.ambientTempC,
+            learned: learnedConsumption
+        )
+    }
+
+    /// Average pack temperature for charge-curve derating.
+    private var packTempC: Float {
+        guard !telemetry.moduleTempsC.isEmpty else { return 25 }
+        return Float(telemetry.moduleTempsC.reduce(0, +) / telemetry.moduleTempsC.count)
+    }
+
+    /// The plan's legs from `fromAlongKm` onward, cut at the current position
+    /// and optionally at a stop boundary. The first remaining leg's elevation
+    /// scales with the driven fraction, matching the plan's uniform grade.
+    private func remainingLegs(
+        of plan: TripPlan,
+        fromAlongKm: Float,
+        upToKm: Float? = nil
+    ) -> [RemainingLeg] {
+        var legs: [RemainingLeg] = []
+        var cursor: Float = 0
+        var started = false
+        for leg in plan.legs {
+            let legEnd = cursor + leg.distanceKm
+            if legEnd <= fromAlongKm {
+                cursor = legEnd
+                continue
+            }
+            if let upToKm, cursor >= upToKm { break }
+            let start = started ? cursor : fromAlongKm
+            let end = min(legEnd, upToKm ?? legEnd)
+            let remaining = end - start
+            started = true
+            guard remaining > 0 else {
+                cursor = legEnd
+                continue
+            }
+            let fraction = leg.distanceKm > 0 ? remaining / leg.distanceKm : 1
+            let speed = leg.driveMinutes > 0
+                ? leg.distanceKm / Float(leg.driveMinutes) * 60
+                : 95
+            legs.append(RemainingLeg(
+                distanceKm: remaining,
+                elevationGainM: leg.elevationGainM * fraction,
+                speedKph: speed
+            ))
+            cursor = legEnd
+        }
+        return legs
+    }
+
+    /// Elevation- and behavior-aware arrival estimate for the next stop (when
+    /// one lies ahead) and the final destination, or nil when there is no
+    /// destination, no SOC, no fresh position, or nothing to predict with.
+    private func liveArrivalEstimate() -> LiveArrival? {
+        guard let soc = telemetry.socDisplay ?? telemetry.socBms else { return nil }
+        guard let position = CarPlayLocation.shared.freshFix else { return nil }
+
+        let usableKwh = Ioniq5RoutingConstants.usableKwhForProfile(
+            services.userPreferences.activeProfileId,
+            customKwh: services.userPreferences.customUsableBatteryKwh
+        )
+        let ambient = Float(telemetry.ambientTempC ?? 20)
+        let live = consumptionEstimator.kwhPer100Km
+        let learned = learnedConsumption
+        let baseline = effectiveConsumptionKwhPer100Km(
+            ambientTempC: telemetry.ambientTempC,
+            learned: nil
+        )
+
+        if let plan = lastPlan {
+            let routePoints = services.activePlan.currentRoutePoints
+            guard !routePoints.isEmpty else { return nil }
+            let (alongKm, _) = RouteGeo.projectOntoRoute(
+                points: routePoints,
+                lat: position.lat,
+                lon: position.lon,
+                totalKm: plan.totalDistanceKm
+            )
+            let allRemaining = remainingLegs(of: plan, fromAlongKm: alongKm)
+            guard !allRemaining.isEmpty else { return nil }
+
+            let destination = arrivalEstimator.estimate(
+                currentSocPercent: soc,
+                usableKwh: usableKwh,
+                remainingLegs: allRemaining,
+                ambientC: ambient,
+                liveKwhPer100Km: live,
+                learnedKwhPer100Km: learned,
+                baselineKwhPer100Km: baseline
+            )
+
+            var nextStop: ArrivalEstimate?
+            var nextStopName: String?
+            var nextStopPlanned: Float?
+            if let stop = plan.stops.first(where: { $0.distanceFromOriginKm > alongKm }) {
+                let upTo = remainingLegs(
+                    of: plan,
+                    fromAlongKm: alongKm,
+                    upToKm: stop.distanceFromOriginKm
+                )
+                if !upTo.isEmpty {
+                    nextStop = arrivalEstimator.estimate(
+                        currentSocPercent: soc,
+                        usableKwh: usableKwh,
+                        remainingLegs: upTo,
+                        ambientC: ambient,
+                        liveKwhPer100Km: live,
+                        learnedKwhPer100Km: learned,
+                        baselineKwhPer100Km: baseline
+                    )
+                }
+                nextStopName = stop.charger.name
+                nextStopPlanned = stop.arrivalSoc
+            }
+
+            return LiveArrival(
+                nextStop: nextStop,
+                destination: destination,
+                nextStopName: nextStopName,
+                nextStopPlannedSoc: nextStopPlanned,
+                destinationPlannedSoc: plan.arrivalSoc,
+                destinationName: "Destination"
+            )
+        }
+
+        // No plan: the chosen charger pin is a flat single leg — no elevation
+        // data exists to do better, so the estimate is behavior-scaled only.
+        guard let dest = poiDestination else { return nil }
+        let distance = roadDistanceKm(position, dest)
+        let flat = RemainingLeg(distanceKm: Float(distance), elevationGainM: 0, speedKph: 95)
+        let estimate = arrivalEstimator.estimate(
+            currentSocPercent: soc,
+            usableKwh: usableKwh,
+            remainingLegs: [flat],
+            ambientC: ambient,
+            liveKwhPer100Km: live,
+            learnedKwhPer100Km: learned,
+            baselineKwhPer100Km: baseline
+        )
+        return LiveArrival(
+            nextStop: nil,
+            destination: estimate,
+            nextStopName: nil,
+            nextStopPlannedSoc: nil,
+            destinationPlannedSoc: nil,
+            destinationName: poiDestinationName ?? "Destination"
+        )
+    }
+
+    /// Pushes the latest estimate onto the plan list's live row and caches it
+    /// for the status screen. In-place update — no list rebuild, no flicker.
+    private func refreshLiveOverlay() {
+        let arrival = liveArrivalEstimate()
+        lastArrivalEstimate = arrival
+
+        guard let arrival, let liveItem = lastPlanLiveItem else {
+            lastPlanLiveItem?.setDetailText("—")
+            return
+        }
+
+        if let nextStop = arrival.nextStop, let name = arrival.nextStopName {
+            var nextText = String(format: "~%.0f%%", nextStop.predictedArrivalSocPercent)
+            if let planned = arrival.nextStopPlannedSoc {
+                nextText += String(format: " (plan %.0f%%)", planned)
+            }
+            var destText = String(format: "~%.0f%%", arrival.destination?.predictedArrivalSocPercent ?? 0)
+            if let planned = arrival.destinationPlannedSoc {
+                destText += String(format: " (plan %.0f%%)", planned)
+            }
+            liveItem.setDetailText("\(name): \(nextText) · dest \(destText)")
+        } else if let dest = arrival.destination {
+            var detail = String(format: "~%.0f%%", dest.predictedArrivalSocPercent)
+            if let planned = arrival.destinationPlannedSoc {
+                detail += String(format: " (plan %.0f%%)", planned)
+            }
+            liveItem.setDetailText("\(arrival.destinationName): \(detail)")
+        } else {
+            liveItem.setDetailText("—")
+        }
     }
 
     // MARK: - Occupancy
@@ -554,9 +1084,14 @@ private func rankChargers(
     socPercent: Float?,
     usableKwh: Float,
     ambientTempC: Int? = nil,
-    learnedKwhPer100Km: Float? = nil
+    learnedKwhPer100Km: Float? = nil,
+    liveKwhPer100Km: Float? = nil
 ) -> [ChargerCandidate] {
-    let consumption = effectiveConsumptionKwhPer100Km(ambientTempC: ambientTempC, learned: learnedKwhPer100Km)
+    // A live OBD measurement already contains this drive's real HVAC draw and
+    // driving style, so it wins outright; learned history and the baseline are
+    // the fallbacks for before the estimator has warmed up.
+    let consumption = liveKwhPer100Km
+        ?? effectiveConsumptionKwhPer100Km(ambientTempC: ambientTempC, learned: learnedKwhPer100Km)
 
     return chargers
         .map { charger in

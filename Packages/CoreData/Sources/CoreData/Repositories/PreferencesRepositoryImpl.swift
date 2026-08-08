@@ -73,6 +73,12 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         prefs.reserveSocPercent = defaults.float(forKey: "reserveSocPercent", default: 10)
         prefs.targetArrivalSocPercent = defaults.float(forKey: "targetArrivalSocPercent", default: 20)
         prefs.payloadMassKg = defaults.float(forKey: "payloadMassKg", default: 100)
+        prefs.calibration = CalibrationSnapshot(
+            crrScale: defaults.float(forKey: "calibrationCrrScale"),
+            cdaScale: defaults.float(forKey: "calibrationCdaScale"),
+            auxScale: defaults.float(forKey: "calibrationAuxScale"),
+            fittedSampleKm: defaults.float(forKey: "calibrationFittedKm")
+        )
         prefs.activeProfileId = defaults.string(forKey: "activeProfileId") ?? "ioniq5_2022_77kwh"
         prefs.customUsableBatteryKwh = defaults.floatOrNil(forKey: "customUsableBatteryKwh")
         prefs.customVehicleName = defaults.string(forKey: "customVehicleName")
@@ -129,6 +135,10 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(prefs.reserveSocPercent, forKey: "reserveSocPercent")
         defaults.set(prefs.targetArrivalSocPercent, forKey: "targetArrivalSocPercent")
         defaults.set(prefs.payloadMassKg, forKey: "payloadMassKg")
+        defaults.set(prefs.calibration.crrScale, forKey: "calibrationCrrScale")
+        defaults.set(prefs.calibration.cdaScale, forKey: "calibrationCdaScale")
+        defaults.set(prefs.calibration.auxScale, forKey: "calibrationAuxScale")
+        defaults.set(prefs.calibration.fittedSampleKm, forKey: "calibrationFittedKm")
         defaults.set(prefs.activeProfileId, forKey: "activeProfileId")
         setFloatOrNil(prefs.customUsableBatteryKwh, forKey: "customUsableBatteryKwh", in: defaults)
         defaults.set(prefs.customVehicleName, forKey: "customVehicleName")

@@ -34,7 +34,6 @@ final class ConnectedCarService {
     private let driveMonitor = DriveMonitor()
     private let parkedEvaluator = ParkedStateEvaluator()
     private let replanMonitor = LiveReplanMonitor()
-    private let routeReplanner = RouteReplanner()
     private var occupancyMonitor: OccupancyAlertMonitor!
     private var chargeAlerts: ChargeAlertMonitor!
     private var tirePressure: TirePressureMonitor!
@@ -43,6 +42,15 @@ final class ConnectedCarService {
     private var cancellables = Set<AnyCancellable>()
     private var isRunning = false
     private var lastTelemetry = VehicleTelemetry()
+
+    /// Re-solves the remaining route with the driver's fitted calibration — the
+    /// occupancy reroute must see the same consumption the live estimates do.
+    /// Rebuilt on demand; a reroute is rare and the solver is stateless.
+    private var routeReplanner: RouteReplanner {
+        RouteReplanner(solver: TripSolver(consumption: ConsumptionModel(
+            calibration: CalibrationFactors(snapshot: services.userPreferences.calibration)
+        )))
+    }
 
     // MARK: - Supervisor tuning
 
@@ -295,6 +303,7 @@ final class ConnectedCarService {
             do {
                 if wasActive {
                     try await tripLog.endTrip(telemetry: telemetry)
+                    await updateCalibration()
                 } else {
                     // No trip to close, but samples may still be buffered from one
                     // the frame-driven path already ended.
@@ -611,10 +620,45 @@ final class ConnectedCarService {
             Task {
                 do {
                     try await services.tripLog.endTrip(telemetry: telemetry)
+                    await updateCalibration()
                 } catch {
                     print("[ConnectedCarService] endTrip failed: \(error.localizedDescription)")
                 }
             }
+        }
+    }
+
+    /// Folds the just-finished trip's measured energy into the driver's
+    /// calibration factors and persists them. Every subsequent estimate and
+    /// plan is scaled by these — the "driving behaviour" that makes the model
+    /// personal across sessions.
+    ///
+    /// Safe to run after every trip: `CalibrationUpdater` no-ops on trips too
+    /// short to mean anything, and `CalibrationFactors.isApplicable` keeps the
+    /// factors out of the model until enough distance has been fitted.
+    private func updateCalibration() async {
+        guard let trip = (try? services.tripLog.trips())?.first else { return }
+        guard let endTime = trip.endTime else { return }
+
+        let duration = endTime.timeIntervalSince(trip.startTime)
+        let speedKph = duration > 0 ? Double(trip.distanceKm) / duration * 3600 : 0
+        let elevation = (try? services.tripLog.netElevationGainM(tripId: trip.id)) ?? nil
+
+        let updater = CalibrationUpdater(factors: CalibrationFactors(
+            snapshot: services.userPreferences.calibration
+        ))
+        let updated = updater.update(
+            distanceKm: Double(trip.distanceKm),
+            speedKph: speedKph,
+            elevationGainM: Double(elevation ?? 0),
+            ambientC: trip.ambientTempAvgC ?? 20,
+            actualEnergyKwh: Double(trip.energyUsedKwh)
+        )
+
+        await services.preferences.update { prefs in
+            var next = prefs
+            next.calibration = updated.snapshot
+            return next
         }
     }
 

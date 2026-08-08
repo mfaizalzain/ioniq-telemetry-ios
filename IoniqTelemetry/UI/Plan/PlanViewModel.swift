@@ -100,7 +100,9 @@ final class PlanViewModel {
     private(set) var isPro = false
 
     private let services: AppServices
-    private let solver = TripSolver()
+    /// Rebuilt when the persisted calibration changes, so planned consumption
+    /// reflects the driver's fitted behaviour.
+    private var solver = TripSolver()
     private let locationProvider = LocationProvider()
     private var telemetry = VehicleTelemetry()
     private var preferences = UserPreferences()
@@ -129,7 +131,13 @@ final class PlanViewModel {
 
         services.preferences.preferences
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] in self?.preferences = $0 }
+            .sink { [weak self] prefs in
+                guard let self else { return }
+                self.preferences = prefs
+                self.solver = TripSolver(consumption: ConsumptionModel(
+                    calibration: CalibrationFactors(snapshot: prefs.calibration)
+                ))
+            }
             .store(in: &cancellables)
 
         services.entitlement.isPro

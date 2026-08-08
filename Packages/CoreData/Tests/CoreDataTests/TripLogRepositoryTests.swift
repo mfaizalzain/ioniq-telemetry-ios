@@ -73,4 +73,56 @@ struct TripLogRepositoryTests {
         #expect(restored.first?.soc == 80)
         #expect(restored.first?.lat == 3.139)
     }
+
+    @Test("net elevation is the last minus first GPS altitude, in time order")
+    func netElevationFromSamples() throws {
+        let (repo, context) = makeRepository()
+
+        let trip = TripEntity(
+            id: "climb",
+            startTime: Date(timeIntervalSince1970: 1000),
+            distanceKm: 10,
+            energyUsedKwh: 2
+        )
+        context.insert(trip)
+        // Inserted out of time order on purpose — the helper must sort by
+        // timestamp before subtracting.
+        context.insert(SampleEntity(
+            tripId: "climb",
+            timestamp: Date(timeIntervalSince1970: 1002),
+            speedKph: 90,
+            elevationM: 350
+        ))
+        context.insert(SampleEntity(
+            tripId: "climb",
+            timestamp: Date(timeIntervalSince1970: 1001),
+            speedKph: 90,
+            elevationM: 100
+        ))
+        try context.save()
+
+        #expect(try repo.netElevationGainM(tripId: "climb") == 250)
+        #expect(try repo.netElevationGainM(tripId: "no-such-trip") == nil)
+    }
+
+    @Test("net elevation is nil when samples carry no GPS altitude")
+    func netElevationNilWithoutAltitude() throws {
+        let (repo, context) = makeRepository()
+
+        let trip = TripEntity(
+            id: "flat",
+            startTime: Date(timeIntervalSince1970: 1000),
+            distanceKm: 10,
+            energyUsedKwh: 2
+        )
+        context.insert(trip)
+        context.insert(SampleEntity(
+            tripId: "flat",
+            timestamp: Date(timeIntervalSince1970: 1001),
+            speedKph: 90
+        ))
+        try context.save()
+
+        #expect(try repo.netElevationGainM(tripId: "flat") == nil)
+    }
 }

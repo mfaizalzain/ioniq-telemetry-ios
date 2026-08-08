@@ -84,6 +84,10 @@ public struct UserPreferences: Sendable {
     public var reserveSocPercent: Float
     public var targetArrivalSocPercent: Float
     public var payloadMassKg: Float
+    /// The driver's fitted consumption calibration (crr/cda/aux scales), fed
+    /// into every physics-based estimate and plan. `.unset` until enough trips
+    /// have been logged to fit it.
+    public var calibration: CalibrationSnapshot
     public var activeProfileId: String
     public var customUsableBatteryKwh: Float?
     public var customVehicleName: String?
@@ -151,6 +155,7 @@ public struct UserPreferences: Sendable {
         reserveSocPercent: Float = 10,
         targetArrivalSocPercent: Float = 20,
         payloadMassKg: Float = 100,
+        calibration: CalibrationSnapshot = .unset,
         activeProfileId: String = "ioniq5_2022_77kwh",
         customUsableBatteryKwh: Float? = nil,
         customVehicleName: String? = nil,
@@ -187,6 +192,7 @@ public struct UserPreferences: Sendable {
         self.reserveSocPercent = reserveSocPercent
         self.targetArrivalSocPercent = targetArrivalSocPercent
         self.payloadMassKg = payloadMassKg
+        self.calibration = calibration
         self.activeProfileId = activeProfileId
         self.customUsableBatteryKwh = customUsableBatteryKwh
         self.customVehicleName = customVehicleName

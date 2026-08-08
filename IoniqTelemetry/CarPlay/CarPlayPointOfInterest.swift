@@ -27,13 +27,20 @@ enum CarPlayPointOfInterest {
     static func make(
         from candidate: ChargerCandidate,
         origin: LatLon,
-        liveStatus: ChargerLiveStatus? = nil
+        liveStatus: ChargerLiveStatus? = nil,
+        liveConsumption: Float? = nil,
+        onSetDestination: (@MainActor (Charger) -> Void)? = nil
     ) -> CPPointOfInterest {
         let charger = candidate.charger
         let coordinate = CLLocationCoordinate2D(latitude: charger.lat, longitude: charger.lon)
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = charger.name
-        let detail = subtitle(for: candidate, origin: origin, liveStatus: liveStatus)
+        let detail = subtitle(
+            for: candidate,
+            origin: origin,
+            liveStatus: liveStatus,
+            liveConsumption: liveConsumption
+        )
 
         let poi = CPPointOfInterest(
             location: mapItem,
@@ -59,13 +66,25 @@ enum CarPlayPointOfInterest {
                 MapsNavigation.navigate(to: destination, name: name, preferGoogleMaps: false)
             }
         }
+        if let onSetDestination {
+            let destinationCharger = charger
+            poi.secondaryButton = CPTextButton(
+                title: "Set as destination",
+                textStyle: .normal
+            ) { _ in
+                Task { @MainActor in
+                    onSetDestination(destinationCharger)
+                }
+            }
+        }
         return poi
     }
 
     private static func subtitle(
         for candidate: ChargerCandidate,
         origin: LatLon,
-        liveStatus: ChargerLiveStatus? = nil
+        liveStatus: ChargerLiveStatus? = nil,
+        liveConsumption: Float? = nil
     ) -> String {
         let charger = candidate.charger
         var parts: [String] = []
@@ -74,6 +93,9 @@ enum CarPlayPointOfInterest {
             parts.append(String(format: "%.0f kW%@", charger.maxPowerKw, ultra))
         }
         parts.append(String(format: "%.1f km", distanceKm(origin, charger)))
+        if let liveConsumption {
+            parts.append(String(format: "%.1f kWh/100 km now", liveConsumption))
+        }
         if let arrival = candidate.arrivalSoc {
             switch candidate.reach {
             case .comfortable:
@@ -139,6 +161,13 @@ final class CarPlayLocation: NSObject, CLLocationManagerDelegate {
             manager.requestLocation()
         }
         return fresh ?? manager.location.map { LatLon(lat: $0.coordinate.latitude, lon: $0.coordinate.longitude) }
+    }
+
+    /// The latest fresh fix, synchronously — for surfaces that render on a
+    /// timer and must not await a location request mid-frame.
+    var freshFix: LatLon? {
+        guard let location = manager.location, LocationProvider.isFreshEnough(location) else { return nil }
+        return LatLon(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
     }
 
     private func resume(_ value: LatLon?) {
