@@ -777,22 +777,42 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
         }
     }
 
+    /// A cached fix is only usable while it's recent. `CLLocationManager.location`
+    /// is the system-wide last-known position — it can be hours old or from a
+    /// different place entirely, which would center "nearby chargers" (and their
+    /// live-status search) hundreds of km from where the user actually is.
+    nonisolated static func isFreshEnough(_ location: CLLocation, now: Date = Date()) -> Bool {
+        location.horizontalAccuracy >= 0 &&
+            now.timeIntervalSince(location.timestamp) <= maxCachedLocationAge
+    }
+
+    nonisolated private static let maxCachedLocationAge: TimeInterval = 120
+
     func currentLocation() async -> LatLon? {
-        if let location = manager.location {
-            return LatLon(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
+        // Fast path: a recent fix is good enough, no need to wait for GPS.
+        if let location = manager.location, Self.isFreshEnough(location) {
+            return Self.coordinate(of: location)
         }
         switch manager.authorizationStatus {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
         case .denied, .restricted:
-            return nil
+            // Can't request a fix — fall back to whatever the manager has cached
+            // rather than returning nothing (mirrors Android's last-known fallback).
+            return manager.location.map(Self.coordinate(of:))
         default:
             break
         }
-        return await withCheckedContinuation { continuation in
+        let fresh = await withCheckedContinuation { continuation in
             continuations.append(continuation)
             manager.requestLocation()
         }
+        // Fresh fix preferred; a stale cached fix beats no location at all.
+        return fresh ?? manager.location.map(Self.coordinate(of:))
+    }
+
+    private static func coordinate(of location: CLLocation) -> LatLon {
+        LatLon(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
     }
 
     private func resume(with location: LatLon?) {
