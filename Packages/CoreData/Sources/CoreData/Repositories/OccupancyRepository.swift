@@ -132,15 +132,20 @@ public final class OccupancyRepository: Sendable {
         let decoded = try JSONDecoder().decode(NearbyResponse.self, from: data)
         let stations: [OccupancySnapshot.Station] = decoded.places.compactMap { place in
             guard let options = place.evChargeOptions else { return nil }
-            let available = options.connectorAggregation?
-                .compactMap(\.availableCount)
-                .reduce(0, +)
+            let aggregations = options.connectorAggregation ?? []
+            let availableValues = aggregations.compactMap(\.availableCount)
             // No availableCount anywhere means this station reports no live status.
-            guard let available else { return nil }
+            guard !availableValues.isEmpty else { return nil }
+            let available = availableValues.reduce(0, +)
+            // Android sums the per-connector aggregation counts. Some Places
+            // responses omit connectorCount even though the aggregation contains
+            // the real total, which previously made iOS discard a valid status.
+            let aggregatedTotal = aggregations.compactMap(\.count).reduce(0, +)
+            let total = aggregatedTotal > 0 ? aggregatedTotal : (options.connectorCount ?? 0)
             return OccupancySnapshot.Station(
                 name: place.displayName?.text ?? "Charger",
                 availableCount: available,
-                totalCount: options.connectorCount ?? 0,
+                totalCount: total,
                 placeId: place.id,
                 lat: place.location?.latitude,
                 lon: place.location?.longitude

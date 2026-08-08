@@ -32,7 +32,7 @@ final class PlanViewModel {
         let available: Int
         let total: Int
 
-        var isFull: Bool { available == 0 }
+        var isFull: Bool { available <= 0 }
     }
 
     enum Slot: Hashable {
@@ -190,11 +190,13 @@ final class PlanViewModel {
 
         // Charger query — bypass AI, load them directly
         if isChargerQuery(text) {
-            await loadNearbyChargers()
+            // This is an explicit user action, so it may request location access
+            // on first use. Passive refreshes below remain permission-safe.
+            await loadNearbyChargers(requestPermission: true)
             if !nearbyChargers.isEmpty {
-                aiInterpretation = "Found \(nearbyChargers.count) nearby charging stations."
+                aiInterpretation = "Found \(nearbyChargers.count) charging stations within 10 km."
             } else {
-                aiInterpretation = "No chargers found nearby."
+                aiInterpretation = "No chargers found within 10 km of your location."
             }
             return
         }
@@ -689,12 +691,17 @@ final class PlanViewModel {
 
     // MARK: - Nearby chargers
 
-    /// Only runs once location is already authorized — opening the tab must not
-    /// trigger the permission prompt.
-    func loadNearbyChargers() async {
-        guard locationProvider.isAuthorized else { return }
-        guard let center = await locationProvider.currentLocation() else { return }
-        nearbyChargers = (try? await services.chargers.chargersNear(center: center, radiusKm: 25)) ?? []
+    /// Passive refreshes only run once location is authorized; the explicit
+    /// nearby-charger action can request permission on first use.
+    func loadNearbyChargers(requestPermission: Bool = false) async {
+        // A background connection refresh must never trigger a permission prompt;
+        // an explicit "Find chargers near me" request may do so.
+        guard requestPermission || locationProvider.isAuthorized else { return }
+        // Prefer the current GPS fix, with the selected origin as the same
+        // last-resort fallback Android uses when no fix is available.
+        guard let center = await locationProvider.currentLocation(requestPermission: requestPermission)
+                ?? origin.selected?.location else { return }
+        nearbyChargers = (try? await services.chargers.chargersNear(center: center, radiusKm: 10)) ?? []
         await loadNearbyAvailability(center: center)
     }
 
@@ -707,13 +714,17 @@ final class PlanViewModel {
     ///
     /// One Places request for the whole radius, not one per charger — it bills the
     /// user's key, so the cost stays flat regardless of how many chargers are
-    /// listed. Requires Pro and a Google key; without them the rows simply carry no
-    /// status, which is honest rather than a guess.
+    /// listed. Requires Pro, the Android-matching occupancy opt-in, and a Google
+    /// key; without them the rows simply carry no status, which is honest rather
+    /// than a guess.
     private func loadNearbyAvailability(center: LatLon) async {
         chargerAvailability = [:]
-        guard isPro, let key = preferences.googleMapsApiKey, !key.isEmpty else { return }
+        guard isPro,
+              preferences.chargerOccupancyAlerts,
+              let key = preferences.googleMapsApiKey,
+              !key.isEmpty else { return }
         guard let snapshot = try? await services.occupancy.occupancyNear(
-            center, radiusM: 25_000, apiKey: key
+            center, radiusM: 10_000, apiKey: key
         ) else { return }
 
         // Pin each charger to the station at its physical site: exact Places-id
@@ -796,14 +807,16 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
 
     nonisolated private static let maxCachedLocationAge: TimeInterval = 120
 
-    func currentLocation() async -> LatLon? {
+    func currentLocation(requestPermission: Bool = true) async -> LatLon? {
         // Fast path: a recent fix is good enough, no need to wait for GPS.
         if let location = manager.location, Self.isFreshEnough(location) {
             return Self.coordinate(of: location)
         }
         switch manager.authorizationStatus {
         case .notDetermined:
-            manager.requestWhenInUseAuthorization()
+            guard requestPermission else {
+                return manager.location.map(Self.coordinate(of:))
+            }
         case .denied, .restricted:
             // Can't request a fix — fall back to whatever the manager has cached
             // rather than returning nothing (mirrors Android's last-known fallback).
@@ -813,7 +826,7 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
         }
         let fresh = await withCheckedContinuation { continuation in
             continuations.append(continuation)
-            manager.requestLocation()
+            requestLocationIfAuthorized()
         }
         // Fresh fix preferred; a stale cached fix beats no location at all.
         return fresh ?? manager.location.map(Self.coordinate(of:))
@@ -821,6 +834,19 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
 
     private static func coordinate(of location: CLLocation) -> LatLon {
         LatLon(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
+    }
+
+    private func requestLocationIfAuthorized() {
+        switch manager.authorizationStatus {
+        case .authorizedWhenInUse, .authorizedAlways:
+            manager.requestLocation()
+        case .notDetermined:
+            manager.requestWhenInUseAuthorization()
+        case .denied, .restricted:
+            resume(with: nil)
+        @unknown default:
+            resume(with: nil)
+        }
     }
 
     private func resume(with location: LatLon?) {
@@ -838,5 +864,9 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in self.resume(with: nil) }
+    }
+
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in self.requestLocationIfAuthorized() }
     }
 }

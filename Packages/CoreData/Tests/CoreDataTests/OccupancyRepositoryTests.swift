@@ -73,6 +73,34 @@ struct OccupancyRepositoryTests {
         #expect(station.lon == 101.101)
     }
 
+    @Test("uses connector aggregation totals when connectorCount is omitted")
+    func decodesAggregatedConnectorTotal() async throws {
+        StubProtocol.responseBody = Data("""
+        {
+          "places": [
+            {
+              "id": "places/ChIJaggregate",
+              "displayName": { "text": "Aggregated Charger" },
+              "location": { "latitude": 4.201, "longitude": 101.101 },
+              "evChargeOptions": {
+                "connectorAggregation": [
+                  { "availableCount": 1, "count": 2 },
+                  { "availableCount": 2, "count": 4 }
+                ]
+              }
+            }
+          ]
+        }
+        """.utf8)
+
+        let snapshot = try await OccupancyRepository(session: makeSession()).occupancyNear(
+            LatLon(lat: 4.2, lon: 101.1), radiusM: 10_000, apiKey: "key"
+        )
+
+        #expect(snapshot.stations.first?.availableCount == 3)
+        #expect(snapshot.stations.first?.totalCount == 6)
+    }
+
     @Test("field mask carries id and location so matching can be exact")
     func fieldMaskIncludesIdentityAndLocation() async throws {
         StubProtocol.responseBody = Data("{}".utf8)
