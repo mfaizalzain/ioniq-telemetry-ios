@@ -708,17 +708,13 @@ final class PlanViewModel {
             center, radiusM: 25_000, apiKey: key
         ) else { return }
 
-        // Places and Open Charge Map name the same site differently, so match on a
-        // normalised containment rather than equality, and leave anything ambiguous
-        // without status.
+        // Pin each charger to the station at its physical site: exact Places-id
+        // identity when the charger row itself came from Places, otherwise
+        // proximity + normalized-name overlap. Anything ambiguous is left
+        // without status (see ChargerStationMatching).
         var matched: [String: ChargerAvailability] = [:]
         for charger in nearbyChargers {
-            let name = Self.normalized(charger.name)
-            guard !name.isEmpty else { continue }
-            let hit = snapshot.stations.first {
-                let station = Self.normalized($0.name)
-                return station == name || station.contains(name) || name.contains(station)
-            }
+            let hit = ChargerStationMatching.match(charger, stations: snapshot.stations)
             // A matched station reported availability (stations only exist when
             // availableCount came back), so this charger has live status even if
             // the station omitted a total count. Rows must never present a
@@ -735,13 +731,6 @@ final class PlanViewModel {
             )
         }
         chargerAvailability = matched
-    }
-
-    private static func normalized(_ name: String) -> String {
-        name.lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
     }
 
     func dismissRoutingNotice() { routingNotice = nil }

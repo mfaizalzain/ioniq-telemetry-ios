@@ -16,6 +16,14 @@ public struct OccupancySnapshot: Sendable, Equatable {
         public let name: String
         public let availableCount: Int
         public let totalCount: Int
+        /// Google Places resource id ("places/…"). Present because the request
+        /// asks for it; used for exact identity matching against chargers that
+        /// were themselves sourced from Places.
+        public let placeId: String?
+        /// Station coordinates; the proximity guard that pins a station to the
+        /// charger at its physical site. Nil when Places omitted the location.
+        public let lat: Double?
+        public let lon: Double?
 
         /// Zero free connectors is occupied, whether or not Places also told us how
         /// many connectors the station has. Requiring `totalCount > 0` meant a
@@ -24,6 +32,22 @@ public struct OccupancySnapshot: Sendable, Equatable {
         /// opposite of the documented rule, and out of step with Android's
         /// `available <= 0`.
         public var isOccupied: Bool { availableCount <= 0 }
+
+        public init(
+            name: String,
+            availableCount: Int,
+            totalCount: Int,
+            placeId: String? = nil,
+            lat: Double? = nil,
+            lon: Double? = nil
+        ) {
+            self.name = name
+            self.availableCount = availableCount
+            self.totalCount = totalCount
+            self.placeId = placeId
+            self.lat = lat
+            self.lon = lon
+        }
     }
 
     /// Only stations that actually reported availability.
@@ -81,7 +105,7 @@ public final class OccupancyRepository: Sendable {
         // Field mask is mandatory and is what the call is billed on — request only
         // the availability fields, not full place details.
         request.setValue(
-            "places.displayName,places.evChargeOptions",
+            "places.id,places.displayName,places.location,places.evChargeOptions",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
         request.httpBody = try JSONEncoder().encode(NearbyRequest(
@@ -116,7 +140,10 @@ public final class OccupancyRepository: Sendable {
             return OccupancySnapshot.Station(
                 name: place.displayName?.text ?? "Charger",
                 availableCount: available,
-                totalCount: options.connectorCount ?? 0
+                totalCount: options.connectorCount ?? 0,
+                placeId: place.id,
+                lat: place.location?.latitude,
+                lon: place.location?.longitude
             )
         }
         return OccupancySnapshot(stations: stations)
@@ -157,6 +184,10 @@ private struct NearbyRequest: Encodable {
 private struct NearbyResponse: Decodable {
     struct Place: Decodable {
         struct DisplayName: Decodable { let text: String? }
+        struct Location: Decodable {
+            let latitude: Double?
+            let longitude: Double?
+        }
         struct EvChargeOptions: Decodable {
             struct ConnectorAggregation: Decodable {
                 let availableCount: Int?
@@ -165,7 +196,9 @@ private struct NearbyResponse: Decodable {
             let connectorCount: Int?
             let connectorAggregation: [ConnectorAggregation]?
         }
+        let id: String?
         let displayName: DisplayName?
+        let location: Location?
         let evChargeOptions: EvChargeOptions?
     }
 
