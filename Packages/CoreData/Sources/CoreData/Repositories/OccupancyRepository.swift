@@ -110,7 +110,7 @@ public final class OccupancyRepository: Sendable {
         )
         request.httpBody = try JSONEncoder().encode(NearbyRequest(
             includedTypes: ["electric_vehicle_charging_station"],
-            maxResultCount: 10,
+            maxResultCount: 20,
             locationRestriction: .init(circle: .init(
                 center: .init(latitude: center.lat, longitude: center.lon),
                 radius: radiusM

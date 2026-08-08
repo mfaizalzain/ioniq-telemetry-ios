@@ -14,7 +14,10 @@ import Foundation
 ///    ambiguous and the charger gets no status rather than a possibly wrong one.
 public enum ChargerStationMatching {
     /// A charger and its station are the same site only within this radius.
-    public static let matchRadiusM = 250.0
+    /// 1 km is deliberately loose enough to absorb OCM coordinate drift (pins are
+    /// often dropped at a site's entrance or car park), while still far too tight
+    /// for a same-named station in another town to claim a charger.
+    public static let matchRadiusM = 1_000.0
     /// Two stations closer than this in distance-from-charger are ambiguous.
     public static let ambiguousMarginM = 40.0
 
