@@ -967,13 +967,17 @@ private struct RoutingNoticeBar: View {
 private struct AvailabilityBadge: View {
     let status: PlanViewModel.ChargerAvailability
 
+    private var label: String {
+        if status.isFull { return "All connectors busy" }
+        if status.total > 0 { return "\(status.available) of \(status.total) connectors free" }
+        return "\(status.available) connectors free"
+    }
+
     var body: some View {
         HStack(spacing: 3) {
             Image(systemName: status.isFull ? "bolt.slash" : "bolt.fill")
                 .font(.caption2)
-            Text(status.isFull
-                 ? "All connectors busy"
-                 : "\(status.available) of \(status.total) connectors free")
+            Text(label)
         }
         .font(.caption2)
         .foregroundStyle(status.isFull ? Color.appRed : .green)
@@ -1003,7 +1007,7 @@ private struct NearbyChargersSection: View {
                         .font(.caption)
                     }
 
-                    ForEach(viewModel.nearbyChargers.prefix(6)) { charger in
+                    ForEach(viewModel.nearbyChargers) { charger in
                         HStack {
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(charger.name).font(.subheadline).lineLimit(1)

@@ -71,13 +71,23 @@ struct ChargerStationMatchingTests {
         #expect(ChargerStationMatching.match(placesCharger, stations: stations)?.placeId == "places/ChIJabc")
     }
 
+    @Test("a nearby supported station still matches when OCM and Places names differ")
+    func proximityMatchesDifferentNames() {
+        let stations = [
+            station(name: "Gentari EV Hub", lat: 3.0, lon: 101.0, available: 1, total: 2)
+        ]
+        let ocmCharger = charger(id: "ocm-1", name: "JomCharge DC", lat: 3.0005, lon: 101.0005)
+
+        #expect(ChargerStationMatching.match(ocmCharger, stations: stations)?.availableCount == 1)
+    }
+
     @Test("two nearly equidistant stations at the same site yield no status instead of a guess")
     func equidistantStationsAreAmbiguous() {
         let stations = [
-            station(name: "ChargEV", lat: 3.0, lon: 101.0002, available: 0, total: 2),
-            station(name: "ChargEV", lat: 3.0002, lon: 101.0, available: 2, total: 2)
+            station(name: "Operator A", lat: 3.0, lon: 101.0002, available: 0, total: 2),
+            station(name: "Operator B", lat: 3.0002, lon: 101.0, available: 2, total: 2)
         ]
-        let charger = charger(id: "ocm-1", name: "ChargEV", lat: 3.0, lon: 101.0)
+        let charger = charger(id: "ocm-1", name: "Unrelated OCM Label", lat: 3.0, lon: 101.0)
 
         #expect(ChargerStationMatching.match(charger, stations: stations) == nil)
     }
@@ -85,10 +95,10 @@ struct ChargerStationMatchingTests {
     @Test("nearest station wins when one candidate is clearly closer")
     func nearestWinsWhenDistinct() {
         let stations = [
-            station(name: "ChargEV", lat: 3.0, lon: 101.0002, available: 0, total: 2),   // ~22 m away
-            station(name: "ChargEV", lat: 3.002, lon: 101.0, available: 1, total: 2)     // ~222 m away
+            station(name: "Operator A", lat: 3.0, lon: 101.0002, available: 0, total: 2),   // ~22 m away
+            station(name: "Operator B", lat: 3.002, lon: 101.0, available: 1, total: 2)     // ~222 m away
         ]
-        let charger = charger(id: "ocm-1", name: "ChargEV", lat: 3.0, lon: 101.0)
+        let charger = charger(id: "ocm-1", name: "Unrelated OCM Label", lat: 3.0, lon: 101.0)
 
         let hit = ChargerStationMatching.match(charger, stations: stations)
         #expect(hit?.availableCount == 0)

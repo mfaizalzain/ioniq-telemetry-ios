@@ -8,10 +8,9 @@ import Foundation
 ///    carries the same Places resource id as its station, so the match is exact
 ///    and cannot be wrong. Identity beats coordinates and names, which both
 ///    drift between sources.
-///  - Proximity + name: everything else (OCM rows) matches the nearest station
-///    within [matchRadiusM] whose normalized name contains/equals the charger's
-///    name. If two stations both pass and are nearly equidistant, the site is
-///    ambiguous and the charger gets no status rather than a possibly wrong one.
+///  - Proximity: everything else (OCM rows) matches the nearest statused station
+///    at the same physical site. If two stations are nearly equidistant, the site
+///    is ambiguous and the charger gets no status rather than a possibly wrong one.
 public enum ChargerStationMatching {
     /// A charger and its station are the same site only within this radius.
     /// 1 km is deliberately loose enough to absorb OCM coordinate drift (pins are
@@ -32,12 +31,13 @@ public enum ChargerStationMatching {
             }
         }
 
-        let ranked = stations.compactMap { station -> (OccupancySnapshot.Station, Double)? in
+        let nearby = stations.compactMap { station -> (OccupancySnapshot.Station, Double)? in
             guard let lat = station.lat, let lon = station.lon else { return nil }
             let dist = distanceMeters(charger.lat, charger.lon, lat, lon)
-            guard dist <= matchRadiusM, namesOverlap(charger.name, station.name) else { return nil }
+            guard dist <= matchRadiusM else { return nil }
             return (station, dist)
-        }.sorted { $0.1 < $1.1 }
+        }
+        let ranked = nearby.sorted { $0.1 < $1.1 }
 
         switch ranked.count {
         case 0:
@@ -48,21 +48,6 @@ public enum ChargerStationMatching {
             guard ranked[1].1 - ranked[0].1 >= ambiguousMarginM else { return nil }
             return ranked[0].0
         }
-    }
-
-    /// True when the two site names describe the same place (normalized
-    /// containment either way), e.g. "petronas" vs "petronas charging station".
-    public static func namesOverlap(_ a: String, _ b: String) -> Bool {
-        let na = normalized(a)
-        let nb = normalized(b)
-        return !na.isEmpty && !nb.isEmpty && (na == nb || na.contains(nb) || nb.contains(na))
-    }
-
-    public static func normalized(_ name: String) -> String {
-        name.lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
     }
 
     /// Equirectangular distance in meters (fine at charger-site scale).

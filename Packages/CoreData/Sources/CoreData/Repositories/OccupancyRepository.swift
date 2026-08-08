@@ -133,15 +133,18 @@ public final class OccupancyRepository: Sendable {
         let stations: [OccupancySnapshot.Station] = decoded.places.compactMap { place in
             guard let options = place.evChargeOptions else { return nil }
             let aggregations = options.connectorAggregation ?? []
-            let availableValues = aggregations.compactMap(\.availableCount)
+            let statusedAggregations = aggregations.filter { $0.availableCount != nil }
             // No availableCount anywhere means this station reports no live status.
-            guard !availableValues.isEmpty else { return nil }
-            let available = availableValues.reduce(0, +)
-            // Android sums the per-connector aggregation counts. Some Places
-            // responses omit connectorCount even though the aggregation contains
-            // the real total, which previously made iOS discard a valid status.
-            let aggregatedTotal = aggregations.compactMap(\.count).reduce(0, +)
-            let total = aggregatedTotal > 0 ? aggregatedTotal : (options.connectorCount ?? 0)
+            guard !statusedAggregations.isEmpty else { return nil }
+            let available = statusedAggregations.compactMap(\.availableCount).reduce(0, +)
+            // Count only connector groups for which Places also reported live
+            // availability. A partially populated response must not turn an
+            // unknown connector group into a falsely "full" station.
+            let aggregatedTotal = statusedAggregations.compactMap(\.count).reduce(0, +)
+            let allGroupsReported = !aggregations.isEmpty && statusedAggregations.count == aggregations.count
+            let total = aggregatedTotal > 0
+                ? aggregatedTotal
+                : (allGroupsReported ? (options.connectorCount ?? 0) : 0)
             return OccupancySnapshot.Station(
                 name: place.displayName?.text ?? "Charger",
                 availableCount: available,
@@ -152,6 +155,26 @@ public final class OccupancyRepository: Sendable {
             )
         }
         return OccupancySnapshot(stations: stations)
+    }
+
+    /// Fetches live availability and pins it to the supplied charger rows.
+    ///
+    /// This is the single enrichment path for phone, CarPlay, and alerting. The
+    /// returned dictionary contains only chargers with a confirmed live station;
+    /// absence never means "full" or "free".
+    public func matchedStatuses(
+        for chargers: [Charger],
+        center: LatLon,
+        radiusM: Double,
+        apiKey: String
+    ) async throws -> [String: OccupancySnapshot.Station] {
+        guard !chargers.isEmpty else { return [:] }
+        let snapshot = try await occupancyNear(center, radiusM: radiusM, apiKey: apiKey)
+        return chargers.reduce(into: [:]) { result, charger in
+            if let station = ChargerStationMatching.match(charger, stations: snapshot.stations) {
+                result[charger.id] = station
+            }
+        }
     }
 }
 

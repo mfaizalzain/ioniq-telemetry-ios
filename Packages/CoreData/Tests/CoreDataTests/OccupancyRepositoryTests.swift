@@ -101,6 +101,33 @@ struct OccupancyRepositoryTests {
         #expect(snapshot.stations.first?.totalCount == 6)
     }
 
+    @Test("partial connector availability does not count unknown groups as full")
+    func decodesOnlyReportedConnectorGroups() async throws {
+        StubProtocol.responseBody = Data("""
+        {
+          "places": [
+            {
+              "displayName": { "text": "Partial Status" },
+              "evChargeOptions": {
+                "connectorCount": 6,
+                "connectorAggregation": [
+                  { "availableCount": 0, "count": 2 },
+                  { "count": 4 }
+                ]
+              }
+            }
+          ]
+        }
+        """.utf8)
+
+        let snapshot = try await OccupancyRepository(session: makeSession()).occupancyNear(
+            LatLon(lat: 4.2, lon: 101.1), radiusM: 10_000, apiKey: "key"
+        )
+
+        #expect(snapshot.stations.first?.availableCount == 0)
+        #expect(snapshot.stations.first?.totalCount == 2)
+    }
+
     @Test("field mask carries id and location so matching can be exact")
     func fieldMaskIncludesIdentityAndLocation() async throws {
         StubProtocol.responseBody = Data("{}".utf8)

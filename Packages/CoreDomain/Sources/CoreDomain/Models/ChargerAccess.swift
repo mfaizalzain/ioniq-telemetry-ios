@@ -12,12 +12,10 @@ public enum ChargerAccess {
     ///
     /// - 2: Private — Restricted Access
     /// - 3: Privately Owned — Notice Required
-    /// - 6: Private — For Staff, Visitors or Customers
-    ///
     /// Type 4 (Public — Membership Required) is not listed here, but OCM sets
-    /// `IsAccessKeyRequired` on those records, so they are excluded by that check
-    /// instead — matching the Android build, which uses the same signal.
-    public static let privateUsageTypeIds: Set<Int> = [2, 3, 6]
+    /// `IsAccessKeyRequired` on those records, so it is excluded by that check
+    /// instead — matching Android's access policy.
+    public static let privateUsageTypeIds: Set<Int> = [2, 3]
 
     /// - Parameters:
     ///   - usageTypeId: OCM `UsageType.ID`, if the record has one.
@@ -39,6 +37,5 @@ public enum ChargerAccess {
     public static func hasRestrictedName(_ name: String?) -> Bool {
         guard let name else { return false }
         return name.localizedCaseInsensitiveContains("restricted")
-            || name.localizedCaseInsensitiveContains("private")
     }
 }

@@ -320,7 +320,7 @@ final class CarPlayCoordinator {
     // MARK: - Chargers
 
     private func loadChargers(center: LatLon) async {
-        guard let chargers = try? await services.chargers.chargersNear(center: center, radiusKm: 30) else {
+        guard let chargers = try? await services.chargers.chargersForInCar(center: center) else {
             return
         }
 
@@ -396,13 +396,16 @@ final class CarPlayCoordinator {
               services.userPreferences.chargerOccupancyAlerts,
               let key = services.userPreferences.googleMapsApiKey,
               !key.isEmpty else { return nil }
-        guard let snapshot = try? await services.occupancy.occupancyNear(
-            center, radiusM: 30_000, apiKey: key
+        guard let statuses = try? await services.occupancy.matchedStatuses(
+            for: chargers,
+            center: center,
+            radiusM: ChargerRepository.inCarRadiusKm * 1_000,
+            apiKey: key
         ) else { return nil }
 
         var status: [String: CarPlayPointOfInterest.ChargerLiveStatus] = [:]
         for charger in chargers {
-            guard let matched = ChargerStationMatching.match(charger, stations: snapshot.stations) else { continue }
+            guard let matched = statuses[charger.id] else { continue }
             status[charger.id] = CarPlayPointOfInterest.ChargerLiveStatus(
                 available: matched.availableCount,
                 total: matched.totalCount
@@ -574,7 +577,7 @@ final class CarPlayCoordinator {
                 return
             }
             // Fetch the far end once, so the suggestion pool covers chargers
-            // between here and there, not just the 30 km ring already loaded.
+            // between here and there, not just the 25 km ring already loaded.
             let pool = (try? await services.chargers.chargersNear(center: dest, radiusKm: 35)) ?? []
             destinationPoolCache[key] = pool
             destinationPool = pool
@@ -621,7 +624,7 @@ final class CarPlayCoordinator {
         }
         guard predictedArrival < services.userPreferences.targetArrivalSocPercent else { return }
 
-        // Candidate pool: the 30 km ring already fetched, chargers around the
+        // Candidate pool: the 25 km ring already fetched, chargers around the
         // destination, and the plan's own stops — deduplicated by id.
         var seen = Set<String>()
         var pool: [Charger] = []
@@ -1002,14 +1005,13 @@ final class CarPlayCoordinator {
 
         Task { [weak self] in
             guard let self else { return }
-            guard let snapshot = try? await self.services.occupancy.occupancyNear(
-                LatLon(lat: first.charger.lat, lon: first.charger.lon),
+            guard let statuses = try? await self.services.occupancy.matchedStatuses(
+                for: [first.charger],
+                center: LatLon(lat: first.charger.lat, lon: first.charger.lon),
                 radiusM: 800,
                 apiKey: apiKey
-            ) else { return }
-            // Only the stop's own charger alerts — a charger with no matched
-            // live status is never assumed full because neighbours are busy.
-            guard let matched = ChargerStationMatching.match(first.charger, stations: snapshot.stations),
+            ),
+            let matched = statuses[first.charger.id],
                   matched.isOccupied else { return }
 
             self.lastAlertedStopId = first.charger.id

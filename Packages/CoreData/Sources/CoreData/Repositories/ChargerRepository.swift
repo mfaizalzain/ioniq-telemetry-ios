@@ -51,10 +51,15 @@ public final class ChargerRepository: @unchecked Sendable {
         "EV_CONNECTOR_TYPE_TESLA": .teslaSupercharger
     ]
 
-    /// Places caps a nearby search at 50 km and 20 results, so an area is covered
-    /// by tiled circles. Each tile is one billed request, hence the ceiling.
-    private static let googleTileRadiusM: Double = 15_000
-    private static let googleMaxTiles = 12
+    /// Keep the public nearby search aligned with Android: Google Places returns at
+    /// most 20 results per circle, so the search circle must match the requested
+    /// area before the final distance filter is applied.
+    public static let nearbyRadiusKm: Double = 10.0
+    /// The in-car surface uses the same wider pool as Android Auto.
+    public static let inCarRadiusKm: Double = 25.0
+    private static let googleDefaultTileRadiusKm: Double = 10.0
+    private static let googleMaxTileRadiusKm: Double = 50.0
+    private static let googleMaxTiles = 16
     private static let googleMaxResults = 20
 
     public init(
@@ -73,14 +78,29 @@ public final class ChargerRepository: @unchecked Sendable {
 
     // MARK: - Public API
 
-    public func chargersNear(center: LatLon, radiusKm: Double = 10.0) async throws -> [Charger] {
+    /// The canonical phone-sized nearby search, matching Android's 10 km lookup.
+    public func chargersNearby(center: LatLon) async throws -> [Charger] {
+        try await chargersNear(center: center, radiusKm: Self.nearbyRadiusKm)
+    }
+
+    /// The canonical in-car nearby search, matching Android Auto's 25 km pool.
+    public func chargersForInCar(center: LatLon) async throws -> [Charger] {
+        try await chargersNear(center: center, radiusKm: Self.inCarRadiusKm)
+    }
+
+    public func chargersNear(center: LatLon) async throws -> [Charger] {
+        try await chargersNear(center: center, radiusKm: Self.nearbyRadiusKm)
+    }
+
+    /// Generic radius search for route/destination-specific consumers.
+    public func chargersNear(center: LatLon, radiusKm: Double) async throws -> [Charger] {
         let dLat = radiusKm / 111.0
         let dLon = radiusKm / (111.0 * max(cos(center.lat * .pi / 180.0), 0.2))
         let chargers = try await loadArea(
             minLat: center.lat - dLat, minLon: center.lon - dLon,
             maxLat: center.lat + dLat, maxLon: center.lon + dLon,
-            // One circle covers a radius search directly — no tiling needed.
-            googleCenters: [center]
+            // Google Places tiles this exact box using the same policy as Android.
+            appleCenters: [center]
         )
         return chargers
             .filter { !$0.isRestricted && approxDistanceKm(center, LatLon(lat: $0.lat, lon: $0.lon)) <= radiusKm }
@@ -98,7 +118,7 @@ public final class ChargerRepository: @unchecked Sendable {
             minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon,
             // Follow the road rather than tiling the whole bounding box: a route's
             // box is mostly empty countryside, and every tile is a billed request.
-            googleCenters: sampleAlongRoute(routePoints)
+            appleCenters: sampleAlongRoute(routePoints)
         )
         return chargers.filter { charger in
             !charger.isRestricted && routePoints.contains { p in
@@ -129,7 +149,7 @@ public final class ChargerRepository: @unchecked Sendable {
         minLon: Double,
         maxLat: Double,
         maxLon: Double,
-        googleCenters: [LatLon]
+        appleCenters: [LatLon]
     ) async throws -> [Charger] {
         let prefixes = Geohash.coveringPrefixes(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon, precision: 4)
         let now = Date()
@@ -155,16 +175,18 @@ public final class ChargerRepository: @unchecked Sendable {
                 case .openChargeMap:
                     try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
                 case .googlePlaces:
-                    try await refreshGooglePlaces(centers: googleCenters)
+                    try await refreshGooglePlaces(
+                        minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon
+                    )
                 case .appleMaps:
-                    try await refreshAppleMaps(centers: googleCenters)
+                    try await refreshAppleMaps(centers: appleCenters)
                 case .combined:
                     // OCM and Apple Maps are independent providers: if OCM
                     // fails, Apple Maps can still fill the box so the user
                     // isn't left with nothing.
                     do { try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon) }
                     catch { refreshError = error }
-                    try await refreshAppleMaps(centers: googleCenters)
+                    try await refreshAppleMaps(centers: appleCenters)
                 }
                 // Deduplicate combined results: Apple Maps duplicates close to OCM
                 // entries are removed, keeping OCM's richer data.
@@ -280,14 +302,14 @@ public final class ChargerRepository: @unchecked Sendable {
 
     // MARK: - Google Places
 
-    /// Thins a route down to the circle centres worth querying.
+    /// Thins a route down to the Apple Maps search centres worth querying.
     ///
     /// Tiles overlap slightly at this spacing so a charger sitting between two
-    /// samples is still inside one of them. Long routes are decimated to the tile
-    /// ceiling rather than refused — a sparse result beats a bill for 300 requests.
+    /// samples is still inside one of them. Long routes are decimated to the
+    /// provider request ceiling rather than refused.
     private func sampleAlongRoute(_ points: [LatLon]) -> [LatLon] {
         guard let first = points.first else { return [] }
-        let spacingKm = Self.googleTileRadiusM / 1000 * 1.6
+        let spacingKm = Self.googleDefaultTileRadiusKm * 1.6
 
         var centers: [LatLon] = [first]
         for point in points.dropFirst() {
@@ -305,21 +327,75 @@ public final class ChargerRepository: @unchecked Sendable {
         return (0..<Self.googleMaxTiles).map { centers[Int((Double($0) * stride).rounded())] }
     }
 
-    private func refreshGooglePlaces(centers: [LatLon]) async throws {
+    private struct GoogleTile {
+        let center: LatLon
+        let radiusM: Double
+    }
+
+    /// Same tiling policy as Android's PlacesChargerSource. A 10 km nearby box
+    /// produces one 10 km circle; larger areas grow the circle until no more than
+    /// 16 billed requests are needed, capped by Places' 50 km limit.
+    private func googleTiles(
+        minLat: Double,
+        minLon: Double,
+        maxLat: Double,
+        maxLon: Double
+    ) -> [GoogleTile] {
+        let midLat = (minLat + maxLat) / 2
+        let kmPerLon = 111.0 * max(cos(midLat * .pi / 180), 0.2)
+        let heightKm = max((maxLat - minLat) * 111.0, 0.001)
+        let widthKm = max((maxLon - minLon) * kmPerLon, 0.001)
+
+        var radiusKm = Self.googleDefaultTileRadiusKm
+        while radiusKm < Self.googleMaxTileRadiusKm &&
+                googleTileCount(widthKm: widthKm, heightKm: heightKm, radiusKm: radiusKm) > Self.googleMaxTiles {
+            radiusKm = min(radiusKm * 1.5, Self.googleMaxTileRadiusKm)
+        }
+
+        let stepKm = radiusKm * sqrt(2.0)
+        let columns = max(Int(ceil(widthKm / stepKm)), 1)
+        let rows = max(Int(ceil(heightKm / stepKm)), 1)
+        let latStep = (maxLat - minLat) / Double(rows)
+        let lonStep = (maxLon - minLon) / Double(columns)
+
+        return (0..<rows).flatMap { row in
+            (0..<columns).map { column in
+                GoogleTile(
+                    center: LatLon(
+                        lat: minLat + latStep * (Double(row) + 0.5),
+                        lon: minLon + lonStep * (Double(column) + 0.5)
+                    ),
+                    radiusM: radiusKm * 1000.0
+                )
+            }
+        }.prefix(Self.googleMaxTiles).map { $0 }
+    }
+
+    private func googleTileCount(widthKm: Double, heightKm: Double, radiusKm: Double) -> Int {
+        let stepKm = radiusKm * sqrt(2.0)
+        return max(Int(ceil(widthKm / stepKm)), 1) * max(Int(ceil(heightKm / stepKm)), 1)
+    }
+
+    private func refreshGooglePlaces(
+        minLat: Double,
+        minLon: Double,
+        maxLat: Double,
+        maxLon: Double
+    ) async throws {
         let key = googleApiKey().trimmingCharacters(in: .whitespaces)
         guard !key.isEmpty else {
             _servingCachedData.value = true
             throw ChargerError.missingGoogleKey
         }
-        guard !centers.isEmpty else { return }
-
         let now = Date()
         var inserted = 0
         var lastError: (any Error)?
 
-        for center in centers.prefix(Self.googleMaxTiles) {
+        for tile in googleTiles(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon) {
             do {
-                inserted += try await fetchGoogleCircle(center: center, key: key, now: now)
+                inserted += try await fetchGoogleCircle(
+                    center: tile.center, radiusM: tile.radiusM, key: key, now: now
+                )
             } catch {
                 // One tile failing shouldn't discard the tiles that worked.
                 lastError = error
@@ -334,7 +410,12 @@ public final class ChargerRepository: @unchecked Sendable {
         _servingCachedData.value = false
     }
 
-    private func fetchGoogleCircle(center: LatLon, key: String, now: Date) async throws -> Int {
+    private func fetchGoogleCircle(
+        center: LatLon,
+        radiusM: Double,
+        key: String,
+        now: Date
+    ) async throws -> Int {
         var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchNearby")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -350,7 +431,7 @@ public final class ChargerRepository: @unchecked Sendable {
             maxResultCount: Self.googleMaxResults,
             locationRestriction: .init(circle: .init(
                 center: .init(latitude: center.lat, longitude: center.lon),
-                radius: Self.googleTileRadiusM
+                radius: radiusM
             ))
         ))
 
@@ -390,10 +471,6 @@ public final class ChargerRepository: @unchecked Sendable {
                 count: entry.count ?? 1
             )
         }
-        // A place with no recognised connector is a charging location Google knows
-        // nothing useful about — routing can't reason about it, so drop it.
-        guard !connectors.isEmpty else { return nil }
-
         let connectorsJson = (try? encoder.encode(connectors)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
 
         return ChargerEntity(

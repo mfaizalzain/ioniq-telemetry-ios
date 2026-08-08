@@ -1,11 +1,11 @@
 import Testing
 @testable import CoreDomain
 
-/// Usage-type IDs are not ordered by openness, so the previous rule (`ID == 2 ||
-/// ID == 3`) let type 6 — "Private — For Staff, Visitors or Customers" — through.
+/// These assertions mirror the Android access policy: usage types 2 and 3 are
+/// restricted, while membership/key-required records are filtered separately.
 struct ChargerAccessTests {
 
-    @Test("private usage types are restricted", arguments: [2, 3, 6])
+    @Test("private usage types are restricted", arguments: [2, 3])
     func privateTypesRestricted(id: Int) {
         #expect(ChargerAccess.isRestricted(usageTypeId: id, isAccessKeyRequired: nil, name: "Some Site"))
     }
@@ -30,7 +30,7 @@ struct ChargerAccessTests {
     @Test("restricted-looking names are caught when the usage type is missing")
     func nameFallback() {
         #expect(ChargerAccess.isRestricted(usageTypeId: nil, isAccessKeyRequired: nil, name: "[Restricted] Condo"))
-        #expect(ChargerAccess.isRestricted(usageTypeId: nil, isAccessKeyRequired: nil, name: "Private Residence"))
+        #expect(!ChargerAccess.isRestricted(usageTypeId: nil, isAccessKeyRequired: nil, name: "Private Residence"))
         #expect(!ChargerAccess.isRestricted(usageTypeId: nil, isAccessKeyRequired: nil, name: "Shell Recharge"))
     }
 

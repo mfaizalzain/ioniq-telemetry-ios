@@ -107,6 +107,38 @@ struct ChargerRepositoryTests {
         #expect(StubProtocol.requestCount == 0)
     }
 
+    @Test("Google nearby search uses Android's 10 km circle and keeps connector-unknown stations")
+    func googleNearbyMatchesAndroidPolicy() async throws {
+        StubProtocol.requestCount = 0
+        StubProtocol.responseBody = Data(#"""
+        {
+          "places": [
+            {
+              "id": "places/unknown-connectors",
+              "displayName": { "text": "Unknown Connector Station" },
+              "location": { "latitude": 4.2, "longitude": 101.1 },
+              "evChargeOptions": { "connectorAggregation": [] }
+            }
+          ]
+        }
+        """#.utf8)
+
+        let context = ModelContext(makeContainer())
+        let repo = ChargerRepository(
+            modelContext: context,
+            apiKey: { "ocm-key" },
+            source: { .googlePlaces },
+            googleApiKey: { "google-key" },
+            session: makeSession()
+        )
+
+        let chargers = try await repo.chargersNearby(center: center)
+
+        #expect(chargers.count == 1)
+        #expect(chargers.first?.connectors.isEmpty == true)
+        #expect(StubProtocol.requestCount == 4, "the 20 km x 20 km box should use Android's four 10 km tiles")
+    }
+
     @Test("a successful refresh returns the new source's chargers")
     func successfulRefreshReturnsNewSourceRows() async throws {
         StubProtocol.requestCount = 0

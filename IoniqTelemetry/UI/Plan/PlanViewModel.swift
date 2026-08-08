@@ -194,9 +194,9 @@ final class PlanViewModel {
             // on first use. Passive refreshes below remain permission-safe.
             await loadNearbyChargers(requestPermission: true)
             if !nearbyChargers.isEmpty {
-                aiInterpretation = "Found \(nearbyChargers.count) charging stations within 10 km."
+                aiInterpretation = "Found \(nearbyChargers.count) charging stations within \(Int(ChargerRepository.nearbyRadiusKm)) km."
             } else {
-                aiInterpretation = "No chargers found within 10 km of your location."
+                aiInterpretation = "No chargers found within \(Int(ChargerRepository.nearbyRadiusKm)) km of your location."
             }
             return
         }
@@ -701,7 +701,7 @@ final class PlanViewModel {
         // last-resort fallback Android uses when no fix is available.
         guard let center = await locationProvider.currentLocation(requestPermission: requestPermission)
                 ?? origin.selected?.location else { return }
-        nearbyChargers = (try? await services.chargers.chargersNear(center: center, radiusKm: 10)) ?? []
+        nearbyChargers = (try? await services.chargers.chargersNearby(center: center)) ?? []
         await loadNearbyAvailability(center: center)
     }
 
@@ -723,27 +723,19 @@ final class PlanViewModel {
               preferences.chargerOccupancyAlerts,
               let key = preferences.googleMapsApiKey,
               !key.isEmpty else { return }
-        guard let snapshot = try? await services.occupancy.occupancyNear(
-            center, radiusM: 10_000, apiKey: key
+        guard let statuses = try? await services.occupancy.matchedStatuses(
+            for: nearbyChargers,
+            center: center,
+            radiusM: ChargerRepository.nearbyRadiusKm * 1_000,
+            apiKey: key
         ) else { return }
 
-        // Pin each charger to the station at its physical site: exact Places-id
-        // identity when the charger row itself came from Places, otherwise
-        // proximity + normalized-name overlap. Anything ambiguous is left
-        // without status (see ChargerStationMatching).
         var matched: [String: ChargerAvailability] = [:]
         for charger in nearbyChargers {
-            let hit = ChargerStationMatching.match(charger, stations: snapshot.stations)
-            // A matched station reported availability (stations only exist when
-            // availableCount came back), so this charger has live status even if
-            // the station omitted a total count. Rows must never present a
-            // "full" state for chargers without the flag — that state is reserved
-            // for stations that actually reported being full.
-            guard let hit else { continue }
+            guard let hit = statuses[charger.id] else { continue }
             if let index = nearbyChargers.firstIndex(where: { $0.id == charger.id }) {
                 nearbyChargers[index].hasLiveStatus = true
             }
-            guard hit.totalCount > 0 else { continue }
             matched[charger.id] = ChargerAvailability(
                 available: hit.availableCount,
                 total: hit.totalCount
