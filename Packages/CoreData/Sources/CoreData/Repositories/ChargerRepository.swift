@@ -24,6 +24,10 @@ public final class ChargerRepository: @unchecked Sendable {
         _servingCachedData.eraseToAnyPublisher()
     }
 
+    /// Set by `noteSourceChanged()`; the next `loadArea` re-fetches from the new
+    /// source instead of trusting rows written by the previous one.
+    private let _sourceChanged = CurrentValueSubject<Bool, Never>(false)
+
     private static let cacheTTL: TimeInterval = 7 * 24 * 60 * 60
 
     private static let connectorMap: [Int: ConnectorType] = [
@@ -57,13 +61,14 @@ public final class ChargerRepository: @unchecked Sendable {
         modelContext: ModelContext,
         apiKey: @escaping @Sendable () -> String,
         source: @escaping @Sendable () -> ChargerSource = { .openChargeMap },
-        googleApiKey: @escaping @Sendable () -> String = { "" }
+        googleApiKey: @escaping @Sendable () -> String = { "" },
+        session: URLSession = NetworkSession.shared
     ) {
         self.modelContext = modelContext
         self.apiKey = apiKey
         self.source = source
         self.googleApiKey = googleApiKey
-        self.session = NetworkSession.shared
+        self.session = session
     }
 
     // MARK: - Public API
@@ -109,6 +114,14 @@ public final class ChargerRepository: @unchecked Sendable {
         try modelContext.save()
     }
 
+    /// Marks all cached rows as suspect because the charger source changed: the
+    /// next area load must re-fetch from the new provider. Non-destructive — the
+    /// old provider's rows stay as a fallback if the new one can't be reached,
+    /// so a source switch never leaves the user with an empty charger list.
+    public func noteSourceChanged() {
+        _sourceChanged.value = true
+    }
+
     // MARK: - Private
 
     private func loadArea(
@@ -120,16 +133,25 @@ public final class ChargerRepository: @unchecked Sendable {
     ) async throws -> [Charger] {
         let prefixes = Geohash.coveringPrefixes(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon, precision: 4)
         let now = Date()
+        let currentSource = source()
+        let wantedPrefixes = Self.sourcePrefixes(currentSource)
+        // A source switch forces the next fetch even when rows look fresh.
+        let sourceChanged = _sourceChanged.value
+        _sourceChanged.value = false
 
-        let stale = prefixes.contains { prefix in
-            let oldest = oldestCachedAt(prefix: prefix)
-            return oldest == nil || now.timeIntervalSince(oldest!) > Self.cacheTTL
+        let cached = try cachedInBox(prefixes: prefixes, minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+        let currentSourceRows = cached.filter { entity in
+            wantedPrefixes.contains { entity.id.hasPrefix($0) }
         }
+        let freshest = currentSourceRows.map(\.cachedAt).max()
+        let stale = sourceChanged ||
+            freshest == nil ||
+            now.timeIntervalSince(freshest!) > Self.cacheTTL
 
         var refreshError: (any Error)?
         if stale {
             do {
-                switch source() {
+                switch currentSource {
                 case .openChargeMap:
                     try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
                 case .googlePlaces:
@@ -137,44 +159,77 @@ public final class ChargerRepository: @unchecked Sendable {
                 case .appleMaps:
                     try await refreshAppleMaps(centers: googleCenters)
                 case .combined:
-                    try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+                    // OCM and Apple Maps are independent providers: if OCM
+                    // fails, Apple Maps can still fill the box so the user
+                    // isn't left with nothing.
+                    do { try await refreshArea(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon) }
+                    catch { refreshError = error }
                     try await refreshAppleMaps(centers: googleCenters)
                 }
                 // Deduplicate combined results: Apple Maps duplicates close to OCM
                 // entries are removed, keeping OCM's richer data.
-                if source() == .combined {
+                if currentSource == .combined {
                     try deduplicateCombined()
                 }
             } catch {
-                // Cached data is better than an error, so hold this and only throw
-                // if the cache turns out to be empty too.
+                // Cached data is better than an error: hold this and only throw
+                // if there is genuinely nothing left to show.
                 refreshError = error
             }
         }
 
+        if let refreshError {
+            // Refresh failed: fall back to whatever is cached (including the
+            // previous source's rows) so the list never blanks out. The banner
+            // is driven by `servingCachedData`, which the failed refresh set.
+            let after = try cachedInBox(prefixes: prefixes, minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+            let preferred = after.filter { entity in
+                wantedPrefixes.contains { entity.id.hasPrefix($0) }
+            }
+            let fallback = preferred.isEmpty ? after : preferred
+            if fallback.isEmpty { throw refreshError }
+            return fallback.map(entityToDomain)
+        }
+
+        // Clean refresh (or fresh cache): the current source's rows are the
+        // truth, and any other provider's leftover rows stay hidden.
+        _servingCachedData.value = false
+        let fresh = try cachedInBox(prefixes: prefixes, minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
+        return fresh
+            .filter { entity in wantedPrefixes.contains { entity.id.hasPrefix($0) } }
+            .map(entityToDomain)
+    }
+
+    /// All cached rows inside the box, deduplicated by id.
+    private func cachedInBox(
+        prefixes: Set<String>,
+        minLat: Double,
+        minLon: Double,
+        maxLat: Double,
+        maxLon: Double
+    ) throws -> [ChargerEntity] {
         var seen = Set<String>()
-        var results: [Charger] = []
+        var rows: [ChargerEntity] = []
         for prefix in prefixes {
-            let entities = try byGeohashPrefix(prefix)
-            for entity in entities {
+            for entity in try byGeohashPrefix(prefix) {
                 guard !seen.contains(entity.id) else { continue }
                 guard entity.lat >= minLat && entity.lat <= maxLat && entity.lon >= minLon && entity.lon <= maxLon else { continue }
                 seen.insert(entity.id)
-                results.append(entityToDomain(entity))
+                rows.append(entity)
             }
         }
-        // Without this the UI reports "no chargers here" when the truth is "the
-        // charger database refused the request" — two very different problems.
-        if results.isEmpty, let refreshError { throw refreshError }
-        return results
+        return rows
     }
 
-    private func oldestCachedAt(prefix: String) -> Date? {
-        let descriptor = FetchDescriptor<ChargerEntity>(
-            predicate: #Predicate { $0.geohash.starts(with: prefix) },
-            sortBy: [SortDescriptor(\.cachedAt, order: .forward)]
-        )
-        return (try? modelContext.fetch(descriptor).first?.cachedAt) ?? nil
+    /// The id prefixes a source writes to the cache, used to show only the
+    /// current source's rows once its refresh has succeeded.
+    private static func sourcePrefixes(_ source: ChargerSource) -> [String] {
+        switch source {
+        case .openChargeMap: return ["ocm-"]
+        case .googlePlaces: return ["gp-"]
+        case .appleMaps: return ["apple-"]
+        case .combined: return ["ocm-", "apple-"]
+        }
     }
 
     private func byGeohashPrefix(_ prefix: String) throws -> [ChargerEntity] {

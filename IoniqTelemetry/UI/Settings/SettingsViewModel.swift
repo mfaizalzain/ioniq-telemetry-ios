@@ -157,12 +157,14 @@ final class SettingsViewModel {
     }
     func setGooglePoiSearch(_ value: Bool) { update { $0.googlePoiSearch = value } }
 
-    /// Switching source invalidates the cache: rows from the old provider would
-    /// otherwise keep satisfying the 7-day TTL and the change would look inert.
+    /// Switching source must take effect immediately, but must not destroy
+    /// working data: the old provider's rows stay as a fallback, and the next
+    /// load re-fetches from the new provider (see
+    /// `ChargerRepository.noteSourceChanged`).
     func setChargerSource(_ value: ChargerSource) {
         guard value != preferences.chargerSource else { return }
         update { $0.chargerSource = value }
-        try? services.chargers.clearCache()
+        services.chargers.noteSourceChanged()
     }
     func setReserveSoc(_ value: Float) { update { $0.reserveSocPercent = value } }
     func setTargetArrivalSoc(_ value: Float) { update { $0.targetArrivalSocPercent = value } }
