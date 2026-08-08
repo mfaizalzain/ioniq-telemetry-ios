@@ -107,6 +107,7 @@ final class PlanViewModel {
     private var telemetry = VehicleTelemetry()
     private var preferences = UserPreferences()
     private var searchTask: Task<Void, Never>?
+    private var nearbyRequestID = UUID()
     private var cancellables = Set<AnyCancellable>()
     /// Cached so a re-route doesn't re-request the route and burn another API call.
     private var lastRoute: BaseRoute?
@@ -193,6 +194,7 @@ final class PlanViewModel {
             // This is an explicit user action, so it may request location access
             // on first use. Passive refreshes below remain permission-safe.
             await loadNearbyChargers(requestPermission: true)
+            if aiError != nil { return }
             if !nearbyChargers.isEmpty {
                 aiInterpretation = "Found \(nearbyChargers.count) charging stations within \(Int(ChargerRepository.nearbyRadiusKm)) km."
             } else {
@@ -694,18 +696,38 @@ final class PlanViewModel {
     /// Passive refreshes only run once location is authorized; the explicit
     /// nearby-charger action can request permission on first use.
     func loadNearbyChargers(requestPermission: Bool = false) async {
+        let requestID = UUID()
+        nearbyRequestID = requestID
         // A background connection refresh must never trigger a permission prompt;
         // an explicit "Find chargers near me" request may do so.
         guard requestPermission || locationProvider.isAuthorized else { return }
         // Prefer the current GPS fix, with the selected origin as the same
         // last-resort fallback Android uses when no fix is available.
-        guard let center = await locationProvider.currentLocation(requestPermission: requestPermission)
+        guard let center = await locationProvider.currentLocation(
+            requestPermission: requestPermission,
+            forceFresh: requestPermission
+        )
                 ?? origin.selected?.location else { return }
-        nearbyChargers = (try? await services.chargers.chargersNearby(center: center)) ?? []
-        await loadNearbyAvailability(center: center)
+        let chargers: [Charger]
+        do {
+            chargers = try await services.chargers.chargersNearby(
+                center: center,
+                forceRefresh: requestPermission
+            )
+        } catch {
+            guard requestID == nearbyRequestID else { return }
+            nearbyChargers = []
+            chargerAvailability = [:]
+            if requestPermission { aiError = error.localizedDescription }
+            return
+        }
+        guard requestID == nearbyRequestID else { return }
+        nearbyChargers = chargers
+        await loadNearbyAvailability(center: center, requestID: requestID)
     }
 
     func clearNearbyChargers() {
+        nearbyRequestID = UUID()
         nearbyChargers = []
         chargerAvailability = [:]
     }
@@ -717,7 +739,8 @@ final class PlanViewModel {
     /// listed. Requires Pro, the Android-matching occupancy opt-in, and a Google
     /// key; without them the rows simply carry no status, which is honest rather
     /// than a guess.
-    private func loadNearbyAvailability(center: LatLon) async {
+    private func loadNearbyAvailability(center: LatLon, requestID: UUID) async {
+        guard requestID == nearbyRequestID else { return }
         chargerAvailability = [:]
         guard isPro,
               preferences.chargerOccupancyAlerts,
@@ -729,6 +752,7 @@ final class PlanViewModel {
             radiusM: ChargerRepository.nearbyRadiusKm * 1_000,
             apiKey: key
         ) else { return }
+        guard requestID == nearbyRequestID else { return }
 
         var matched: [String: ChargerAvailability] = [:]
         for charger in nearbyChargers {
@@ -799,9 +823,9 @@ final class LocationProvider: NSObject, CLLocationManagerDelegate {
 
     nonisolated private static let maxCachedLocationAge: TimeInterval = 120
 
-    func currentLocation(requestPermission: Bool = true) async -> LatLon? {
+    func currentLocation(requestPermission: Bool = true, forceFresh: Bool = false) async -> LatLon? {
         // Fast path: a recent fix is good enough, no need to wait for GPS.
-        if let location = manager.location, Self.isFreshEnough(location) {
+        if !forceFresh, let location = manager.location, Self.isFreshEnough(location) {
             return Self.coordinate(of: location)
         }
         switch manager.authorizationStatus {

@@ -6,8 +6,7 @@ import Testing
 @testable import CoreData
 
 /// Covers the source-switch contract: switching providers must take effect
-/// immediately, but must never blank the charger list when the new provider
-/// can't be reached — the old rows fall back instead.
+/// immediately, without mixing rows from the previous provider.
 @Suite("ChargerRepository", .serialized)
 struct ChargerRepositoryTests {
 
@@ -80,8 +79,8 @@ struct ChargerRepositoryTests {
 
     private let center = LatLon(lat: 4.2, lon: 101.1)
 
-    @Test("a failed refresh after a source switch falls back to the old source's rows")
-    func failedRefreshKeepsOldRows() async throws {
+    @Test("a failed refresh after a source switch does not show the old source's rows")
+    func failedRefreshDoesNotMixSources() async throws {
         StubProtocol.requestCount = 0
         let context = ModelContext(makeContainer())
         context.insert(entity(id: "ocm-1", name: "Petronas Tapah"))
@@ -100,9 +99,13 @@ struct ChargerRepositoryTests {
         let cancellable = repo.servingCachedData.sink { servingCached = $0 }
         defer { cancellable.cancel() }
 
-        let chargers = try await repo.chargersNear(center: center)
-
-        #expect(chargers.map(\.id) == ["ocm-1"], "old rows must still show when the new source can't refresh")
+        var didThrow = false
+        do {
+            _ = try await repo.chargersNear(center: center)
+        } catch {
+            didThrow = true
+        }
+        #expect(didThrow)
         #expect(servingCached, "the UI must warn that it's serving cached data")
         #expect(StubProtocol.requestCount == 0)
     }
@@ -156,6 +159,52 @@ struct ChargerRepositoryTests {
 
         #expect(chargers.map(\.id) == ["ocm-1"])
         #expect(chargers.first?.name == "Petronas Tapah")
+        #expect(StubProtocol.requestCount == 1)
+    }
+
+    @Test("a successful refresh removes same-source rows no longer returned")
+    func refreshReplacesStaleRowsInArea() async throws {
+        StubProtocol.requestCount = 0
+        StubProtocol.responseBody = ocmResponse(id: 4, title: "Current OCM Result")
+        let context = ModelContext(makeContainer())
+        context.insert(entity(
+            id: "ocm-old",
+            name: "Removed OCM Row",
+            cachedAt: Date(timeIntervalSinceNow: -8 * 24 * 60 * 60)
+        ))
+        try context.save()
+
+        let repo = ChargerRepository(
+            modelContext: context,
+            apiKey: { "ocm-key" },
+            source: { .openChargeMap },
+            session: makeSession()
+        )
+
+        let chargers = try await repo.chargersNearby(center: center)
+
+        #expect(chargers.map(\.id) == ["ocm-4"])
+        #expect(StubProtocol.requestCount == 1)
+    }
+
+    @Test("an explicit nearby search refreshes even a fresh cached area")
+    func nearbyForceRefreshesFreshRows() async throws {
+        StubProtocol.requestCount = 0
+        StubProtocol.responseBody = ocmResponse(id: 5, title: "Explicit Refresh Result")
+        let context = ModelContext(makeContainer())
+        context.insert(entity(id: "ocm-cached", name: "Cached OCM Row"))
+        try context.save()
+
+        let repo = ChargerRepository(
+            modelContext: context,
+            apiKey: { "ocm-key" },
+            source: { .openChargeMap },
+            session: makeSession()
+        )
+
+        let chargers = try await repo.chargersNearby(center: center, forceRefresh: true)
+
+        #expect(chargers.map(\.id) == ["ocm-5"])
         #expect(StubProtocol.requestCount == 1)
     }
 

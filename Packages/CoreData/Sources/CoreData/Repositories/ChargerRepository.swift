@@ -79,8 +79,12 @@ public final class ChargerRepository: @unchecked Sendable {
     // MARK: - Public API
 
     /// The canonical phone-sized nearby search, matching Android's 10 km lookup.
-    public func chargersNearby(center: LatLon) async throws -> [Charger] {
-        try await chargersNear(center: center, radiusKm: Self.nearbyRadiusKm)
+    public func chargersNearby(center: LatLon, forceRefresh: Bool = false) async throws -> [Charger] {
+        try await chargersNear(
+            center: center,
+            radiusKm: Self.nearbyRadiusKm,
+            forceRefresh: forceRefresh
+        )
     }
 
     /// The canonical in-car nearby search, matching Android Auto's 25 km pool.
@@ -93,14 +97,19 @@ public final class ChargerRepository: @unchecked Sendable {
     }
 
     /// Generic radius search for route/destination-specific consumers.
-    public func chargersNear(center: LatLon, radiusKm: Double) async throws -> [Charger] {
+    public func chargersNear(
+        center: LatLon,
+        radiusKm: Double,
+        forceRefresh: Bool = false
+    ) async throws -> [Charger] {
         let dLat = radiusKm / 111.0
         let dLon = radiusKm / (111.0 * max(cos(center.lat * .pi / 180.0), 0.2))
         let chargers = try await loadArea(
             minLat: center.lat - dLat, minLon: center.lon - dLon,
             maxLat: center.lat + dLat, maxLon: center.lon + dLon,
             // Google Places tiles this exact box using the same policy as Android.
-            appleCenters: [center]
+            appleCenters: [center],
+            forceRefresh: forceRefresh
         )
         return chargers
             .filter { !$0.isRestricted && approxDistanceKm(center, LatLon(lat: $0.lat, lon: $0.lon)) <= radiusKm }
@@ -134,10 +143,8 @@ public final class ChargerRepository: @unchecked Sendable {
         try modelContext.save()
     }
 
-    /// Marks all cached rows as suspect because the charger source changed: the
-    /// next area load must re-fetch from the new provider. Non-destructive — the
-    /// old provider's rows stay as a fallback if the new one can't be reached,
-    /// so a source switch never leaves the user with an empty charger list.
+    /// Marks all cached rows as suspect because the charger source changed. The
+    /// next area load re-fetches from the new provider and never mixes providers.
     public func noteSourceChanged() {
         _sourceChanged.value = true
     }
@@ -149,7 +156,8 @@ public final class ChargerRepository: @unchecked Sendable {
         minLon: Double,
         maxLat: Double,
         maxLon: Double,
-        appleCenters: [LatLon]
+        appleCenters: [LatLon],
+        forceRefresh: Bool = false
     ) async throws -> [Charger] {
         let prefixes = Geohash.coveringPrefixes(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon, precision: 4)
         let now = Date()
@@ -166,7 +174,8 @@ public final class ChargerRepository: @unchecked Sendable {
         // Match Android: one old row means the covered area is stale. Using the
         // newest row can leave a partially stale Plan result on screen.
         let oldest = currentSourceRows.map(\.cachedAt).min()
-        let stale = sourceChanged ||
+        let stale = forceRefresh ||
+            sourceChanged ||
             oldest == nil ||
             now.timeIntervalSince(oldest!) > Self.cacheTTL
 
@@ -196,23 +205,24 @@ public final class ChargerRepository: @unchecked Sendable {
                     try deduplicateCombined()
                 }
             } catch {
-                // Cached data is better than an error: hold this and only throw
-                // if there is genuinely nothing left to show.
+                // Same-source cached data can still be useful during an outage,
+                // but rows from another provider must never be shown as results
+                // from the selected source.
                 refreshError = error
             }
         }
 
         if let refreshError {
-            // Refresh failed: fall back to whatever is cached (including the
-            // previous source's rows) so the list never blanks out. The banner
-            // is driven by `servingCachedData`, which the failed refresh set.
+            // Refresh failed: serve only rows belonging to the selected source.
+            // This matches Android: same-source cached rows remain usable, while
+            // a source switch with no rows stays empty instead of displaying
+            // unrelated old-provider results.
             let after = try cachedInBox(prefixes: prefixes, minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon)
             let preferred = after.filter { entity in
                 wantedPrefixes.contains { entity.id.hasPrefix($0) }
             }
-            let fallback = preferred.isEmpty ? after : preferred
-            if fallback.isEmpty { throw refreshError }
-            return fallback.map(entityToDomain)
+            if preferred.isEmpty { throw refreshError }
+            return preferred.map(entityToDomain)
         }
 
         // Clean refresh (or fresh cache): the current source's rows are the
@@ -288,10 +298,13 @@ public final class ChargerRepository: @unchecked Sendable {
             let pois = try decoder.decode([OCMPoi].self, from: data)
             let now = Date()
 
-            for poi in pois {
-                guard let entity = poiToEntity(poi, now: now) else { continue }
-                modelContext.insert(entity)
-            }
+            let entities = pois.compactMap { poiToEntity($0, now: now) }
+            try replaceCachedRows(
+                in: minLat...maxLat,
+                lon: minLon...maxLon,
+                sourcePrefix: "ocm-",
+                with: entities
+            )
             try modelContext.save()
             _servingCachedData.value = false
         } catch let error as ChargerError {
@@ -300,6 +313,25 @@ public final class ChargerRepository: @unchecked Sendable {
             _servingCachedData.value = true
             throw ChargerError.transport(error)
         }
+    }
+
+    /// A successful provider response is authoritative for its source and area.
+    /// Remove rows that disappeared before inserting the new snapshot; otherwise
+    /// a charger removed from OCM remains visible until the cache TTL expires.
+    private func replaceCachedRows(
+        in latitude: ClosedRange<Double>,
+        lon longitude: ClosedRange<Double>,
+        sourcePrefix: String,
+        with entities: [ChargerEntity]
+    ) throws {
+        let cached = try modelContext.fetch(FetchDescriptor<ChargerEntity>())
+        for entity in cached where
+            entity.id.hasPrefix(sourcePrefix) &&
+            latitude.contains(entity.lat) &&
+            longitude.contains(entity.lon) {
+            modelContext.delete(entity)
+        }
+        for entity in entities { modelContext.insert(entity) }
     }
 
     // MARK: - Google Places
@@ -391,22 +423,40 @@ public final class ChargerRepository: @unchecked Sendable {
         }
         let now = Date()
         var inserted = 0
+        var fetchedEntities: [ChargerEntity] = []
         var lastError: (any Error)?
 
         for tile in googleTiles(minLat: minLat, minLon: minLon, maxLat: maxLat, maxLon: maxLon) {
             do {
-                inserted += try await fetchGoogleCircle(
+                let entities = try await fetchGoogleCircle(
                     center: tile.center, radiusM: tile.radiusM, key: key, now: now
                 )
+                inserted += entities.count
+                fetchedEntities.append(contentsOf: entities)
             } catch {
                 // One tile failing shouldn't discard the tiles that worked.
                 lastError = error
             }
         }
 
+        var seenIds = Set<String>()
+        let uniqueFetchedEntities = fetchedEntities.filter { seenIds.insert($0.id).inserted }
+
         if inserted == 0, let lastError {
             _servingCachedData.value = true
             throw lastError
+        }
+        if lastError == nil {
+            try replaceCachedRows(
+                in: minLat...maxLat,
+                lon: minLon...maxLon,
+                sourcePrefix: "gp-",
+                with: uniqueFetchedEntities
+            )
+        } else {
+            // Preserve old rows when one tile failed, but still retain successful
+            // tile results for the next query.
+            for entity in uniqueFetchedEntities { modelContext.insert(entity) }
         }
         try modelContext.save()
         _servingCachedData.value = false
@@ -417,7 +467,7 @@ public final class ChargerRepository: @unchecked Sendable {
         radiusM: Double,
         key: String,
         now: Date
-    ) async throws -> Int {
+    ) async throws -> [ChargerEntity] {
         var request = URLRequest(url: URL(string: "https://places.googleapis.com/v1/places:searchNearby")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -425,7 +475,7 @@ public final class ChargerRepository: @unchecked Sendable {
         // The field mask decides the billing SKU. `evChargeOptions` is what makes
         // these places usable as chargers rather than pins on a map.
         request.setValue(
-            "places.id,places.displayName,places.formattedAddress,places.location,places.evChargeOptions,places.businessStatus",
+            "places.id,places.displayName,places.formattedAddress,places.location,places.evChargeOptions",
             forHTTPHeaderField: "X-Goog-FieldMask"
         )
         request.httpBody = try encoder.encode(PlacesNearbyRequest(
@@ -444,13 +494,7 @@ public final class ChargerRepository: @unchecked Sendable {
                 throw ChargerError.googleHttpStatus(http.statusCode)
             }
             let decoded = try decoder.decode(PlacesNearbyResponse.self, from: data)
-            var count = 0
-            for place in decoded.places {
-                guard let entity = placeToEntity(place, now: now) else { continue }
-                modelContext.insert(entity)
-                count += 1
-            }
-            return count
+            return decoded.places.compactMap { placeToEntity($0, now: now) }
         } catch let error as ChargerError {
             throw error
         } catch {
@@ -487,7 +531,9 @@ public final class ChargerRepository: @unchecked Sendable {
             // Places reports no network operator, price or access policy, so those
             // stay empty rather than being guessed at.
             operator: nil,
-            isOperational: place.businessStatus.map { $0 == "OPERATIONAL" } ?? true,
+            // Match Android: Places nearby results are treated as usable here;
+            // live occupancy is a separate, optional enrichment.
+            isOperational: true,
             pricePerKwh: nil,
             cachedAt: now,
             isRestricted: false,
