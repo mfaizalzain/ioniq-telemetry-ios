@@ -55,6 +55,8 @@ final class CarPlayCoordinator {
     /// Last batch of fetched chargers, so we can re-rank on telemetry updates
     /// without re-fetching from the API.
     private var fetchedChargers: [Charger] = []
+    /// Live occupancy per charger id, fetched once per area load.
+    private var lastLiveStatus: [String: CarPlayPointOfInterest.ChargerLiveStatus]?
     private var lastOrigin: LatLon?
 
     /// Latest active trip plan, so the plan tab can be rebuilt from the
@@ -255,17 +257,51 @@ final class CarPlayCoordinator {
             learnedKwhPer100Km: learnedConsumption
         )
 
-        // Cache for re-ranking on telemetry updates
-        fetchedChargers = chargers
-        lastOrigin = center
-
         // CarPlay caps a POI template at 12 entries; sending more is dropped
         // silently, so trim to the nearest within comfort/tight bounds first.
         let visible = candidates.prefix(12)
+        // Cache for re-ranking on telemetry updates — the live status rides
+        // along so refreshChargers doesn't re-bill a Places call per frame.
+        let liveStatus = await loadLiveStatus(for: chargers, center: center)
+        fetchedChargers = chargers
+        lastLiveStatus = liveStatus
+        lastOrigin = center
         chargersTemplate.setPointsOfInterest(
-            visible.map { CarPlayPointOfInterest.make(from: $0, origin: center) },
+            visible.map {
+                CarPlayPointOfInterest.make(
+                    from: $0, origin: center, liveStatus: liveStatus?[$0.charger.id]
+                )
+            },
             selectedIndex: NSNotFound
         )
+    }
+
+    /// Live occupancy for the listed chargers, when the requirements are met
+    /// (Pro + Google key) — the same gate as the phone's Nearby Chargers list.
+    /// One Places request for the whole area, matched to each charger's
+    /// physical site via `ChargerStationMatching`. Returns nil when the
+    /// requirements aren't met or the lookup failed — rows then carry no
+    /// status, never a guess.
+    private func loadLiveStatus(
+        for chargers: [Charger],
+        center: LatLon
+    ) async -> [String: CarPlayPointOfInterest.ChargerLiveStatus]? {
+        guard services.isPro,
+              let key = services.userPreferences.googleMapsApiKey,
+              !key.isEmpty else { return nil }
+        guard let snapshot = try? await services.occupancy.occupancyNear(
+            center, radiusM: 30_000, apiKey: key
+        ) else { return nil }
+
+        var status: [String: CarPlayPointOfInterest.ChargerLiveStatus] = [:]
+        for charger in chargers {
+            guard let matched = ChargerStationMatching.match(charger, stations: snapshot.stations) else { continue }
+            status[charger.id] = CarPlayPointOfInterest.ChargerLiveStatus(
+                available: matched.availableCount,
+                total: matched.totalCount
+            )
+        }
+        return status
     }
 
     /// Re-rank cached chargers with fresh telemetry data — no API fetch needed.
@@ -286,7 +322,11 @@ final class CarPlayCoordinator {
         )
         let visible = candidates.prefix(12)
         chargersTemplate.setPointsOfInterest(
-            visible.map { CarPlayPointOfInterest.make(from: $0, origin: origin) },
+            visible.map {
+                CarPlayPointOfInterest.make(
+                    from: $0, origin: origin, liveStatus: lastLiveStatus?[$0.charger.id]
+                )
+            },
             selectedIndex: NSNotFound
         )
     }
@@ -380,14 +420,18 @@ final class CarPlayCoordinator {
                 LatLon(lat: first.charger.lat, lon: first.charger.lon),
                 radiusM: 800,
                 apiKey: apiKey
-            ), snapshot.allOccupied else { return }
+            ) else { return }
+            // Only the stop's own charger alerts — a charger with no matched
+            // live status is never assumed full because neighbours are busy.
+            guard let matched = ChargerStationMatching.match(first.charger, stations: snapshot.stations),
+                  matched.isOccupied else { return }
 
             self.lastAlertedStopId = first.charger.id
             let distance = String(format: "%.1f km", first.distanceFromOriginKm)
             let alert = CPAlertTemplate(
                 titleVariants: [
-                    "Charger may be full",
-                    "\(first.charger.name) is \(distance) away and nearby stations are occupied."
+                    "Next stop is full",
+                    "\(first.charger.name) is \(distance) away and has no available connectors."
                 ],
                 actions: [CPAlertAction(title: "OK", style: .default, handler: { [weak self] _ in
                     self?.interfaceController.dismissTemplate(animated: true, completion: nil)

@@ -10,19 +10,38 @@ import MapKit
 /// the sanctioned way to do that without being a navigation app.
 enum CarPlayPointOfInterest {
 
-    static func make(from candidate: ChargerCandidate, origin: LatLon) -> CPPointOfInterest {
+    /// Live occupancy of a charger's matched station, or nil when the charger
+    /// has no live status. Only real reported data — never an inference from
+    /// other stations in the area.
+    struct ChargerLiveStatus: Equatable {
+        let available: Int
+        let total: Int
+
+        var isFull: Bool { available <= 0 }
+
+        var label: String {
+            isFull ? "Full — no connectors free" : "\(available) of \(total) connectors free"
+        }
+    }
+
+    static func make(
+        from candidate: ChargerCandidate,
+        origin: LatLon,
+        liveStatus: ChargerLiveStatus? = nil
+    ) -> CPPointOfInterest {
         let charger = candidate.charger
         let coordinate = CLLocationCoordinate2D(latitude: charger.lat, longitude: charger.lon)
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = charger.name
+        let detail = subtitle(for: candidate, origin: origin, liveStatus: liveStatus)
 
         let poi = CPPointOfInterest(
             location: mapItem,
             title: charger.name,
-            subtitle: subtitle(for: candidate, origin: origin),
+            subtitle: detail,
             summary: charger.operator,
             detailTitle: charger.name,
-            detailSubtitle: subtitle(for: candidate, origin: origin),
+            detailSubtitle: detail,
             detailSummary: charger.usageCost,
             pinImage: nil
         )
@@ -43,7 +62,11 @@ enum CarPlayPointOfInterest {
         return poi
     }
 
-    private static func subtitle(for candidate: ChargerCandidate, origin: LatLon) -> String {
+    private static func subtitle(
+        for candidate: ChargerCandidate,
+        origin: LatLon,
+        liveStatus: ChargerLiveStatus? = nil
+    ) -> String {
         let charger = candidate.charger
         var parts: [String] = []
         if charger.maxPowerKw > 0 {
@@ -67,6 +90,9 @@ enum CarPlayPointOfInterest {
         }
         if !charger.isOperational {
             parts.append("Out of service")
+        }
+        if let liveStatus {
+            parts.append(liveStatus.label)
         }
         return parts.joined(separator: " · ")
     }
@@ -93,19 +119,26 @@ final class CarPlayLocation: NSObject, CLLocationManagerDelegate {
     }
 
     func currentLocation() async -> LatLon? {
-        if let location = manager.location {
+        // A cached fix is only usable while it's recent — the same rule as the
+        // phone's LocationProvider. CLLocationManager.location can be hours old
+        // or from a different place, which would center the charger list in the
+        // wrong town.
+        if let location = manager.location, LocationProvider.isFreshEnough(location) {
             return LatLon(lat: location.coordinate.latitude, lon: location.coordinate.longitude)
         }
         // CarPlay must not be the surface that first asks for permission — there is
         // no good way to answer a prompt while driving. If it isn't already granted,
-        // the charger tab simply stays empty until the phone app has asked.
+        // fall back to the cached position (even if stale) rather than an empty list.
         guard manager.authorizationStatus == .authorizedAlways
-            || manager.authorizationStatus == .authorizedWhenInUse else { return nil }
+            || manager.authorizationStatus == .authorizedWhenInUse else {
+            return manager.location.map { LatLon(lat: $0.coordinate.latitude, lon: $0.coordinate.longitude) }
+        }
 
-        return await withCheckedContinuation { continuation in
+        let fresh = await withCheckedContinuation { continuation in
             continuations.append(continuation)
             manager.requestLocation()
         }
+        return fresh ?? manager.location.map { LatLon(lat: $0.coordinate.latitude, lon: $0.coordinate.longitude) }
     }
 
     private func resume(_ value: LatLon?) {
