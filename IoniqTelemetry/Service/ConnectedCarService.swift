@@ -83,15 +83,14 @@ final class ConnectedCarService {
             self?.postTireAlert(low)
         }
         occupancyMonitor = OccupancyAlertMonitor(
-            availabilityNear: { [occupancy = services.occupancy] center, radius, key in
+            availabilityNear: { [occupancy = services.occupancy] charger, radius, key in
                 guard let snapshot = try? await occupancy.occupancyNear(
-                    center, radiusM: radius, apiKey: key
+                    LatLon(lat: charger.lat, lon: charger.lon), radiusM: radius, apiKey: key
                 ) else { return nil }
-                return OccupancyAlertMonitor.OccupancyReport(
-                    stationCount: snapshot.stations.count,
-                    hasStatus: snapshot.hasStatus,
-                    allOccupied: snapshot.allOccupied
-                )
+                // Only the stop's own charger matters: a charger with no matched
+                // live status reports nil and never alerts.
+                let matched = ChargerStationMatching.match(charger, stations: snapshot.stations)
+                return OccupancyAlertMonitor.OccupancyReport(stopChargerOccupied: matched?.isOccupied)
             }
         )
         healthEstimator = BatteryHealthEstimator(
@@ -493,14 +492,13 @@ final class ConnectedCarService {
         telemetry: VehicleTelemetry
     ) async {
         let liveSoc = telemetry.socDisplay ?? telemetry.socBms
-        let busy = "All \(alert.statusedStations) chargers with live status near "
-            + "\(alert.stopName) are busy — about \(alert.etaMinutes) min ahead."
+        let busy = "\(alert.stopName) is full — about \(alert.etaMinutes) min ahead."
 
         // Needs a fix, a live SOC and a route to say anything about reachability.
         guard let position, let liveSoc, routePoints.count >= 2 else {
             await notifier.post(
                 .chargerOccupancy,
-                title: "Chargers ahead are occupied",
+                title: "Next stop is full",
                 body: "\(busy) Consider an alternative stop."
             )
             return
@@ -519,14 +517,14 @@ final class ConnectedCarService {
             } ?? "An alternative charger is reachable on your current charge."
             await notifier.post(
                 .chargerOccupancy,
-                title: "Chargers ahead are occupied",
+                title: "Next stop is full",
                 body: "\(busy) \(altText)",
                 categoryIdentifier: AlertNotifier.occupancyRerouteCategory
             )
         } else {
             await notifier.post(
                 .chargerOccupancy,
-                title: "Chargers ahead are occupied",
+                title: "Next stop is full",
                 body: "\(busy) No charger is reachable on your current charge; "
                     + "reduce speed to extend range."
             )

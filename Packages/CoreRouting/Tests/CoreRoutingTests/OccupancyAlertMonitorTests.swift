@@ -44,12 +44,10 @@ struct OccupancyAlertMonitorTests {
         )
     }
 
-    /// A report as the repository would build it: `stationCount` counts only
-    /// stations that reported live status.
-    private func report(stations: Int, allOccupied: Bool) -> OccupancyAlertMonitor.OccupancyReport {
-        OccupancyAlertMonitor.OccupancyReport(
-            stationCount: stations, hasStatus: stations > 0, allOccupied: allOccupied
-        )
+    /// A report as the service would build it: `stopChargerOccupied` is nil when
+    /// the stop's charger has no matched live status.
+    private func report(_ stopChargerOccupied: Bool?) -> OccupancyAlertMonitor.OccupancyReport {
+        OccupancyAlertMonitor.OccupancyReport(stopChargerOccupied: stopChargerOccupied)
     }
 
     private func monitor(
@@ -60,22 +58,31 @@ struct OccupancyAlertMonitorTests {
 
     // MARK: - Alerting
 
-    @Test("alerts when the next stop is imminent and every statused charger is busy")
+    @Test("alerts when the next stop is imminent and the stop's own charger is occupied")
     func alertsWhenImminentAndFull() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         // Stop at 25 km with ~20 km travelled → a few km out at 60 kph.
         let alert = await m.check(
             plan: planWithStop(atKm: 25), routePoints: routePoints,
             position: positionAt20km, speedKph: 60, apiKey: "k"
         )
         #expect(alert?.stopName == "Stop c1")
-        #expect(alert?.statusedStations == 2)
         #expect((alert?.etaMinutes ?? 0) >= 1)
     }
 
-    @Test("no alert when at least one charger is free")
+    @Test("no alert when the stop's charger has a free connector")
     func noAlertWhenOneFree() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: false))
+        let m = monitor(returning: report(false))
+        let alert = await m.check(
+            plan: planWithStop(atKm: 25), routePoints: routePoints,
+            position: positionAt20km, speedKph: 60, apiKey: "k"
+        )
+        #expect(alert == nil)
+    }
+
+    @Test("no alert when the stop's charger has no matched live status")
+    func noAlertWithoutStopStatus() async {
+        let m = monitor(returning: report(nil))
         let alert = await m.check(
             plan: planWithStop(atKm: 25), routePoints: routePoints,
             position: positionAt20km, speedKph: 60, apiKey: "k"
@@ -86,7 +93,7 @@ struct OccupancyAlertMonitorTests {
     /// "No data" must never be read as "occupied", or the feature invents alerts.
     @Test("no alert when nothing reports live status")
     func noAlertWithoutStatus() async {
-        let m = monitor(returning: report(stations: 0, allOccupied: false))
+        let m = monitor(returning: report(nil))
         let alert = await m.check(
             plan: planWithStop(atKm: 25), routePoints: routePoints,
             position: positionAt20km, speedKph: 60, apiKey: "k"
@@ -109,7 +116,7 @@ struct OccupancyAlertMonitorTests {
 
     @Test("no alert while the stop is beyond the ETA threshold")
     func noAlertBeyondThreshold() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         // 90 km out at 60 kph is 90 minutes — far past the 10-minute window.
         let alert = await m.check(
             plan: planWithStop(atKm: 95), routePoints: routePoints,
@@ -121,7 +128,7 @@ struct OccupancyAlertMonitorTests {
     @Test("no alert without an API key — these calls bill the user")
     func noAlertWithoutKey() async {
         for key in [nil, ""] as [String?] {
-            let m = monitor(returning: report(stations: 2, allOccupied: true))
+            let m = monitor(returning: report(true))
             let alert = await m.check(
                 plan: planWithStop(atKm: 25), routePoints: routePoints,
                 position: positionAt20km, speedKph: 60, apiKey: key
@@ -132,7 +139,7 @@ struct OccupancyAlertMonitorTests {
 
     @Test("no alert when stationary — a standing car has no meaningful ETA")
     func noAlertWhenStationary() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         let alert = await m.check(
             plan: planWithStop(atKm: 25), routePoints: routePoints,
             position: positionAt20km, speedKph: 0, apiKey: "k"
@@ -142,7 +149,7 @@ struct OccupancyAlertMonitorTests {
 
     @Test("no alert without a plan, a position, or a usable route")
     func noAlertWithoutInputs() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         #expect(await m.check(plan: nil, routePoints: routePoints, position: positionAt20km, speedKph: 60, apiKey: "k") == nil)
         #expect(await m.check(plan: planWithStop(atKm: 25), routePoints: routePoints, position: nil, speedKph: 60, apiKey: "k") == nil)
         #expect(await m.check(plan: planWithStop(atKm: 25), routePoints: [], position: positionAt20km, speedKph: 60, apiKey: "k") == nil)
@@ -150,7 +157,7 @@ struct OccupancyAlertMonitorTests {
 
     @Test("stops already behind the driver are not considered")
     func passedStopsIgnored() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         // Stop at 5 km, driver at ~20 km — already passed.
         let alert = await m.check(
             plan: planWithStop(atKm: 5), routePoints: routePoints,
@@ -163,7 +170,7 @@ struct OccupancyAlertMonitorTests {
 
     @Test("alerts at most once per stop")
     func alertsOncePerStop() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         let plan = planWithStop(atKm: 25)
         let first = await m.check(
             plan: plan, routePoints: routePoints, position: positionAt20km,
@@ -186,9 +193,7 @@ struct OccupancyAlertMonitorTests {
         let calls = CallCounter()
         let m = OccupancyAlertMonitor(availabilityNear: { _, _, _ in
             calls.record()
-            return OccupancyAlertMonitor.OccupancyReport(
-                stationCount: 2, hasStatus: true, allOccupied: false
-            )
+            return OccupancyAlertMonitor.OccupancyReport(stopChargerOccupied: false)
         })
         let plan = planWithStop(atKm: 25)
         for offset in [0.0, 1.0, 60.0, 120.0] {
@@ -211,9 +216,7 @@ struct OccupancyAlertMonitorTests {
             lookups.record()
             // Suspend, so any task that slipped past the throttle would overlap here.
             await Task.yield()
-            return OccupancyAlertMonitor.OccupancyReport(
-                stationCount: 2, hasStatus: true, allOccupied: false
-            )
+            return OccupancyAlertMonitor.OccupancyReport(stopChargerOccupied: false)
         })
         let plan = planWithStop(atKm: 25)
         let now = Date(timeIntervalSince1970: 0)
@@ -238,7 +241,7 @@ struct OccupancyAlertMonitorTests {
 
     @Test("a new plan re-arms the alert for the same charger")
     func newPlanReArms() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         let first = await m.check(
             plan: planWithStop(atKm: 25), routePoints: routePoints, position: positionAt20km,
             speedKph: 60, apiKey: "k", now: Date(timeIntervalSince1970: 0)
@@ -257,7 +260,7 @@ struct OccupancyAlertMonitorTests {
 
     @Test("reset clears both the per-stop guard and the throttle")
     func resetClearsState() async {
-        let m = monitor(returning: report(stations: 2, allOccupied: true))
+        let m = monitor(returning: report(true))
         let plan = planWithStop(atKm: 25)
         _ = await m.check(
             plan: plan, routePoints: routePoints, position: positionAt20km,

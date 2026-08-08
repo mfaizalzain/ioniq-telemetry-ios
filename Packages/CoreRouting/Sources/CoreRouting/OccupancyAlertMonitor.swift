@@ -2,12 +2,13 @@ import CoreDomain
 import Foundation
 
 /// While driving an active plan, warns when the next charge stop is imminent and
-/// every nearby charger reporting live availability is occupied — so the driver can
-/// pick an alternative before arriving at a full station.
+/// the stop's own charger reports occupied — so the driver can pick an
+/// alternative before arriving at a full station.
 ///
+/// The alert never infers a charger's status from other stations in the area: a
+/// charger with no matched live status, or with a free connector, never alerts.
 /// Availability is injected rather than depended on directly, which keeps the
-/// timing and gating logic testable without a network. Stations with no live status
-/// are ignored: "no data" is not "available".
+/// timing and gating logic testable without a network.
 ///
 /// Calls are Pro- and key-gated by the caller, throttled to `recheckInterval`, and
 /// fired at most once per stop.
@@ -22,25 +23,22 @@ public final class OccupancyAlertMonitor {
     public struct Alert: Sendable, Equatable {
         public let stopName: String
         public let occupiedChargerId: String
-        public let statusedStations: Int
         public let etaMinutes: Int
     }
 
-    /// Live occupancy near a point. Returns nil on error, which is treated as "no
-    /// information" and never as "occupied".
+    /// Live occupancy of the stop's own charger. Returns nil on error, which is
+    /// treated as "no information" and never as "occupied".
     public typealias AvailabilityLookup =
-        @Sendable (LatLon, Double, String) async -> OccupancyReport?
+        @Sendable (Charger, Double, String) async -> OccupancyReport?
 
     /// Minimal shape the monitor needs, so CoreRouting doesn't depend on CoreData.
+    /// `stopChargerOccupied` is nil when the charger has no matched live status —
+    /// that must never be read as "full".
     public struct OccupancyReport: Sendable, Equatable {
-        public let stationCount: Int
-        public let hasStatus: Bool
-        public let allOccupied: Bool
+        public let stopChargerOccupied: Bool?
 
-        public init(stationCount: Int, hasStatus: Bool, allOccupied: Bool) {
-            self.stationCount = stationCount
-            self.hasStatus = hasStatus
-            self.allOccupied = allOccupied
+        public init(stopChargerOccupied: Bool?) {
+            self.stopChargerOccupied = stopChargerOccupied
         }
     }
 
@@ -101,19 +99,15 @@ public final class OccupancyAlertMonitor {
         if let lastCheck, now.timeIntervalSince(lastCheck) < recheckInterval { return nil }
         lastCheck = now
 
-        guard let report = await availabilityNear(
-            LatLon(lat: nextStop.charger.lat, lon: nextStop.charger.lon),
-            searchRadiusM,
-            apiKey
-        ) else { return nil }
-
-        guard report.hasStatus, report.allOccupied else { return nil }
+        guard let report = await availabilityNear(nextStop.charger, searchRadiusM, apiKey) else { return nil }
+        // Only a confirmed "occupied" for the stop's own charger alerts — a nil
+        // status or a free connector never does.
+        guard report.stopChargerOccupied == true else { return nil }
 
         alertedStopKey = stopKey
         return Alert(
             stopName: nextStop.charger.name,
             occupiedChargerId: nextStop.charger.id,
-            statusedStations: report.stationCount,
             etaMinutes: max(Int(etaMinutes), 1)
         )
     }
