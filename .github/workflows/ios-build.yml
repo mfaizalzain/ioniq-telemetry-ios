@@ -39,7 +39,8 @@ jobs:
           if [ -n "${{ secrets.OPEN_CHARGE_MAP_API_KEY }}" ]; then
             echo "OPEN_CHARGE_MAP_API_KEY=${{ secrets.OPEN_CHARGE_MAP_API_KEY }}" >> Secrets.xcconfig
           fi
-          cat Secrets.xcconfig
+          # Show the file was created without leaking key values.
+          sed 's/=.*/=<redacted>/' Secrets.xcconfig
           mkdir -p IoniqTelemetryTests
           ls -la
 

@@ -49,7 +49,8 @@ jobs:
           if [ -n "${{ secrets.OPEN_CHARGE_MAP_API_KEY }}" ]; then
             echo "OPEN_CHARGE_MAP_API_KEY=${{ secrets.OPEN_CHARGE_MAP_API_KEY }}" >> Secrets.xcconfig
           fi
-          cat Secrets.xcconfig
+          # Show the file was created without leaking key values.
+          sed 's/=.*/=<redacted>/' Secrets.xcconfig
           mkdir -p IoniqTelemetryTests
 
       - name: Generate project
@@ -146,17 +147,26 @@ jobs:
 
       - name: Upload to App Store Connect (TestFlight)
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APP_SPECIFIC_PASSWORD: ${{ secrets.APP_SPECIFIC_PASSWORD }}
+          ASC_API_KEY_BASE64: ${{ secrets.ASC_API_KEY_BASE64 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER: ${{ secrets.ASC_API_ISSUER }}
         run: |
           set -euo pipefail
-          # Apple ID + app-specific password auth (no API key needed).
+          # App Store Connect API key auth (replaces Apple ID + app-specific password,
+          # which is fragile: 2FA-dependent, and post-Xcode-26 multi-provider accounts
+          # additionally require --provider-public-id).
           IPA_PATH="$(find "$RUNNER_TEMP/export" -maxdepth 2 -name '*.ipa' | head -1)"
           test -n "$IPA_PATH" || { echo "ERROR: no .ipa found in $RUNNER_TEMP/export"; exit 1; }
           echo "Uploading: $IPA_PATH"
+          # altool searches ./private_keys, ~/private_keys, ~/.private_keys,
+          # ~/.appstoreconnect/private_keys for AuthKey_<keyid>.p8. --upload-app
+          # spawns iTMSTransporter, which changes cwd, so the relative ./private_keys
+          # lookup fails; $HOME/private_keys is absolute and immune to that.
+          mkdir -p "$HOME/private_keys"
+          echo "$ASC_API_KEY_BASE64" | base64 --decode > "$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
           xcrun altool --upload-app \
             -f "$IPA_PATH" \
             -t ios \
-            -u "$APPLE_ID" \
-            -p "$APP_SPECIFIC_PASSWORD" \
+            --apiKey "$ASC_API_KEY_ID" \
+            --apiIssuer "$ASC_API_ISSUER" \
             --verbose

@@ -2,8 +2,9 @@
 #
 # Archives a Release build and uploads it to TestFlight.
 #
-# Uses the Apple ID app-specific password stored in the macOS keychain
-# (service: AC_PASSWORD, account: faizalmzain@gmail.com).
+# Uploads with an App Store Connect API key: the .p8 must live at
+# ~/private_keys/AuthKey_<keyid>.p8 and ASC_API_KEY_ID / ASC_API_ISSUER must be
+# set (export them in your shell profile).
 #
 # Usage: scripts/archive_and_upload.sh [--no-upload]
 set -euo pipefail
@@ -62,12 +63,14 @@ if [[ "${1:-}" == "--no-upload" ]]; then
   exit 0
 fi
 
-: "${AC_PASSWORD:?set AC_PASSWORD in keychain}"
-echo "Checking AC_PASSWORD keychain entry..."
-security find-generic-password -s "AC_PASSWORD" -a "faizalmzain@gmail.com" >/dev/null 2>&1 || {
-  echo "Error: AC_PASSWORD not found in keychain."
-  echo "Generate at appleid.apple.com/account/manage and run:"
-  echo "  security add-generic-password -a faizalmzain@gmail.com -s AC_PASSWORD -w 'xxxx-xxxx-xxxx-xxxx'"
+: "${ASC_API_KEY_ID:?set ASC_API_KEY_ID (App Store Connect API key ID)}"
+: "${ASC_API_ISSUER:?set ASC_API_ISSUER (App Store Connect issuer ID)}"
+KEY_FILE="$HOME/private_keys/AuthKey_${ASC_API_KEY_ID}.p8"
+echo "Checking API key at $KEY_FILE..."
+[[ -f "$KEY_FILE" ]] || {
+  echo "Error: $KEY_FILE not found."
+  echo "Download the .p8 from App Store Connect (Users and Access > Integrations)"
+  echo "and save it as $KEY_FILE, then re-run."
   exit 1
 }
 
@@ -75,7 +78,7 @@ echo "==> Uploading to TestFlight"
 xcrun altool --upload-app \
   -f "$BUILD_DIR/$SCHEME.ipa" \
   -t ios \
-  -u faizalmzain@gmail.com \
-  -p "@keychain:AC_PASSWORD"
+  --apiKey "$ASC_API_KEY_ID" \
+  --apiIssuer "$ASC_API_ISSUER"
 
 echo "==> Done. Build $NEXT uploaded."
