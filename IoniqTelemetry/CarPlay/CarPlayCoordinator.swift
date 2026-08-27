@@ -212,8 +212,10 @@ final class CarPlayCoordinator {
     // MARK: - Status
 
     private func refreshStatus() {
-        // Compute learned consumption from recent trip history (matching Android Auto)
-        learnedConsumption = (try? services.tripLog.trips()).flatMap { trips in
+        // Compute learned consumption from recent trip history (matching Android Auto).
+        // Only the 60-day window matters — this runs every 2 s while CarPlay is active.
+        let cutoff = Date().addingTimeInterval(-learnedConsumptionWindow)
+        learnedConsumption = (try? services.tripLog.trips(since: cutoff)).flatMap { trips in
             learnedConsumptionKwhPer100Km(trips: trips)
         }
 
@@ -456,7 +458,7 @@ final class CarPlayCoordinator {
     // MARK: - Trips
 
     private func reloadTrips() {
-        let trips = (try? services.tripLog.trips().prefix(20)) ?? []
+        let trips = (try? services.tripLog.trips(limit: 20)) ?? []
         let items = trips.map { trip -> CPListItem in
             let item = CPListItem(
                 text: trip.startTime.formatted(date: .abbreviated, time: .shortened),

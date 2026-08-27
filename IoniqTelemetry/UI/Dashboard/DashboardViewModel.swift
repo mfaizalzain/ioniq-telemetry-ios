@@ -180,8 +180,13 @@ final class DashboardViewModel {
 
     /// Loads recent trips from the trip log. Call when the dashboard appears or
     /// trips may have changed.
+    ///
+    /// Only the 30-day measurement window is fetched: both consumers of
+    /// `recentTrips` (measured consumption and the AI digest, whose longest
+    /// period is monthly = 30 days) filter to that window anyway.
     func refreshTrips() {
-        recentTrips = (try? services.tripLog.trips()) ?? []
+        let cutoff = Date().addingTimeInterval(-measuredConsumptionWindow)
+        recentTrips = (try? services.tripLog.trips(since: cutoff)) ?? []
     }
 }
 

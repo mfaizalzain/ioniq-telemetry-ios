@@ -637,7 +637,7 @@ final class ConnectedCarService {
     /// short to mean anything, and `CalibrationFactors.isApplicable` keeps the
     /// factors out of the model until enough distance has been fitted.
     private func updateCalibration() async {
-        guard let trip = (try? services.tripLog.trips())?.first else { return }
+        guard let trip = (try? services.tripLog.trips(limit: 1))?.first else { return }
         guard let endTime = trip.endTime else { return }
 
         let duration = endTime.timeIntervalSince(trip.startTime)

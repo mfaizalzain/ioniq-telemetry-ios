@@ -113,9 +113,21 @@ public final class TripLogRepository: @unchecked Sendable {
 
     // MARK: - Public API
 
-    public func trips() throws -> [TripEntity] {
+    /// All logged trips, newest first.
+    ///
+    /// Pass `since` and/or `limit` when the caller only needs a slice —
+    /// e.g. CarPlay refreshes every 2 s while driving, and a full-history
+    /// fetch on each tick is wasted work once the log grows. Both are applied
+    /// in the store, not after fetching.
+    public func trips(since: Date? = nil, limit: Int? = nil) throws -> [TripEntity] {
         try flushPendingSamples()
-        let descriptor = FetchDescriptor<TripEntity>(sortBy: [SortDescriptor(\.startTime, order: .reverse)])
+        var descriptor = FetchDescriptor<TripEntity>(sortBy: [SortDescriptor(\.startTime, order: .reverse)])
+        if let since {
+            descriptor.predicate = #Predicate<TripEntity> { $0.startTime >= since }
+        }
+        if let limit {
+            descriptor.fetchLimit = limit
+        }
         return try modelContext.fetch(descriptor)
     }
 

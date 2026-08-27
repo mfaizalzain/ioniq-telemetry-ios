@@ -105,6 +105,54 @@ struct TripLogRepositoryTests {
         #expect(try repo.netElevationGainM(tripId: "no-such-trip") == nil)
     }
 
+    @Test("trips(since:) returns only trips started at or after the cutoff, newest first")
+    func tripsSinceFiltersOldTrips() throws {
+        let (repo, context) = makeRepository()
+
+        // Three trips a day apart; the cutoff sits between the middle and newest.
+        let old = Date(timeIntervalSince1970: 1_000)
+        let middle = old.addingTimeInterval(24 * 3600)
+        let newest = middle.addingTimeInterval(24 * 3600)
+        for (id, start) in [("old", old), ("middle", middle), ("newest", newest)] {
+            context.insert(TripEntity(id: id, startTime: start, distanceKm: 10, energyUsedKwh: 2))
+        }
+        try context.save()
+
+        let cutoff = middle.addingTimeInterval(12 * 3600)
+        let result = try repo.trips(since: cutoff)
+
+        #expect(result.map(\.id) == ["newest"])
+    }
+
+    @Test("trips(limit:) returns only the N most recent trips")
+    func tripsLimitCapsResult() throws {
+        let (repo, context) = makeRepository()
+
+        for i in 0..<5 {
+            let start = Date(timeIntervalSince1970: 1_000 + Double(i) * 3600)
+            context.insert(TripEntity(id: "t\(i)", startTime: start, distanceKm: 10, energyUsedKwh: 2))
+        }
+        try context.save()
+
+        let result = try repo.trips(limit: 2)
+
+        // Newest two, newest first.
+        #expect(result.map(\.id) == ["t4", "t3"])
+    }
+
+    @Test("trips() with no arguments still returns the full history")
+    func tripsUnparameterizedReturnsAll() throws {
+        let (repo, context) = makeRepository()
+
+        for i in 0..<3 {
+            let start = Date(timeIntervalSince1970: 1_000 + Double(i) * 3600)
+            context.insert(TripEntity(id: "t\(i)", startTime: start, distanceKm: 10, energyUsedKwh: 2))
+        }
+        try context.save()
+
+        #expect(try repo.trips().count == 3)
+    }
+
     @Test("net elevation is nil when samples carry no GPS altitude")
     func netElevationNilWithoutAltitude() throws {
         let (repo, context) = makeRepository()
