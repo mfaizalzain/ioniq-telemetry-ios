@@ -52,7 +52,7 @@ public final class BackupRepository: @unchecked Sendable {
     /// Exports a backup directly to a timestamped file in the given directory and
     /// prunes old backups there, keeping only the last 5.
     ///
-    /// - Parameter directory: A writable directory URL (e.g. Documents/autobackup/).
+    /// - Parameter directory: A writable directory URL (e.g. Application Support/autobackup/).
     /// - Returns: The URL of the newly written file.
     public func exportToPersistentFile(preferences prefs: UserPreferences, directory: URL) throws -> URL {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
@@ -88,7 +88,7 @@ public final class BackupRepository: @unchecked Sendable {
     }
 
     /// Returns auto-backup files sorted newest-first.
-    /// Files are in the auto-backup directory (Documents/autobackup/).
+    /// Files are in the auto-backup directory (Application Support/autobackup/).
     public static func listAutoBackups(directory: URL) -> [AutoBackupFile] {
         let fm = FileManager.default
         guard let contents = try? fm.contentsOfDirectory(

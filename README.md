@@ -172,8 +172,10 @@ own key. A master toggle stops all data leaving the device while keeping the key
   settings. Format version 2 is shared with Android (epoch millis, Android's field
   spelling); format 1 files from either platform still restore.
 - Optional background auto-backup (daily/weekly/monthly) via `BGProcessingTask`
-  `com.fmz.IoniqTelemetry.autobackup`, written to `Documents/autobackup/` and visible
-  in the Files app.
+  `com.fmz.IoniqTelemetry.autobackup`, written to Application Support/`autobackup/`
+  (not visible in the Files app — a backup carries every API key, and
+  `UIFileSharingEnabled` is off). Files written to the old Documents location by
+  earlier builds are moved over on first launch.
 
 ### Pro
 One-time non-consumable `ioniq_telemetry_pro` via StoreKit 2. Entitlement is

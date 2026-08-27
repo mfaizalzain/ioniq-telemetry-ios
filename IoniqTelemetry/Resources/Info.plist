@@ -72,10 +72,13 @@
 	<array>
 		<string>com.fmz.IoniqTelemetry.autobackup</string>
 	</array>
+	<!-- false: Documents is not exposed in the Files app. Auto-backups live in
+	     Application Support and manual exports go through the share sheet, so no
+	     app file needs to be browsable — and a backup carries every API key. -->
 	<key>UIFileSharingEnabled</key>
-	<true/>
+	<false/>
 	<key>UISupportsOpeningDocumentsInPlace</key>
-	<true/>
+	<false/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UISupportedInterfaceOrientations_iPhone</key>

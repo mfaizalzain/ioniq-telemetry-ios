@@ -136,6 +136,7 @@ final class AppServices {
 
         await autoConnectLastAdapter()
 
+        migrateLegacyAutoBackups()
         registerAutoBackupTask()
     }
 
@@ -306,6 +307,8 @@ final class AppServices {
     /// The actual background task body: export, record the timestamp, and
     /// re-schedule the next run.
     private func handleAutoBackupTask(_ task: BGProcessingTask) async {
+        // A background launch skips `initialize()`, so migrate here too.
+        Self.migrateLegacyAutoBackups()
         let directory = Self.autoBackupDirectory()
         do {
             try backup.exportToPersistentFile(preferences: userPreferences, directory: directory)
@@ -324,12 +327,38 @@ final class AppServices {
         scheduleOrCancelAutoBackup()
     }
 
-    /// The directory where auto-backup files are stored (Documents/autobackup/).
-    /// Files here are visible via iTunes File Sharing and the Files app because
-    /// UIFileSharingEnabled is set in Info.plist.
+    /// The directory where auto-backup files are stored (Application Support/autobackup/).
+    /// Application Support is not exposed in the Files app, which matters because a
+    /// backup carries every API key the user has entered. Manual exports still go to
+    /// a temp file via the share sheet, where the user picks the destination.
     static func autoBackupDirectory() -> URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let directory = base.appendingPathComponent("autobackup", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }
+
+    /// One-time move of auto-backup files written to Documents/autobackup by builds
+    /// before the directory moved to Application Support. Idempotent: a no-op once
+    /// the legacy directory is gone, so it can run on every launch. Runs from both
+    /// `initialize()` and the background task handler, because a BGTaskScheduler
+    /// launch skips the SwiftUI `.task` that calls `initialize()`.
+    static func migrateLegacyAutoBackups() {
         let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        return documents.appendingPathComponent("autobackup", isDirectory: true)
+        let legacy = documents.appendingPathComponent("autobackup", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: legacy.path) else { return }
+
+        let destination = autoBackupDirectory()
+        for file in (try? FileManager.default.contentsOfDirectory(at: legacy, includingPropertiesForKeys: nil)) ?? [] {
+            // A name collision (same stamp in both directories) keeps the old copy
+            // rather than losing either one.
+            try? FileManager.default.moveItem(at: file, to: destination.appendingPathComponent(file.lastPathComponent))
+        }
+        // Only remove the directory once it is empty, so anything a user put there
+        // by hand via Files survives the move.
+        if (try? FileManager.default.contentsOfDirectory(at: legacy, includingPropertiesForKeys: nil))?.isEmpty == true {
+            try? FileManager.default.removeItem(at: legacy)
+        }
     }
 
     // MARK: - Helpers
