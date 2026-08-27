@@ -136,7 +136,7 @@ final class AppServices {
 
         await autoConnectLastAdapter()
 
-        migrateLegacyAutoBackups()
+        Self.migrateLegacyAutoBackups()
         registerAutoBackupTask()
     }
 
