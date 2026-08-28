@@ -37,6 +37,7 @@
 		7174DAD475B5F29FFCBFF102 /* AlertNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = D76ACB924B36FF8C171B52B1 /* AlertNotifier.swift */; };
 		7AADF0191EBB6A1FCF4F1329 /* AiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AD72D2698920511CEDD113A /* AiService.swift */; };
 		7B55233B7E5EEAA127719D42 /* AppServices.swift in Sources */ = {isa = PBXBuildFile; fileRef = E478B08AFC2545C89E60B30C /* AppServices.swift */; };
+		7BC35B738D1007B33A03D183 /* UsageCostFormatter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E730EBD08CD7CED2B61F364 /* UsageCostFormatter.swift */; };
 		7BFD7C815E57122C9FA9009A /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CA626BD167720CB91E5DA00 /* SettingsViewModel.swift */; };
 		7D8AD819E4D270C82B43EE9F /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */; };
 		82BD22F8A6DFE7105725A9B1 /* DisplaySection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E00DDEEE5BD92E6BA7A37535 /* DisplaySection.swift */; };
@@ -88,6 +89,7 @@
 		39E4C656FFEE54E2D359DFD6 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		3BD0F36BBF1F0EC4A7BF4C1D /* CoreUI */ = {isa = PBXFileReference; lastKnownFileType = folder; name = CoreUI; path = Packages/CoreUI; sourceTree = SOURCE_ROOT; };
 		3DAFDDF866DA9EAF02A85E40 /* AIDigestSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIDigestSection.swift; sourceTree = "<group>"; };
+		3E730EBD08CD7CED2B61F364 /* UsageCostFormatter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UsageCostFormatter.swift; sourceTree = "<group>"; };
 		3F6099A4448EEBE22D1F18A1 /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		47AD48321C5F8754904DC3A3 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		54C12EF4A0F03A94394B3443 /* SwiftData.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftData.framework; path = System/Library/Frameworks/SwiftData.framework; sourceTree = SDKROOT; };
@@ -185,6 +187,7 @@
 				D6B352999AF9493821D40901 /* Plan */,
 				E8362811379CFDBC4ABEE4A1 /* Settings */,
 				E2527C2881C4105CF0E7D819 /* Trips */,
+				8DFA5411C969F0E7381ADD1F /* Util */,
 			);
 			path = UI;
 			sourceTree = "<group>";
@@ -278,6 +281,14 @@
 				CAA05DCFB71BC190BABB2E56 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		8DFA5411C969F0E7381ADD1F /* Util */ = {
+			isa = PBXGroup;
+			children = (
+				3E730EBD08CD7CED2B61F364 /* UsageCostFormatter.swift */,
+			);
+			path = Util;
 			sourceTree = "<group>";
 		};
 		906E82DC3E5206E772840AE6 /* Components */ = {
@@ -524,6 +535,7 @@
 				488D648D249927D9FC127D94 /* TripDetailView.swift in Sources */,
 				F5358B51092E6DF7F0F23662 /* TripsView.swift in Sources */,
 				CD14EF3A45BD2BABB770F360 /* TripsViewModel.swift in Sources */,
+				7BC35B738D1007B33A03D183 /* UsageCostFormatter.swift in Sources */,
 				58FF896F28601DACFC7E543E /* VehicleLocationProvider.swift in Sources */,
 				29993D664074FA2464D98DB2 /* VehiclePickerSheet.swift in Sources */,
 			);

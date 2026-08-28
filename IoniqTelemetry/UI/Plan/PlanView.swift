@@ -516,7 +516,7 @@ private struct ItineraryTimeline: View {
                         .foregroundStyle(Color.appAccent)
                     Text("\(Int(plan.stops.reduce(0) { $0 + $1.energyAddedKwh })) kWh · \(plan.stops.count) stop(s)"
                         + (plan.totalChargingCost.map {
-                            " · ~\(currencySymbol(from: plan.stops.first?.charger.usageCost))\(String(format: "%.2f", $0)) charging"
+                            " · ~\(UsageCostFormatter.currencySymbol(of: plan.stops.first?.charger.usageCost))\(String(format: "%.2f", $0)) charging"
                         } ?? ""))
                         .font(.subheadline.weight(.medium))
                     Spacer()
@@ -550,14 +550,6 @@ private struct ItineraryTimeline: View {
         }
         .backgroundStyle(.ultraThinMaterial)
     }
-}
-
-/// The currency symbol implied by a raw OCM cost string ("£0.45/kWh" → "£").
-private func currencySymbol(from raw: String?) -> String {
-    guard let raw else { return "" }
-    let codes = [("USD", "$"), ("EUR", "€"), ("GBP", "£"), ("AUD", "$"), ("CAD", "$")]
-    for (code, symbol) in codes where raw.uppercased().contains(code) { return symbol }
-    return raw.first { "$€£¥".contains($0) }.map(String.init) ?? ""
 }
 
 private struct LegRow: View {
@@ -619,7 +611,7 @@ private struct StopCard: View {
                         Text(String(format: "%.0f kW", kw)).font(.caption.weight(.semibold))
                     }
                     if let price = stop.charger.pricePerKwh, price > 0 {
-                        Text(String(format: "$%.2f/kWh", price)).font(.caption).foregroundStyle(.secondary)
+                        Text(String(format: "%@%.2f/kWh", UsageCostFormatter.currencySymbol(of: stop.charger.usageCost), price)).font(.caption).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -1118,9 +1110,8 @@ private struct ChargerAlongRouteCard: View {
                             .font(.caption).foregroundStyle(Color.appAmber)
                     }
                 }
-                if ChargerPriceText(charger: rc.charger).isEmpty == false {
-                    Text(ChargerPriceText(charger: rc.charger))
-                        .font(.caption).foregroundStyle(.secondary)
+                if let price = ChargerPrice.label(for: rc.charger) {
+                    Text(price).font(.caption).foregroundStyle(.secondary)
                 }
             }
             Spacer()
@@ -1156,27 +1147,19 @@ private struct ChargerAlongRouteCard: View {
     }
 }
 
-/// Returns a formatted price string for a charger, or empty string if unavailable.
-private func ChargerPriceText(charger: Charger) -> String {
-    if let price = charger.pricePerKwh, price > 0 {
-        return String(format: "$%.2f/kWh", price)
-    }
-    if !(charger.usageCost ?? "").isEmpty {
-        return charger.usageCost!
-    }
-    return ""
-}
-
 // MARK: - Charger price label
 
 /// Tariff for a charger row.
 private enum ChargerPrice {
     static func label(for charger: Charger) -> String? {
-        if let price = charger.pricePerKwh {
-            return String(format: "$%.2f/kWh", price)
+        // Prefer the cleaned OCM string (correct currency, "Free", trimmed) —
+        // same source of truth as Android's badges.
+        if let formatted = UsageCostFormatter.formatUsageCost(charger.usageCost) {
+            return formatted
         }
-        guard let cost = charger.usageCost?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !cost.isEmpty else { return nil }
-        return cost
+        // Fallback for entries the cleaner rejects (e.g. "0.45/kWh" with no
+        // currency marker): symbol + parsed price, when a real price exists.
+        guard let price = charger.pricePerKwh, price > 0 else { return nil }
+        return String(format: "%@%.2f/kWh", UsageCostFormatter.currencySymbol(of: charger.usageCost), price)
     }
 }
