@@ -1,6 +1,9 @@
 import Combine
+import os
 import CoreDomain
 import Foundation
+private let log = Logger(subsystem: "com.fmz.ioniqtelemetry.data", category: "prefs")
+
 
 /// UserDefaults-backed implementation of PreferencesRepository.
 ///
@@ -165,7 +168,7 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(prefs.aiProvider.rawValue, forKey: "aiProvider")
         for (account, result) in keyWrites + aiWrites {
             if case .failure(let error) = result {
-                print("[PreferencesRepository] failed to persist key '\(account)': \(error)")
+                log.error("[PreferencesRepository] failed to persist key '\(account)': \(error)")
             }
         }
         defaults.set(prefs.aiFeaturesEnabled, forKey: "aiFeaturesEnabled")

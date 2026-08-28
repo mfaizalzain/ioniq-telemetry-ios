@@ -286,7 +286,7 @@ private struct AiSection: View {
                     } label: {
                         VStack(alignment: .leading, spacing: 1) {
                             Label("AI Features", systemImage: "rectangle.3.group")
-                            Text("Charging Intelligence, Battery Reports & AI AiAssistant")
+                            Text("Charging Intelligence, Battery Reports & AI Assistant")
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
@@ -307,10 +307,10 @@ private struct AiSection: View {
                 if keyMissing {
                     Text("Add a \(viewModel.preferences.aiProvider.label) API key to enable AI-powered features. Your own key means requests land on your free quota, not a shared pool. Your trip data, battery stats, and vehicle telemetry are sent to \(viewModel.preferences.aiProvider.label) to generate responses.")
                 } else {
-                    Text("AI features use your \(viewModel.preferences.aiProvider.label) API key. Battery Health Reports, Charging Insights, and the AI AiAssistant all draw from the same key. Your trip data and vehicle telemetry are sent to \(viewModel.preferences.aiProvider.label) to generate responses.")
+                    Text("AI features use your \(viewModel.preferences.aiProvider.label) API key. Battery Health Reports, Charging Insights, and the AI Assistant all draw from the same key. Your trip data and vehicle telemetry are sent to \(viewModel.preferences.aiProvider.label) to generate responses.")
                 }
             } else {
-                Text("Charging Intelligence, Battery Health Reports and the AI AiAssistant with vehicle context are Pro features that need an API key.")
+                Text("Charging Intelligence, Battery Health Reports and the AI Assistant with vehicle context are Pro features that need an API key.")
             }
         }
     }

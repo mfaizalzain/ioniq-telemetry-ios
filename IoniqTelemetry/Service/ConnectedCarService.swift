@@ -1,8 +1,11 @@
 import Combine
+import os
 import CoreData
 import CoreDomain
 import CoreRouting
 import Foundation
+private let log = Logger(subsystem: "com.fmz.ioniqtelemetry", category: "connectedcar")
+
 
 /// The always-on pipeline behind a drive.
 ///
@@ -156,7 +159,7 @@ final class ConnectedCarService {
             do {
                 try tripLog.finalizeOrphanedTrips()
             } catch {
-                print("[ConnectedCarService] finalizeOrphanedTrips failed: \(error.localizedDescription)")
+                log.error("[ConnectedCarService] finalizeOrphanedTrips failed: \(error.localizedDescription)")
             }
         }
 
@@ -310,7 +313,7 @@ final class ConnectedCarService {
                     try tripLog.flushPendingSamples()
                 }
             } catch {
-                print("[ConnectedCarService] finalizeActiveTrip failed: \(error.localizedDescription)")
+                log.error("[ConnectedCarService] finalizeActiveTrip failed: \(error.localizedDescription)")
             }
         }
     }
@@ -324,7 +327,7 @@ final class ConnectedCarService {
             do {
                 try tripLog.finalizeOrphanedTrips()
             } catch {
-                print("[ConnectedCarService] finalizeOrphanedTrips failed: \(error.localizedDescription)")
+                log.error("[ConnectedCarService] finalizeOrphanedTrips failed: \(error.localizedDescription)")
             }
         }
         finalizeStaleTripIfNeeded()
@@ -613,7 +616,7 @@ final class ConnectedCarService {
             do {
                 try services.tripLog.startTrip(telemetry: telemetry)
             } catch {
-                print("[ConnectedCarService] startTrip failed: \(error.localizedDescription)")
+                log.error("[ConnectedCarService] startTrip failed: \(error.localizedDescription)")
             }
         case .end:
             isTripActive = false
@@ -622,7 +625,7 @@ final class ConnectedCarService {
                     try await services.tripLog.endTrip(telemetry: telemetry)
                     await updateCalibration()
                 } catch {
-                    print("[ConnectedCarService] endTrip failed: \(error.localizedDescription)")
+                    log.error("[ConnectedCarService] endTrip failed: \(error.localizedDescription)")
                 }
             }
         }
@@ -671,7 +674,7 @@ final class ConnectedCarService {
                 inVehicle: inVehicle
             )
         } catch {
-            print("[ConnectedCarService] sample logging failed: \(error.localizedDescription)")
+            log.error("[ConnectedCarService] sample logging failed: \(error.localizedDescription)")
         }
     }
 

@@ -279,14 +279,6 @@ final class AiService {
         return minutes >= 60 ? "\(minutes / 60)h \(minutes % 60)m" : "\(minutes)m"
     }
 
-    private func avgSpeedString(from trip: TripEntity) -> String {
-        guard let end = trip.endTime else { return "—" }
-        let hours = end.timeIntervalSince(trip.startTime) / 3600
-        guard hours > 0 else { return "—" }
-        let speed = Double(trip.distanceKm) / hours
-        return String(format: "%.0f km/h", speed)
-    }
-
     private func avgSpeedValue(from trip: TripEntity) -> Float? {
         guard let end = trip.endTime else { return nil }
         let hours = end.timeIntervalSince(trip.startTime) / 3600
@@ -297,25 +289,6 @@ final class AiService {
     private func durationMinutes(from trip: TripEntity) -> Int? {
         guard let end = trip.endTime else { return nil }
         return Int(end.timeIntervalSince(trip.startTime) / 60)
-    }
-
-    /// Computes regen energy recovered from telemetry samples.
-    private func computeRegen(from samples: [SampleEntity]) -> (regenKwh: Double?, totalDraw: Double?) {
-        guard samples.count > 1 else { return (nil, nil) }
-        var regenEnergy = 0.0
-        var drawEnergy = 0.0
-        for i in 1 ..< samples.count {
-            guard let p1 = samples[i - 1].powerKw, let p2 = samples[i].powerKw else { continue }
-            let dt = samples[i].timestamp.timeIntervalSince(samples[i - 1].timestamp) / 3600.0
-            let avgPower = (Double(p1) + Double(p2)) / 2.0
-            let energy = avgPower * dt
-            if avgPower < 0 { // Discharge = negative power (driving)
-                drawEnergy += abs(energy)
-            } else if avgPower > 0 { // Regen = positive power
-                regenEnergy += energy
-            }
-        }
-        return (regenEnergy > 0 ? regenEnergy : nil, drawEnergy > 0 ? drawEnergy : nil)
     }
 
     // MARK: - Private

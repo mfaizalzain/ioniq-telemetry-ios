@@ -1,8 +1,11 @@
 import Combine
+import os
 import CoreData
 import CoreDomain
 import Foundation
 import StoreKit
+private let paywallLog = Logger(subsystem: "com.fmz.ioniqtelemetry", category: "paywall")
+
 
 /// StoreKit 2 purchase flow for Pro.
 ///
@@ -154,7 +157,7 @@ final class PaywallViewModel {
             }
         }
 
-        print("[Paywall] \(stage) failed for \(Self.productID) — \(detail)")
+        paywallLog.error("[Paywall] \(stage) failed for \(Self.productID) — \(detail)")
     }
 
     /// Recomputes Pro from what StoreKit currently considers active. `isPro` here

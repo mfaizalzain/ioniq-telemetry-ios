@@ -1,4 +1,5 @@
 import Combine
+import os
 import CoreData
 import CoreDomain
 import CoreOBD
@@ -7,6 +8,8 @@ import Foundation
 import SwiftData
 import BackgroundTasks
 import UserNotifications
+private let log = Logger(subsystem: "com.fmz.ioniqtelemetry", category: "appservices")
+
 
 /// Composition root. Owns every repository and the OBD stack, and joins the OBD
 /// telemetry stream to the shared telemetry repository and the trip log.
@@ -131,7 +134,7 @@ final class AppServices {
         do {
             try tripLog.purge(isPro: entitled)
         } catch {
-            print("[AppServices] trip purge failed: \(error.localizedDescription)")
+            log.error("[AppServices] trip purge failed: \(error.localizedDescription)")
         }
 
         await autoConnectLastAdapter()
@@ -300,7 +303,7 @@ final class AppServices {
         do {
             try BGTaskScheduler.shared.submit(request)
         } catch {
-            print("[AutoBackup] failed to schedule: \(error.localizedDescription)")
+            log.error("[AutoBackup] failed to schedule: \(error.localizedDescription)")
         }
     }
 
@@ -319,7 +322,7 @@ final class AppServices {
             }
             task.setTaskCompleted(success: true)
         } catch {
-            print("[AutoBackup] export failed: \(error.localizedDescription)")
+            log.error("[AutoBackup] export failed: \(error.localizedDescription)")
             task.setTaskCompleted(success: false)
         }
         // Schedule the next run regardless of success or failure — a transient

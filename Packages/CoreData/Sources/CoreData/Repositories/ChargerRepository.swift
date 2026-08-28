@@ -1,8 +1,11 @@
 import Combine
+import os
 import CoreDomain
 import Foundation
 import MapKit
 import SwiftData
+private let log = Logger(subsystem: "com.fmz.ioniqtelemetry.data", category: "chargers")
+
 
 /// Repository for charger data — Open Charge Map or Google Places fetch, plus a
 /// local cache with a 7-day TTL shared by both.
@@ -751,7 +754,7 @@ public enum ChargerError: LocalizedError {
                 inserted += 1
             }
         }
-        print("[ChargerRepo] Apple Maps: \(inserted) chargers found near \(centers.count) centre(s)")
+        log.info("[ChargerRepo] Apple Maps: \(inserted) chargers found near \(centers.count) centre(s)")
         try modelContext.save()
     }
 
@@ -796,7 +799,7 @@ public enum ChargerError: LocalizedError {
             modelContext.delete(entity)
         }
         if !toDelete.isEmpty {
-            print("[ChargerRepo] Dedup: removed \(toDelete.count) Apple Maps chargers near OCM entries")
+            log.info("[ChargerRepo] Dedup: removed \(toDelete.count) Apple Maps chargers near OCM entries")
         }
         try modelContext.save()
     }

@@ -1,5 +1,8 @@
 import ActivityKit
+import os
 import Foundation
+private let log = Logger(subsystem: "com.fmz.ioniqtelemetry", category: "liveactivity")
+
 
 /// Live Activity content: SOC, range, charging state — glanceable on the lock
 /// screen / Dynamic Island while a drive or charge is in progress (feature
@@ -28,7 +31,7 @@ enum TelemetryLiveActivity {
         do {
             active = try Activity.request(attributes: attributes, contentState: state, pushType: nil)
         } catch {
-            print("[LiveActivity] start failed: \(error.localizedDescription)")
+            log.error("[LiveActivity] start failed: \(error.localizedDescription)")
         }
     }
 
