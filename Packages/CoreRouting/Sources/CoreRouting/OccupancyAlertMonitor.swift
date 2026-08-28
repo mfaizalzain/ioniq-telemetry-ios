@@ -81,9 +81,12 @@ public final class OccupancyAlertMonitor {
         guard let position, routePoints.count >= 2 else { return nil }
         guard speedKph >= minSpeedKph else { return nil }  // need motion for an ETA
 
+        // The plan's headline distance includes each stop's round-trip detour, but the
+        // driver's progress is measured on the base route — project against the
+        // polyline's own length so alongKm stays comparable to stop distances.
         let (alongKm, _) = RouteGeo.projectOntoRoute(
             points: routePoints, lat: position.lat, lon: position.lon,
-            totalKm: plan.totalDistanceKm
+            totalKm: Float(RouteGeo.polylineLengthKm(points: routePoints))
         )
         guard let nextStop = plan.stops.first(where: { $0.distanceFromOriginKm > alongKm + 0.1 }) else {
             return nil

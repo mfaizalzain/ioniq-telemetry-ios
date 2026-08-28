@@ -18,6 +18,23 @@ public enum RouteGeo {
         return r * 2 * atan2(sqrt(a), sqrt(1 - a))
     }
 
+    /// Total length of the polyline in kilometres: haversine sum of consecutive
+    /// segments. Zero for fewer than two points. This is the geometric length of the
+    /// (simplified) route, which sits slightly below the provider's road distance —
+    /// but it is the only length a caller has when the provider figure isn't, and it
+    /// keeps projections on a scale comparable to the route's own geometry.
+    public static func polylineLengthKm(points: [LatLon]) -> Double {
+        guard points.count >= 2 else { return 0 }
+        var total = 0.0
+        for i in 1..<points.count {
+            total += haversineKm(
+                lat1: points[i - 1].lat, lon1: points[i - 1].lon,
+                lat2: points[i].lat, lon2: points[i].lon
+            )
+        }
+        return total
+    }
+
     /// Index of the polyline vertex closest to `position`.
     public static func nearestIndex(position: LatLon, points: [LatLon]) -> Int {
         var bestIdx = 0
@@ -96,8 +113,9 @@ public final class RouteReplanner: Sendable {
         let remaining = Array(routePoints[nearestIdx...])
         if remaining.count < 2 { return nil }
 
-        let alongKm = plan.totalDistanceKm * Float(nearestIdx) / Float(max(routePoints.count - 1, 1))
-        let remainingKm = max(plan.totalDistanceKm - alongKm, 0)
+        // The plan's headline distance includes each stop's round-trip detour, but what
+        // lies ahead of the car is the polyline suffix itself — measure it directly.
+        let remainingKm = Float(RouteGeo.polylineLengthKm(points: remaining))
 
         let routeChargers: [RouteCharger] = candidateChargers
             .filter { $0.id != occupiedChargerId }

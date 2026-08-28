@@ -378,9 +378,10 @@ public final class TripSolver: Sendable {
             stops: stops,
             userWaypoints: userWaypoints,
             // The legs lie along the base route, but the driver actually covers each
-            // stop's detour; the SOC math already charges that energy, so the headline
-            // distance must agree.
-            totalDistanceKm: totalRouteKm + stops.map(\.detourKm).reduce(0, +),
+            // stop's detour twice — out to the charger and back onto the route. The SOC
+            // math already charges that round trip (see the 2× in the expansion), so the
+            // headline distance must agree with it.
+            totalDistanceKm: totalRouteKm + 2 * stops.map(\.detourKm).reduce(0, +),
             totalDriveMinutes: legs.map(\.driveMinutes).reduce(0, +),
             totalChargeMinutes: stops.map(\.chargeMinutes).reduce(0, +),
             arrivalSoc: arrivalSoc,

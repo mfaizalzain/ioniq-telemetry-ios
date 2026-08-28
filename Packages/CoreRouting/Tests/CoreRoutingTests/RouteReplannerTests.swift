@@ -91,12 +91,37 @@ struct RouteReplannerTests {
         #expect(rerouted.remainingRoute.first?.lat == 0.5)
     }
 
-    @Test("no alternative when the only candidate is the occupied stop")
+    /// The only candidate is the occupied stop, so the re-solve has no chargers to
+    /// work with. On a healthy charge that still leaves the destination directly
+    /// reachable — the correct reroute is a stop-free plan, not nil. (Nil is the
+    /// "nothing ahead is reachable" case, covered by the nearly-flat test below.)
+    @Test("falls back to a stop-free run when the only candidate is occupied")
     func noAlternativeAvailable() {
         let busy = charger("busy", lat: 0.5)
         let result = RouteReplanner().reroute(
             currentPosition: LatLon(lat: 0.1, lon: 0),
             liveSocPercent: 60,
+            plan: plan(stopCharger: busy),
+            routePoints: routePoints,
+            candidateChargers: [busy],
+            occupiedChargerId: "busy",
+            paramsTemplate: params
+        )
+        // Remaining polyline is ~100 km and the pack covers it, so the reroute
+        // succeeds with no charging stop instead of failing outright.
+        let rerouted = try? #require(result, "a stop-free reroute is still a route")
+        #expect(rerouted?.plan.stops.isEmpty == true)
+        #expect(rerouted?.remainingRoute.first?.lat == 0.1)
+    }
+
+    /// Mid charge, no candidates at all, and the destination out of reach on the
+    /// pack alone: there is genuinely nothing to route through, so nil.
+    @Test("nil when the only candidate is occupied and the destination is out of reach")
+    func noAlternativeAndDestinationUnreachable() {
+        let busy = charger("busy", lat: 0.5)
+        let result = RouteReplanner().reroute(
+            currentPosition: LatLon(lat: 0.1, lon: 0),
+            liveSocPercent: 30,
             plan: plan(stopCharger: busy),
             routePoints: routePoints,
             candidateChargers: [busy],

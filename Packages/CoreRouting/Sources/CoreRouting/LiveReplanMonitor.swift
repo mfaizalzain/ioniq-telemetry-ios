@@ -68,11 +68,14 @@ public final class LiveReplanMonitor {
         var predictedSoc: Float?
 
         if let position, routePoints.count >= 2 {
+            // The plan's headline distance includes each stop's round-trip detour, but
+            // the legs (and their SOC profile) are on the base-route scale — project
+            // against the polyline's own length so alongKm and predictedSoc agree.
             let (alongKm, detourKm) = RouteGeo.projectOntoRoute(
                 points: routePoints,
                 lat: position.lat,
                 lon: position.lon,
-                totalKm: plan.totalDistanceKm
+                totalKm: Float(RouteGeo.polylineLengthKm(points: routePoints))
             )
             travelledKm = Double(alongKm)
             offRouteKm = detourKm
