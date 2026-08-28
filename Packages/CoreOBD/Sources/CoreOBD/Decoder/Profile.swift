@@ -102,20 +102,72 @@ public enum ProfileParser {
         guard let data = json.data(using: .utf8) else {
             throw ProfileError.invalidJSON
         }
-        let decoder = JSONDecoder()
-        do {
-            return try decoder.decode(DecoderProfile.self, from: data)
-        } catch {
-            throw ProfileError.decodingFailed(error)
-        }
+        return try parse(data: data)
     }
 
     public static func parse(data: Data) throws -> DecoderProfile {
         let decoder = JSONDecoder()
+        let profile: DecoderProfile
         do {
-            return try decoder.decode(DecoderProfile.self, from: data)
+            profile = try decoder.decode(DecoderProfile.self, from: data)
         } catch {
             throw ProfileError.decodingFailed(error)
+        }
+        try validate(profile)
+        return profile
+    }
+
+    /// Fail a malformed profile at parse time instead of at every decode.
+    ///
+    /// Without this, a single bad entry surfaces far from its cause: a formula
+    /// NSExpression can't parse makes `DecoderEngine.evaluateFormula` throw an
+    /// Objective-C exception (a crash, not a Swift error) for every decode of
+    /// that signal, and a formula referencing more bytes than `length` declares
+    /// reads past the declared window (L1–L3 of the 2026-08 review). All five
+    /// bundled profiles pass this today; it exists to catch future typos.
+    static func validate(_ profile: DecoderProfile) throws {
+        guard !profile.profileId.isEmpty else {
+            throw ProfileError.invalidProfile("profileId is empty")
+        }
+        guard profile.usableCapacityKwh > 0, profile.usableCapacityKwh < 250 else {
+            throw ProfileError.invalidProfile(
+                "usableCapacityKwh out of range: \(profile.usableCapacityKwh)")
+        }
+        guard !profile.requests.isEmpty else {
+            throw ProfileError.invalidProfile("profile has no requests")
+        }
+        for request in profile.requests {
+            guard !request.signals.isEmpty else {
+                throw ProfileError.invalidProfile("request \(request.id) has no signals")
+            }
+            for signal in request.signals {
+                try validateSignal(signal, requestId: request.id)
+            }
+        }
+    }
+
+    private static func validateSignal(_ signal: SignalDef, requestId: String) throws {
+        let where_ = "request \(requestId), signal \(signal.id)"
+        // UDS responses run tens of bytes (the E-GMP BMS module answers with 60+);
+        // 255 is a generous sanity ceiling, not a protocol limit. Decode-time reads
+        // are bounded by the actual payload length regardless.
+        guard signal.length >= 1, signal.length <= 8, signal.startByte >= 0,
+              signal.startByte + signal.length <= 255 else {
+            throw ProfileError.invalidProfile(
+                "\(where_): bad startByte/length (\(signal.startByte)+\(signal.length))")
+        }
+        guard signal.min == nil || signal.max == nil || signal.min! <= signal.max! else {
+            throw ProfileError.invalidProfile("\(where_): min > max")
+        }
+        // The formula must reference only bytes inside the declared window, and
+        // NSExpression must be able to parse it once the byte placeholders are
+        // substituted — both checked here, with synthetic bytes standing in for
+        // real ones.
+        let byteCount = signal.startByte + signal.length
+        let bytes = [UInt8](repeating: 0x01, count: byteCount)
+        guard DecoderEngine.staticSelfTest(payload: Data(bytes), signal: signal) != nil else {
+            throw ProfileError.invalidProfile(
+                "\(where_): formula '\(signal.formula)' failed self-test")
         }
     }
 }
@@ -123,11 +175,13 @@ public enum ProfileParser {
 public enum ProfileError: LocalizedError {
     case invalidJSON
     case decodingFailed(any Error)
+    case invalidProfile(String)
 
     public var errorDescription: String? {
         switch self {
         case .invalidJSON: return "Profile is not valid JSON."
         case .decodingFailed(let underlying): return String(describing: underlying)
+        case .invalidProfile(let reason): return "Profile is structurally invalid: \(reason)"
         }
     }
 }
