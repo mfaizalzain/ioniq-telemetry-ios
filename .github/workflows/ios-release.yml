@@ -159,9 +159,30 @@ jobs:
           IPA_PATH="$(find "$RUNNER_TEMP/export" -maxdepth 2 -name '*.ipa' | head -1)"
           test -n "$IPA_PATH" || { echo "ERROR: no .ipa found in $RUNNER_TEMP/export"; exit 1; }
           echo "Uploading: $IPA_PATH"
+          # altool exits 0 even when Apple REJECTS the upload, so a 409 like
+          # "CFBundleShortVersionString must contain a higher version than that of the
+          # previously approved version" shows up as a green run with nothing in
+          # TestFlight. Require the success line before passing.
+          set +e
           xcrun altool --upload-app \
             -f "$IPA_PATH" \
             -t ios \
             -u "$APPLE_ID" \
             -p "$APP_SPECIFIC_PASSWORD" \
-            --verbose
+            --verbose 2>&1 | tee "$RUNNER_TEMP/altool.log"
+          ALTOOL_STATUS=${PIPESTATUS[0]}
+          set -e
+
+          if grep -qiE "Validation failed|ERROR ITMS|This bundle is invalid|Invalid Signature" "$RUNNER_TEMP/altool.log"; then
+            echo "::error::App Store Connect rejected the upload — see the altool output above."
+            exit 1
+          fi
+          if [ "$ALTOOL_STATUS" -ne 0 ]; then
+            echo "::error::altool exited $ALTOOL_STATUS"
+            exit 1
+          fi
+          if ! grep -qiE "No errors uploading|UPLOAD SUCCEEDED" "$RUNNER_TEMP/altool.log"; then
+            echo "::error::altool did not report a successful upload."
+            exit 1
+          fi
+          echo "Uploaded to TestFlight."'
