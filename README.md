@@ -159,7 +159,7 @@ scroll. The scene reads `AppServices.shared`, so phone and car show one adapter
 connection's data.
 
 ### AI features (Pro, bring your own key)
-Gemini (`gemini-flash-lite-latest`) or DeepSeek, selected in Settings, with the user's
+Gemini (`gemini-3.5-flash-lite`) or DeepSeek, selected in Settings, with the user's
 own key. A master toggle stops all data leaving the device while keeping the key.
 - Post-trip briefing, weekly/monthly digest, charging intelligence, battery health
   report, and a context-aware assistant chat.

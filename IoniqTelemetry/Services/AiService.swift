@@ -11,9 +11,19 @@ import Foundation
 final class AiService {
 
     private let session: URLSession
-    private let baseURLGemini = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent"
-    private let baseURLDeepSeek = "https://api.deepseek.com/v1/chat/completions"
-    private let deepseekModel = "deepseek-v4-flash"
+    /// Gemini candidates, newest first. `gemini-3.5-flash-lite` is the Flash-Lite model
+    /// Google's model page tells new projects to use; `gemini-3.1-flash-lite` is the
+    /// older 3.x stable (end-of-life 2027-05-07) kept only as a 404 fallback. Both are
+    /// Gemini 3+, which callGemini requires because it pins
+    /// `thinkingConfig.thinkingLevel` (that field errors on Gemini 2.x and older).
+    private let geminiModels = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
+    /// DeepSeek Responses API - the transport Android already uses. Reasoning and the
+    /// answer come back as separate output items, so chain-of-thought can never crowd
+    /// out the text the way chat-completions `max_tokens` allows.
+    private let deepSeekURL = "https://api.deepseek.com/v1/responses"
+    /// Current DeepSeek model id. `deepseek-v4-flash` still resolves, but the V4 model it
+    /// named was retired (requests are served by V4.1-Flash at Flash pricing).
+    private let deepseekModel = "deepseek-flash"
 
     init() {
         let config = URLSessionConfiguration.ephemeral
@@ -317,12 +327,25 @@ final class AiService {
         }
     }
 
-    /// Calls the Gemini API (Google AI Studio).
+    /// Calls the Gemini API (Google AI Studio), stepping to the next candidate model when
+    /// the current one has been retired (HTTP 404 from the model path).
     private func callGemini(prompt: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: baseURLGemini) else {
-            throw AiError.invalidURL
+        var lastError: Error = AiError.invalidURL
+        for model in geminiModels {
+            guard let url = URL(string:
+                "https://generativelanguage.googleapis.com/v1beta/models/\(model):generateContent"
+            ) else { continue }
+            do {
+                return try await performGemini(url: url, prompt: prompt, apiKey: apiKey)
+            } catch AiError.apiError(let code, _) where code == 404 {
+                lastError = AiError.apiError(code, "Model \(model) unavailable")
+                continue
+            }
         }
+        throw lastError
+    }
 
+    private func performGemini(url: URL, prompt: String, apiKey: String) async throws -> String {
         let body: [String: Any] = [
             "contents": [
                 ["parts": [["text": prompt]]]
@@ -331,15 +354,22 @@ final class AiService {
                 "temperature": 0.3,
                 "maxOutputTokens": 1024,
                 "topP": 0.95,
-                "topK": 40
+                "topK": 40,
+                // Gemini 3 models think by default (flash-lite defaults to MINIMAL) and
+                // thought tokens are billed against maxOutputTokens, so an unpinned
+                // budget can be spent entirely on reasoning and the candidate comes back
+                // with no text part.
+                "thinkingConfig": [
+                    "thinkingLevel": "MINIMAL",
+                    "includeThoughts": false
+                ]
             ]
         ]
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         // The key goes in the x-goog-api-key header, never the URL query string:
-        // a query-embedded key leaks into proxy/referrer logs. The Places/ORS/
-        // DeepSeek calls already use headers.
+        // a query-embedded key leaks into proxy/referrer logs.
         request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -351,7 +381,7 @@ final class AiService {
         }
 
         guard httpResponse.statusCode == 200 else {
-            let body = String(data: data, encoding: .utf8) ?? "—"
+            let body = String(data: data, encoding: .utf8) ?? "-"
             throw AiError.apiError(httpResponse.statusCode, body)
         }
 
@@ -367,28 +397,35 @@ final class AiService {
         return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// Calls the DeepSeek API (OpenAI-compatible format).
+    /// Calls the DeepSeek Responses API (`POST /responses`).
     /// - Parameters:
     ///   - systemPrompt: Optional system message. When nil the prompt is sent as a user message.
     ///   - userMessage: The user's message content.
     ///   - apiKey: DeepSeek API key.
     /// - Returns: The model's response text.
     private func callDeepSeek(systemPrompt: String?, userMessage: String, apiKey: String) async throws -> String {
-        guard let url = URL(string: baseURLDeepSeek) else {
+        guard let url = URL(string: deepSeekURL) else {
             throw AiError.invalidURL
         }
 
-        var messages: [[String: Any]] = []
+        var input: [[String: Any]] = []
         if let systemPrompt, !systemPrompt.isEmpty {
-            messages.append(["role": "system", "content": systemPrompt])
+            // Responses API accepts role "system" on message items.
+            input.append(["role": "system", "content": systemPrompt])
         }
-        messages.append(["role": "user", "content": userMessage])
+        input.append(["role": "user", "content": userMessage])
 
         let body: [String: Any] = [
-            "model": "\(deepseekModel)",
-            "messages": messages,
-            "max_tokens": 4096,
-            "temperature": 0.3
+            "model": deepseekModel,
+            "input": input,
+            "max_output_tokens": 4096,
+            "temperature": 0.3,
+            "store": false,
+            // Thinking is enabled by default at effort "high" and its tokens count
+            // against max_output_tokens - a short analysis prompt could otherwise spend
+            // the whole budget on reasoning and return no message item. "none" keeps the
+            // answer inside the cap and makes temperature effective (thinking ignores it).
+            "reasoning": ["effort": "none"]
         ]
 
         var request = URLRequest(url: url)
@@ -404,20 +441,33 @@ final class AiService {
         }
 
         guard httpResponse.statusCode == 200 else {
-            let body = String(data: data, encoding: .utf8) ?? "—"
+            let body = String(data: data, encoding: .utf8) ?? "-"
             throw AiError.apiError(httpResponse.statusCode, body)
         }
 
-        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-              let choices = json["choices"] as? [[String: Any]],
-              let first = choices.first,
-              let message = first["message"] as? [String: Any],
-              let text = message["content"] as? String else {
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AiError.decodingError
         }
 
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
+        // DeepSeek returns the top-level `output_text` convenience field as an EMPTY
+        // string (verified against the live API 2026-10-27), so the real answer has to be
+        // read out of the output items: the message item's first text part. Reasoning
+        // items carry `reasoning_text` instead, so they never match.
+        var text = (json["output_text"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if text?.isEmpty ?? true {
+            text = nil
+            if let output = json["output"] as? [[String: Any]] {
+                for item in output where (item["type"] as? String) == "message" {
+                    if let parts = item["content"] as? [[String: Any]],
+                       let candidate = parts.first(where: { ($0["text"] as? String)?.isEmpty == false })?["text"] as? String {
+                        text = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+                        break
+                    }
+                }
+            }
+        }
+
+        guard let trimmed = text, !trimmed.isEmpty else {
             throw AiError.decodingError
         }
 
