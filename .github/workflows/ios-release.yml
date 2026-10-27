@@ -185,4 +185,4 @@ jobs:
             echo "::error::altool did not report a successful upload."
             exit 1
           fi
-          echo "Uploaded to TestFlight."'
+          echo "Uploaded to TestFlight."
