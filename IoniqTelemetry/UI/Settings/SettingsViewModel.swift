@@ -37,6 +37,22 @@ final class SettingsViewModel {
 
     var savedAdapterName: String? { preferences.lastObdDeviceName }
 
+    /// Mirrors the persisted switch; on by default.
+    var autoConnectEnabled: Bool { preferences.autoConnectEnabled }
+
+    /// Only a BLE adapter can be woken by iOS. Hiding the switch for WiFi adapters
+    /// is honest: there is nothing to arm.
+    var canArmAutoConnect: Bool { services.savedAdapterSupportsWakeUp }
+
+    /// "Last seen" is what makes a stale saved adapter visible instead of an
+    /// auto-connect that silently never fires.
+    var lastAdapterSeenText: String? {
+        guard let seen = preferences.lastObdDeviceSeenAt else { return nil }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter.localizedString(for: seen, relativeTo: Date())
+    }
+
     private let services: AppServices
     private var cancellables = Set<AnyCancellable>()
 
@@ -132,6 +148,12 @@ final class SettingsViewModel {
     }
 
     func disconnect() async { await services.disconnect() }
+
+    /// Persists the switch and (un)arms the parked connection right away, so a change
+    /// takes effect without waiting for the next launch.
+    func setAutoConnect(_ enabled: Bool) async {
+        await services.setAutoConnectEnabled(enabled)
+    }
 
     func forgetAdapter() async { await services.forgetAdapter() }
 

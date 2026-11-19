@@ -13,6 +13,16 @@ struct IoniqTelemetryApp: App {
 
     @Environment(\.scenePhase) private var scenePhase
 
+    init() {
+        // Auto-connect can relaunch this app in the background to hand back a
+        // restored adapter link, and a background relaunch is not guaranteed to
+        // present a scene — so the `.task` below may never run. `initialize()` is
+        // idempotent, so starting it here as well covers both paths, and the trip
+        // pipeline (`connectedCar.start()`) exists in either case.
+        let services = AppServices.shared
+        Task { await services.initialize() }
+    }
+
     var body: some Scene {
         WindowGroup {
             AppRootView()

@@ -1,4 +1,5 @@
 import Combine
+import CoreBluetooth
 import os
 import CoreData
 import CoreDomain
@@ -45,6 +46,12 @@ final class AppServices {
     let obdManager: ObdManager
     let bleScanner = BleScanner()
 
+    /// Owns the app's single `CBCentralManager` for the whole process, arm the
+    /// unattended connect and receives the link iOS restores after it terminates
+    /// us. Created at launch because state restoration only works for a manager
+    /// that exists before iOS calls `willRestoreState`.
+    let blePresence: BlePresenceHost
+
     /// Raw decoder output, before correction. `ConnectedCarService` is the only
     /// subscriber: it fixes regen-vs-charging and speed, then publishes the result
     /// to `telemetry`, which is what every other surface reads.
@@ -69,6 +76,10 @@ final class AppServices {
     // MARK: - Init
 
     init(modelContext: ModelContext = AppDatabase.shared.container.mainContext) {
+        // Built first: the OBD factory below captures it, and every BLE session has
+        // to reuse this one central manager rather than create its own.
+        let presence = BlePresenceHost()
+        blePresence = presence
         preferences = PreferencesRepositoryImpl()
         entitlement = EntitlementRepositoryImpl()
         telemetry = TelemetryRepositoryImpl()
@@ -100,7 +111,7 @@ final class AppServices {
                 // A UUID is a CoreBluetooth peripheral identifier; anything else
                 // (host, or host:port) is a WiFi ELM327 adapter.
                 if UUID(uuidString: address) != nil {
-                    return BleTransport() as any ObdTransport
+                    return BleTransport(host: presence) as any ObdTransport
                 }
                 return WifiTransport() as any ObdTransport
             },
@@ -108,6 +119,16 @@ final class AppServices {
         )
 
         connectedCar = ConnectedCarService(services: self)
+
+        // Wired here, after `self` is fully formed: the host is created before the
+        // repositories, and its handlers need `self`.
+        blePresence.setLinkHandler { [weak self] link in
+            // Delivered on the BLE queue; every consumer of this link is main-actor.
+            Task { @MainActor in await self?.adoptRestoredLink(link) }
+        }
+        blePresence.setStateHandler { state in
+            log.info("[AutoConnect] central state \(String(describing: state))")
+        }
     }
 
     // MARK: - Startup
@@ -138,6 +159,11 @@ final class AppServices {
         }
 
         await autoConnectLastAdapter()
+        // The car is usually asleep at launch, so the attempt above normally fails.
+        // Hand the request to Core Bluetooth before returning: it is held for as
+        // long as it takes, survives suspension, and iOS relaunches us in the
+        // background to complete it if we get terminated first.
+        armAutoConnect()
 
         Self.migrateLegacyAutoBackups()
         registerAutoBackupTask()
@@ -236,15 +262,25 @@ final class AppServices {
     func connect(to device: ObdDevice) async -> Result<Void, Error> {
         bleScanner.stop()
         autoReconnectSuppressed = false
+        // The link is being opened by hand, so a request the host is still holding
+        // for the same or another adapter must not race this one.
+        blePresence.disarm()
+
         let result = await obdManager.connect(device: device)
-        if case .success = result {
+        switch result {
+        case .success:
             await preferences.update { prefs in
                 var next = prefs
                 next.lastObdDeviceAddress = device.address
                 next.lastObdDeviceName = device.name
                 next.lastObdTransportType = device.type.rawValue
+                next.lastObdDeviceSeenAt = Date()
                 return next
             }
+        case .failure:
+            // The adapter was not reachable (car switched off, most likely), so
+            // park a request instead of leaving the next drive to chance.
+            armAutoConnect()
         }
         return result
     }
@@ -252,19 +288,101 @@ final class AppServices {
     /// - Parameter userInitiated: true for the Settings button, false when
     ///   `ConnectedCarService` is tearing down a dead session to rebuild it.
     func disconnect(userInitiated: Bool = true) async {
-        if userInitiated { autoReconnectSuppressed = true }
+        if userInitiated {
+            autoReconnectSuppressed = true
+            // Someone who taps Disconnect wants to stay disconnected: drop the
+            // request the host is holding too, or the adapter comes back on its own.
+            blePresence.disarm()
+        }
         await obdManager.disconnect()
     }
 
     /// Clears the saved adapter so the app stops auto-reconnecting to it.
     func forgetAdapter() async {
+        blePresence.disarm()
         await disconnect()
         await preferences.update { prefs in
             var next = prefs
             next.lastObdDeviceAddress = nil
             next.lastObdDeviceName = nil
             next.lastObdTransportType = nil
+            next.lastObdDeviceSeenAt = nil
             return next
+        }
+    }
+
+    // MARK: - Auto-connect
+
+    /// The user-facing switch. On by default (it is what the app already did at
+    /// launch) and off only when somebody turns it off.
+    var autoConnectEnabled: Bool { userPreferences.autoConnectEnabled }
+
+    /// True while Core Bluetooth is holding an untimed connect for the saved
+    /// adapter on our behalf. The supervisor stands down while this is true: the
+    /// request is already parked with iOS, and re-scanning every few seconds would
+    /// burn the phone's battery for a result we will be woken for anyway.
+    var isHoldingAutoConnectRequest: Bool { blePresence.armed != nil }
+
+    /// True when the saved adapter is a BLE peripheral — the only kind iOS can be
+    /// asked to wake us for. A WiFi ELM327 is reachable only while the app runs.
+    var savedAdapterSupportsWakeUp: Bool {
+        AutoConnectTarget.supportsWakeUp(userPreferences.lastObdDeviceAddress)
+    }
+
+    /// Parks an untimed connect for the saved adapter, so iOS completes it and wakes
+    /// the app the moment the car powers the dongle up — even if this process is
+    /// gone by then.
+    @discardableResult
+    func armAutoConnect() -> Bool {
+        guard userPreferences.autoConnectEnabled,
+              !autoReconnectSuppressed,
+              let identifier = AutoConnectTarget.peripheralIdentifier(
+                  forSavedAddress: userPreferences.lastObdDeviceAddress
+              )
+        else { return false }
+        return blePresence.arm(identifier: identifier)
+    }
+
+    /// Turns unattended auto-connect on or off. Off unarms immediately; on parks a
+    /// request now rather than waiting for the next launch.
+    func setAutoConnectEnabled(_ enabled: Bool) async {
+        await preferences.update { prefs in
+            var next = prefs
+            next.autoConnectEnabled = enabled
+            return next
+        }
+        if enabled {
+            armAutoConnect()
+        } else {
+            blePresence.disarm()
+        }
+    }
+
+    /// Builds a session around a link iOS handed back: either a parked request that
+    /// completed while the app was suspended, or a restored link from a background
+    /// relaunch after the app had been terminated.
+    private func adoptRestoredLink(_ link: BlePresenceHost.AdapterLink) async {
+        guard userPreferences.autoConnectEnabled, !autoReconnectSuppressed else {
+            log.info("[AutoConnect] link offered while disabled — ignoring")
+            blePresence.disarm()
+            return
+        }
+        // Only an idle session can adopt: a link offered while a connect is in
+        // flight (or a session is live) is either a duplicate of it or a race, and
+        // tearing the working one down to adopt it would lose frames.
+        switch obdManager.connectionState {
+        case .disconnected, .error:
+            break
+        default:
+            return
+        }
+
+        log.info("[AutoConnect] adopting link \(link.identifier.uuidString, privacy: .public)")
+        if case .failure(let error) = await obdManager.adoptRestoredLink(link) {
+            log.error("[AutoConnect] adopt failed: \(error.localizedDescription)")
+            // Nothing is driving that link now, so park a fresh request rather than
+            // leaving the next drive to the reconnect loop.
+            armAutoConnect()
         }
     }
 

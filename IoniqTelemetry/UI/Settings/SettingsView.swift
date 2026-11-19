@@ -156,7 +156,7 @@ private struct AdapterSection: View {
     @Binding var showAdapterPicker: Bool
 
     var body: some View {
-        Section("OBD Adapter") {
+        Section {
             LabeledContent {
                 ConnectionBadge(state: ConnectionState(viewModel.connectionState))
             } label: {
@@ -185,6 +185,23 @@ private struct AdapterSection: View {
                 }
             }
 
+            // Offered only once an adapter is saved and it is a BLE one: the feature
+            // is "wake up for this adapter", and iOS cannot wake anything for a WiFi
+            // adapter.
+            if viewModel.savedAdapterName != nil, viewModel.canArmAutoConnect {
+                Toggle(isOn: Binding(
+                    get: { viewModel.autoConnectEnabled },
+                    set: { enabled in Task { await viewModel.setAutoConnect(enabled) } }
+                )) {
+                    Label("Auto-connect", systemImage: "bolt.horizontal.circle")
+                }
+                if let seen = viewModel.lastAdapterSeenText {
+                    Text("Last connected \(seen)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             if viewModel.savedAdapterName != nil {
                 Button("Forget Adapter", role: .destructive) {
                     Task { await viewModel.forgetAdapter() }
@@ -195,6 +212,19 @@ private struct AdapterSection: View {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(Color.appRed)
+            }
+        } header: {
+            Text("OBD Adapter")
+        } footer: {
+            // The two limits worth stating, because both look like a bug from the
+            // driver's seat: iOS will not relaunch a force-quit app, and a WiFi
+            // adapter has no wake-up path at all.
+            if viewModel.savedAdapterName != nil {
+                if viewModel.canArmAutoConnect {
+                    Text("Auto-connect opens a session when \(viewModel.savedAdapterName ?? "the adapter") is in range, so drives are logged without opening the app. It stops working if you force-quit the app — iOS will not relaunch it.")
+                } else {
+                    Text("WiFi adapters cannot be woken automatically — open the app and reconnect to start a session.")
+                }
             }
         }
     }

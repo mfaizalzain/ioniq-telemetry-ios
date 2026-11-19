@@ -89,6 +89,12 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         prefs.lastObdDeviceAddress = defaults.string(forKey: "lastObdDeviceAddress")
         prefs.lastObdDeviceName = defaults.string(forKey: "lastObdDeviceName")
         prefs.lastObdTransportType = defaults.string(forKey: "lastObdTransportType")
+        // Default true: auto-connect at launch is what shipped, so an upgrade must
+        // not silently change behaviour for users who never touch Settings.
+        prefs.autoConnectEnabled = defaults.bool(forKey: "autoConnectEnabled", default: true)
+        if let seen = defaults.object(forKey: "lastObdDeviceSeenAt") as? TimeInterval {
+            prefs.lastObdDeviceSeenAt = Date(timeIntervalSince1970: seen)
+        }
 
         if let raw = defaults.string(forKey: "themeMode"),
            let val = ThemeMode(rawValue: raw) { prefs.themeMode = val }
@@ -149,6 +155,12 @@ public final class PreferencesRepositoryImpl: PreferencesRepository, @unchecked 
         defaults.set(prefs.lastObdDeviceAddress, forKey: "lastObdDeviceAddress")
         defaults.set(prefs.lastObdDeviceName, forKey: "lastObdDeviceName")
         defaults.set(prefs.lastObdTransportType, forKey: "lastObdTransportType")
+        defaults.set(prefs.autoConnectEnabled, forKey: "autoConnectEnabled")
+        if let seen = prefs.lastObdDeviceSeenAt {
+            defaults.set(seen.timeIntervalSince1970, forKey: "lastObdDeviceSeenAt")
+        } else {
+            defaults.removeObject(forKey: "lastObdDeviceSeenAt")
+        }
         defaults.set(prefs.themeMode.rawValue, forKey: "themeMode")
         defaults.set(prefs.dynamicColor, forKey: "dynamicColor")
         setFloatOrNil(prefs.estimatedSohPercent, forKey: "estimatedSohPercent", in: defaults)

@@ -86,6 +86,13 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
     private var lastIdentifier: UUID?
 
     private var centralManager: CBCentralManager!
+
+    /// The launch-time manager owner, when one was injected. Its manager is reused
+    /// rather than creating a second one, so the open link is the same one iOS
+    /// restores after this process was terminated. Optional so the transport still
+    /// works standalone (package tests, replay).
+    private weak var host: BlePresenceHost?
+
     private var peripheral: CBPeripheral?
     private var writeCharacteristic: CBCharacteristic?
     private var notifyCharacteristic: CBCharacteristic?
@@ -119,9 +126,13 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
 
     // MARK: - Init
 
-    public override init() {
+    /// - Parameter host: the process-wide `BlePresenceHost`. When supplied, its
+    ///   central manager is reused and its delegate routes here while a session is
+    ///   live, which is what makes a link restored after termination adoptable.
+    public init(host: BlePresenceHost? = nil) {
+        self.host = host
         super.init()
-        centralManager = CBCentralManager(delegate: self, queue: queue)
+        centralManager = host?.central ?? CBCentralManager(delegate: self, queue: queue)
     }
 
     deinit {
@@ -137,6 +148,9 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
 
     public func connect(device: ObdDevice) async throws {
         await disconnect()
+        // From here until `disconnect()`, the host's manager must report to this
+        // transport rather than trying to build a session of its own.
+        host?.forward(to: self)
         setState(.connecting)
 
         do {
@@ -192,7 +206,9 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
     /// restores the GATT layer and reports the state change.
     public func beginStandingReconnect() -> Bool {
         guard centralManager.state == .poweredOn else { return false }
-        guard let identifier = lock.withLock({ lastIdentifier }),
+        // A fresh transport (rebuilt after the app was relaunched) has no
+        // `lastIdentifier` yet; the host still remembers what it is holding.
+        guard let identifier = lock.withLock({ lastIdentifier }) ?? host?.armed,
               let target = centralManager.retrievePeripherals(withIdentifiers: [identifier]).first
         else { return false }
 
@@ -208,7 +224,44 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
             responseBuffer = ""
         }
         setState(.connecting)
-        centralManager.connect(target, options: nil)
+        if let host {
+            // Arm through the host so the request outlives this process: the host
+            // is the delegate that gets `willRestoreState` after a relaunch.
+            host.forward(to: self)
+            host.arm(identifier: identifier)
+        } else {
+            centralManager.connect(target, options: nil)
+        }
+        return true
+    }
+
+    /// Takes over a GATT link that completed without this transport asking for it:
+    /// a standing request that finished while the app was suspended, or a link iOS
+    /// restored after terminating and relaunching the app.
+    ///
+    /// The link is only the radio half of a session — `ObdManager` still has to
+    /// redo the ELM327 handshake — so this drives discovery and reports
+    /// `.connected` through the same standing-reconnect path as a recovered drop.
+    ///
+    /// - Returns: false when the peripheral is not actually connected any more.
+    public func adoptRestoredLink(_ link: BlePresenceHost.AdapterLink) -> Bool {
+        guard link.peripheral.state == .connected else { return false }
+
+        host?.forward(to: self)
+        link.peripheral.delegate = self
+        lock.withLock {
+            standingReconnect = true
+            standingPeripheral = link.peripheral
+            peripheral = link.peripheral
+            lastIdentifier = link.identifier
+            writeCharacteristic = nil
+            notifyCharacteristic = nil
+            selectedServiceIsKnown = false
+            pendingServiceCount = 0
+            responseBuffer = ""
+        }
+        setState(.connecting)
+        link.peripheral.discoverServices(nil)
         return true
     }
 
@@ -244,6 +297,11 @@ public final class BleTransport: NSObject, ObdTransport, @unchecked Sendable {
 
     public func disconnect() async {
         cancelStandingReconnect()
+        // Clear the host's intent too: a request it is still holding would be
+        // reissued from `didDisconnectPeripheral` and resurrect a session that is
+        // being torn down on purpose.
+        host?.stopForwarding()
+        host?.disarm()
         let (target, stage, send) = lock.withLock { () -> (CBPeripheral?, CheckedContinuation<Void, any Error>?, CheckedContinuation<String, any Error>?) in
             let p = peripheral
             let st = pendingStage

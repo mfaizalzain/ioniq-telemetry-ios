@@ -68,3 +68,36 @@ struct PreferencesRepositoryTests {
         #expect(withKey.chargerSourceOrDefault == .googlePlaces)
     }
 }
+
+/// Auto-connect is on by default: it is the behaviour that shipped, so an upgrade
+/// must not silently turn it off for users who never open Settings.
+@Suite("PreferencesRepository auto-connect persistence", .serialized)
+struct AutoConnectPreferenceTests {
+
+    private let keys = ["autoConnectEnabled", "lastObdDeviceSeenAt"]
+
+    @Test("auto-connect defaults to on and survives a save")
+    func defaultsOnAndRoundTrips() async {
+        for key in keys { UserDefaults.standard.removeObject(forKey: key) }
+
+        let fresh = PreferencesRepositoryImpl()
+        #expect(fresh.currentPreferences.autoConnectEnabled)
+        #expect(fresh.currentPreferences.lastObdDeviceSeenAt == nil)
+
+        let seen = Date(timeIntervalSince1970: 1_800_000_000)
+        await fresh.update { prefs in
+            var next = prefs
+            next.autoConnectEnabled = false
+            next.lastObdDeviceSeenAt = seen
+            return next
+        }
+
+        let reloaded = PreferencesRepositoryImpl()
+        #expect(!reloaded.currentPreferences.autoConnectEnabled)
+        #expect(reloaded.currentPreferences.lastObdDeviceSeenAt == seen)
+
+        // Leave no footprint: the next test in the suite starts from defaults.
+        for key in keys { UserDefaults.standard.removeObject(forKey: key) }
+        #expect(PreferencesRepositoryImpl().currentPreferences.autoConnectEnabled)
+    }
+}

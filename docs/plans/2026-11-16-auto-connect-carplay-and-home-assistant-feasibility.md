@@ -49,6 +49,12 @@ templates, and no network export path.
 
 ## 1. Auto-connect without opening the app
 
+> **Implemented 2026-11-19** — `BlePresenceHost` (launch-time central manager,
+> `willRestoreState`, standing arming), `BleTransport.adoptRestoredLink`,
+> `ObdManager.adoptRestoredLink`, the `autoConnectEnabled` preference with its
+> Settings switch, and the supervisor stand-down while a request is parked. The
+> sketch below is the design it was built from, kept as written.
+
 ### The iOS mechanism is different from Android's, and simpler
 
 Android needs a wake-up exemption (CDM presence, notification, boot) because a foreground service may

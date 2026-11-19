@@ -228,7 +228,10 @@ final class ConnectedCarService {
               // CoreBluetooth is already holding an untimed connect for this
               // adapter. Reconnecting here would cancel the one mechanism that
               // survives the app being suspended.
-              !services.obdManager.isRecoveringLink else { return }
+              !services.obdManager.isRecoveringLink,
+              // Same reason, one layer up: the presence host has a request parked
+              // with iOS. Scanning here would fight it and drain the phone.
+              !services.isHoldingAutoConnectRequest else { return }
 
         switch connectionState {
         case .connected where quietFor >= Self.sessionDead:

@@ -95,6 +95,14 @@ public struct UserPreferences: Sendable {
     public var lastObdDeviceAddress: String?
     public var lastObdDeviceName: String?
     public var lastObdTransportType: String?
+    /// Unattended auto-connect: open a session when the saved adapter appears,
+    /// without the user opening the app. On by default, because it is the behaviour
+    /// the app already had at launch — the switch exists so it can be turned *off*.
+    public var autoConnectEnabled: Bool
+    /// When the saved adapter was last successfully connected. Shown in Settings so
+    /// a stale saved address (adapter replaced, firmware reset) is visible instead of
+    /// an auto-connect that mysteriously never fires.
+    public var lastObdDeviceSeenAt: Date?
     public var themeMode: ThemeMode
     /// Material You wallpaper-based color (Android 12+); ignored on older devices.
     public var dynamicColor: Bool
@@ -163,6 +171,8 @@ public struct UserPreferences: Sendable {
         lastObdDeviceAddress: String? = nil,
         lastObdDeviceName: String? = nil,
         lastObdTransportType: String? = nil,
+        autoConnectEnabled: Bool = true,
+        lastObdDeviceSeenAt: Date? = nil,
         themeMode: ThemeMode = .dark,
         dynamicColor: Bool = true,
         estimatedSohPercent: Float? = nil,
@@ -200,6 +210,8 @@ public struct UserPreferences: Sendable {
         self.lastObdDeviceAddress = lastObdDeviceAddress
         self.lastObdDeviceName = lastObdDeviceName
         self.lastObdTransportType = lastObdTransportType
+        self.autoConnectEnabled = autoConnectEnabled
+        self.lastObdDeviceSeenAt = lastObdDeviceSeenAt
         self.themeMode = themeMode
         self.dynamicColor = dynamicColor
         self.estimatedSohPercent = estimatedSohPercent

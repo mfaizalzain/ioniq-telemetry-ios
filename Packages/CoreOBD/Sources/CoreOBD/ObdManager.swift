@@ -36,6 +36,10 @@ public final class ObdManager {
     private var scheduler: PollingScheduler?
     private var stateWatchTask: Task<Void, Never>?
     private let transportFactory: TransportFactory
+    /// How long a restored link is given to complete the handshake before the
+    /// adoption is abandoned. Bounded because the caller may be a background
+    /// relaunch with a short execution budget.
+    private static let restorationTimeout: TimeInterval = 20
     /// Set while the transport is holding a standing reconnect, so a `.connected`
     /// from the state stream is understood as "link restored, rebuild the session"
     /// rather than the replay of a state this manager already handled.
@@ -128,9 +132,80 @@ public final class ObdManager {
         // late. The stream replays the current state on subscription, so a transport
         // that dropped between `connect` returning and this task starting is still
         // caught.
-        let states = t.stateStream
+        installStateWatch(t)
+
+        let profile = activeProfile
+        let s = newScheduler(transport: t, profile: profile)
+        scheduler = s
+        s.start(requests: profile.requests)
+
+        return .success(())
+    }
+
+    /// Adopts a GATT link that iOS restored while this process was not running and
+    /// rebuilds the session on top of it: ELM327 handshake first, because a
+    /// power-cycled adapter is back at its factory defaults, then polling.
+    ///
+    /// Called from `AppServices` when the presence host hands over a link — the
+    /// "phone in a pocket, car switched on" case that auto-connect exists for.
+    /// - Returns: `.success` once the session is live, i.e. after the handshake.
+    public func adoptRestoredLink(_ link: BlePresenceHost.AdapterLink) async -> Result<Void, Error> {
+        await disconnect()
+
+        let t: any ObdTransport
+        do {
+            // Same factory the user-facing connect path uses, addressed by the
+            // peripheral identifier, so a WiFi adapter can never land here.
+            t = try await transportFactory(link.identifier.uuidString)
+        } catch {
+            updateConnectionState(.error)
+            return .failure(error)
+        }
+        guard let ble = t as? BleTransport else {
+            return .failure(BleTransport.BleError.deviceNotFound)
+        }
+
+        transport = t
+        // Set before the link is adopted: `.connected` arrives from the transport's
+        // own queue once discovery finishes, and the watch task has to already know
+        // this link is a restoration rather than a fresh connect.
+        awaitingStandingReconnect = true
+
+        guard ble.adoptRestoredLink(link) else {
+            awaitingStandingReconnect = false
+            await disconnect()
+            return .failure(BleTransport.BleError.disconnected)
+        }
+        updateConnectionState(.connecting)
+        // Subscribed *after* adoption, never before: the stream replays the current
+        // state on subscription, and doing it the other way round replays
+        // `.disconnected` from the brand-new transport — which the watch task reads
+        // as a dropped session and exits on, leaving the adopted link unwatched.
+        installStateWatch(t)
+
+        let deadline = Date().addingTimeInterval(Self.restorationTimeout)
+        while Date() < deadline {
+            switch connectionState {
+            case .connected:
+                return .success(())
+            case .error:
+                await disconnect()
+                return .failure(BleTransport.BleError.connectFailed("The restored link did not answer."))
+            default:
+                try? await Task.sleep(nanoseconds: 200_000_000)
+            }
+        }
+        await disconnect()
+        return .failure(BleTransport.BleError.connectFailed("Timed out rebuilding the restored session."))
+    }
+
+    /// Watches the transport's state stream and drives the drop/recovery state
+    /// machine. Pulled out of `connect` so a restored link follows the identical
+    /// path instead of a second, subtly different one.
+    private func installStateWatch(_ t: any ObdTransport) {
+        stateWatchTask?.cancel()
         stateWatchTask = Task { [weak self] in
-            for await st in states {
+            for await st in t.stateStream {
                 guard !Task.isCancelled else { return }
                 guard let self else { return }
                 switch st {
@@ -145,13 +220,6 @@ public final class ObdManager {
                 }
             }
         }
-
-        let profile = activeProfile
-        let s = newScheduler(transport: t, profile: profile)
-        scheduler = s
-        s.start(requests: profile.requests)
-
-        return .success(())
     }
 
     private func newScheduler(transport: any ObdTransport, profile: DecoderProfile) -> PollingScheduler {

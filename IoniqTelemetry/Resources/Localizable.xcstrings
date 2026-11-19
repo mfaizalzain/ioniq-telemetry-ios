@@ -103,6 +103,40 @@
         }
       }
     },
+    "Auto-connect": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-connect"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动连接"
+          }
+        }
+      }
+    },
+    "Auto-connect opens a session when %@ is in range, so drives are logged without opening the app. It stops working if you force-quit the app — iOS will not relaunch it.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto-connect opens a session when %@ is in range, so drives are logged without opening the app. It stops working if you force-quit the app — iOS will not relaunch it."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当 %@ 在范围内时，自动连接会开启会话，无需打开应用即可记录行程。如果你强制退出应用，此功能将停止工作——iOS 不会重新启动应用。"
+          }
+        }
+      }
+    },
     "Avoid this charger — re-route": {
       "extractionState": "manual",
       "localizations": {
@@ -596,6 +630,23 @@
         }
       }
     },
+    "Last connected %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last connected %@"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次连接：%@"
+          }
+        }
+      }
+    },
     "Light": {
       "extractionState": "manual",
       "localizations": {
@@ -1068,6 +1119,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "WiFi 适配器"
+          }
+        }
+      }
+    },
+    "WiFi adapters cannot be woken automatically — open the app and reconnect to start a session.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WiFi adapters cannot be woken automatically — open the app and reconnect to start a session."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "WiFi 适配器无法被自动唤醒——请打开应用并重新连接以开始会话。"
           }
         }
       }
